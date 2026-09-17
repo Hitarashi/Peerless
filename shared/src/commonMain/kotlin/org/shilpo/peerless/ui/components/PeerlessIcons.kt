@@ -442,4 +442,272 @@ object PeerlessIcons {
             }
         }.build()
     }
+
+    val Home: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Home",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.White)) {
+                moveTo(10f, 20f)
+                verticalLineTo(14f)
+                horizontalLineTo(14f)
+                verticalLineTo(20f)
+                horizontalLineTo(19f)
+                verticalLineTo(12f)
+                horizontalLineTo(22f)
+                lineTo(12f, 3f)
+                lineTo(2f, 12f)
+                horizontalLineTo(5f)
+                verticalLineTo(20f)
+                horizontalLineTo(10f)
+                close()
+            }
+        }.build()
+    }
+
+    val Library: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Library",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.White)) {
+                moveTo(20f, 2f)
+                horizontalLineTo(8f)
+                curveTo(6.9f, 2f, 6f, 2.9f, 6f, 4f)
+                verticalLineTo(16f)
+                curveTo(6f, 17.1f, 6.9f, 18f, 8f, 18f)
+                horizontalLineTo(20f)
+                curveTo(21.1f, 18f, 22f, 17.1f, 22f, 16f)
+                verticalLineTo(4f)
+                curveTo(22f, 2.9f, 21.1f, 2f, 20f, 2f)
+                close()
+                moveTo(18f, 7f)
+                horizontalLineTo(14f)
+                verticalLineTo(12.55f)
+                curveTo(13.56f, 12.21f, 13.01f, 12f, 12.4f, 12f)
+                curveTo(10.74f, 12f, 9.4f, 13.34f, 9.4f, 15f)
+                curveTo(9.4f, 16.66f, 10.74f, 18f, 12.4f, 18f)
+                curveTo(14.06f, 18f, 15.4f, 16.66f, 15.4f, 15f)
+                verticalLineTo(9f)
+                horizontalLineTo(18f)
+                verticalLineTo(7f)
+                close()
+                moveTo(2f, 6f)
+                verticalLineTo(20f)
+                curveTo(2f, 21.1f, 2.9f, 22f, 4f, 22f)
+                horizontalLineTo(18f)
+                verticalLineTo(20f)
+                horizontalLineTo(4f)
+                verticalLineTo(6f)
+                horizontalLineTo(2f)
+                close()
+            }
+        }.build()
+    }
+
+    val Queue: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Queue",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.White)) {
+                moveTo(15f, 6f)
+                horizontalLineTo(3f)
+                verticalLineTo(8f)
+                horizontalLineTo(15f)
+                verticalLineTo(6f)
+                close()
+                moveTo(15f, 10f)
+                horizontalLineTo(3f)
+                verticalLineTo(12f)
+                horizontalLineTo(15f)
+                verticalLineTo(10f)
+                close()
+                moveTo(11f, 14f)
+                horizontalLineTo(3f)
+                verticalLineTo(16f)
+                horizontalLineTo(11f)
+                verticalLineTo(14f)
+                close()
+                moveTo(19f, 6f)
+                verticalLineTo(12.18f)
+                curveTo(18.53f, 12.07f, 18.04f, 12f, 17.5f, 12f)
+                curveTo(15.01f, 12f, 13f, 14.01f, 13f, 16.5f)
+                curveTo(13f, 18.99f, 15.01f, 21f, 17.5f, 21f)
+                curveTo(19.99f, 21f, 22f, 18.99f, 22f, 16.5f)
+                verticalLineTo(8f)
+                horizontalLineTo(24f)
+                verticalLineTo(6f)
+                horizontalLineTo(19f)
+                close()
+            }
+        }.build()
+    }
+
+    val Lyrics: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Lyrics",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.White)) {
+                moveTo(20f, 4f)
+                horizontalLineTo(4f)
+                curveTo(2.9f, 4f, 2f, 4.9f, 2f, 6f)
+                verticalLineTo(18f)
+                curveTo(2f, 19.1f, 2.9f, 20f, 4f, 20f)
+                horizontalLineTo(20f)
+                curveTo(21.1f, 20f, 22f, 19.1f, 22f, 18f)
+                verticalLineTo(6f)
+                curveTo(22f, 4.9f, 21.1f, 4f, 20f, 4f)
+                close()
+                moveTo(18f, 9f)
+                horizontalLineTo(6f)
+                verticalLineTo(7f)
+                horizontalLineTo(18f)
+                verticalLineTo(9f)
+                close()
+                moveTo(15f, 13f)
+                horizontalLineTo(6f)
+                verticalLineTo(11f)
+                horizontalLineTo(15f)
+                verticalLineTo(13f)
+                close()
+                moveTo(12f, 17f)
+                horizontalLineTo(6f)
+                verticalLineTo(15f)
+                horizontalLineTo(12f)
+                verticalLineTo(17f)
+                close()
+            }
+        }.build()
+    }
+
+    val SignalPath: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "SignalPath",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.White)) {
+                moveTo(3f, 17f)
+                verticalLineTo(19f)
+                horizontalLineTo(9f)
+                verticalLineTo(17f)
+                horizontalLineTo(3f)
+                close()
+                moveTo(3f, 5f)
+                verticalLineTo(7f)
+                horizontalLineTo(13f)
+                verticalLineTo(5f)
+                horizontalLineTo(3f)
+                close()
+                moveTo(13f, 21f)
+                verticalLineTo(19f)
+                horizontalLineTo(21f)
+                verticalLineTo(17f)
+                horizontalLineTo(13f)
+                verticalLineTo(15f)
+                horizontalLineTo(11f)
+                verticalLineTo(21f)
+                horizontalLineTo(13f)
+                close()
+                moveTo(7f, 9f)
+                verticalLineTo(11f)
+                horizontalLineTo(3f)
+                verticalLineTo(13f)
+                horizontalLineTo(7f)
+                verticalLineTo(15f)
+                horizontalLineTo(9f)
+                verticalLineTo(9f)
+                horizontalLineTo(7f)
+                close()
+                moveTo(21f, 13f)
+                verticalLineTo(11f)
+                horizontalLineTo(11f)
+                verticalLineTo(13f)
+                horizontalLineTo(21f)
+                close()
+                moveTo(17f, 9f)
+                horizontalLineTo(19f)
+                verticalLineTo(7f)
+                horizontalLineTo(21f)
+                verticalLineTo(5f)
+                horizontalLineTo(19f)
+                verticalLineTo(3f)
+                horizontalLineTo(17f)
+                verticalLineTo(9f)
+                close()
+            }
+        }.build()
+    }
+
+    val VolumeUp: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "VolumeUp",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.White)) {
+                moveTo(3f, 9f)
+                verticalLineTo(15f)
+                horizontalLineTo(7f)
+                lineTo(12f, 20f)
+                verticalLineTo(4f)
+                lineTo(7f, 9f)
+                horizontalLineTo(3f)
+                close()
+                moveTo(16.5f, 12f)
+                curveTo(16.5f, 10.23f, 15.48f, 8.71f, 14f, 7.97f)
+                verticalLineTo(16.02f)
+                curveTo(15.48f, 15.29f, 16.5f, 13.77f, 16.5f, 12f)
+                close()
+                moveTo(14f, 3.23f)
+                verticalLineTo(5.29f)
+                curveTo(16.89f, 6.15f, 19f, 8.83f, 19f, 12f)
+                curveTo(19f, 15.17f, 16.89f, 17.85f, 14f, 18.71f)
+                verticalLineTo(20.77f)
+                curveTo(18.01f, 19.86f, 21f, 16.28f, 21f, 12f)
+                curveTo(21f, 7.72f, 18.01f, 4.14f, 14f, 3.23f)
+                close()
+            }
+        }.build()
+    }
+
+    val VolumeMute: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "VolumeMute",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.White)) {
+                moveTo(7f, 9f)
+                verticalLineTo(15f)
+                horizontalLineTo(11f)
+                lineTo(16f, 20f)
+                verticalLineTo(4f)
+                lineTo(11f, 9f)
+                horizontalLineTo(7f)
+                close()
+            }
+        }.build()
+    }
 }

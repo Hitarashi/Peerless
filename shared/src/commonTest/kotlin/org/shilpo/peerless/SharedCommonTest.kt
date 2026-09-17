@@ -294,6 +294,7 @@ class SharedCommonTest {
         val fakeEngine = FakeAudioEngine()
         val client = PeerlessApiClient("http://localhost:4444")
         val coordinator = PlaybackCoordinator(apiClient = client, audioEngine = fakeEngine)
+        coordinator.setDevMode(true)
 
         val track1 = TrackSummaryDto(
             id = 1,
