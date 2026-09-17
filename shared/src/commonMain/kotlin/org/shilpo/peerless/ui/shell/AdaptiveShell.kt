@@ -123,8 +123,21 @@ fun AdaptiveShell(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(BackgroundDark)
+                    .background(MaterialTheme.colorScheme.background)
             ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f),
+                                    MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.45f),
+                                    MaterialTheme.colorScheme.background
+                                )
+                            )
+                        )
+                )
                 val coroutineScope = rememberCoroutineScope()
                 val onRipClick: (TrackSummaryDto) -> Unit = { track ->
                     coroutineScope.launch {
@@ -363,8 +376,8 @@ fun FloatingNavDock(
     HorizontalFloatingToolbar(
         expanded = true,
         colors = FloatingToolbarDefaults.standardFloatingToolbarColors(
-            toolbarContainerColor = SurfaceContainerHighDark,
-            toolbarContentColor = OnSurfaceDark
+            toolbarContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            toolbarContentColor = MaterialTheme.colorScheme.onSurface
         ),
         shape = PillShape,
         modifier = modifier
@@ -373,9 +386,13 @@ fun FloatingNavDock(
     ) {
         NavigationDestination.PrimaryDestinations.forEach { dest ->
             val isSelected = dest == selectedDestination
-            val pillColor = if (isSelected) PrimaryDark.copy(alpha = 0.22f) else Color.Transparent
-            val iconTint = if (isSelected) PrimaryDark else OnSurfaceVariantDark.copy(alpha = 0.65f)
-            val borderColor = if (isSelected) PrimaryDark.copy(alpha = 0.40f) else Color.Transparent
+            val pillColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else Color.Transparent
+            val iconTint =
+                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                    alpha = 0.65f
+                )
+            val borderColor =
+                if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.40f) else Color.Transparent
 
             Box(
                 modifier = Modifier
@@ -410,7 +427,7 @@ fun FloatingNavDock(
                             text = dest.title,
                             style = ExpressiveTypography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = PrimaryDark
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }

@@ -13,8 +13,10 @@ kotlinx-serialization = "1.11.0"
 ktor = "3.6.0"
 coil3 = "3.6.2"
 androidx-media3 = "1.11.1"
+materialkolor = "5.0.1"
 
 [libraries]
+materialkolor = { module = "com.materialkolor:material-kolor", version.ref = "materialkolor" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
 compose-uiTooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "composeMultiplatform" }

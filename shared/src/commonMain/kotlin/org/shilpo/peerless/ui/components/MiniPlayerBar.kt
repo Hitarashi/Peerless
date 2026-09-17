@@ -30,7 +30,8 @@ import coil3.compose.AsyncImage
 import org.shilpo.peerless.model.PlaybackInfo
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.player.PlaybackStatus
-import org.shilpo.peerless.theme.*
+import org.shilpo.peerless.theme.ExpressiveTypography
+import org.shilpo.peerless.theme.PillShape
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -64,14 +65,14 @@ fun MiniPlayerBar(
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 4.dp)
             .clip(PillShape)
-            .background(SurfaceContainerDark.copy(alpha = 0.95f))
+            .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.95f))
             .border(
                 1.dp,
                 Brush.horizontalGradient(
                     listOf(
-                        PrimaryDark.copy(alpha = 0.35f),
-                        OutlineVariantDark.copy(alpha = 0.7f),
-                        SecondaryDark.copy(alpha = 0.25f)
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f)
                     )
                 ),
                 PillShape
@@ -85,7 +86,7 @@ fun MiniPlayerBar(
                     .fillMaxWidth()
                     .height(3.dp)
                     .align(Alignment.TopCenter),
-                color = SecondaryDark,
+                color = MaterialTheme.colorScheme.secondary,
                 trackColor = Color(0x14FFFFFF)
             )
         } else {
@@ -95,7 +96,7 @@ fun MiniPlayerBar(
                     .fillMaxWidth()
                     .height(3.dp)
                     .align(Alignment.TopCenter),
-                color = PrimaryDark,
+                color = MaterialTheme.colorScheme.primary,
                 trackColor = Color(0x14FFFFFF)
             )
         }
@@ -111,10 +112,10 @@ fun MiniPlayerBar(
                 modifier = Modifier
                     .size(46.dp)
                     .clip(CircleShape)
-                    .background(SurfaceContainerHighestDark)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                     .border(
                         1.5.dp,
-                        if (isPlaying) PrimaryDark.copy(alpha = 0.5f) else OutlineVariantDark,
+                        if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant,
                         CircleShape
                     ),
                 contentAlignment = Alignment.Center
@@ -122,7 +123,7 @@ fun MiniPlayerBar(
                 Icon(
                     imageVector = PeerlessIcons.MusicNote,
                     contentDescription = null,
-                    tint = OnSurfaceVariantDark.copy(alpha = 0.4f),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                     modifier = Modifier.size(20.dp)
                 )
 
@@ -142,7 +143,7 @@ fun MiniPlayerBar(
                     ) {
                         AnimatedEqualizer(
                             isPlaying = true,
-                            color = PrimaryDark,
+                            color = MaterialTheme.colorScheme.primary,
                             barWidth = 2.5.dp,
                             maxHeight = 13.dp
                         )
@@ -161,7 +162,7 @@ fun MiniPlayerBar(
                     text = track.title,
                     style = ExpressiveTypography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = OnSurfaceDark,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -173,7 +174,7 @@ fun MiniPlayerBar(
                     Text(
                         text = track.artist,
                         style = ExpressiveTypography.bodySmall,
-                        color = OnSurfaceVariantDark,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
@@ -201,7 +202,7 @@ fun MiniPlayerBar(
                         .scale(buttonScale)
                         .size(42.dp)
                         .clip(CircleShape)
-                        .background(PrimaryDark)
+                        .background(MaterialTheme.colorScheme.primary)
                         .clickable(
                             interactionSource = playButtonInteractionSource,
                             indication = ripple(bounded = false, radius = 21.dp),
@@ -217,7 +218,7 @@ fun MiniPlayerBar(
                         Icon(
                             imageVector = if (playing) PeerlessIcons.Pause else PeerlessIcons.Play,
                             contentDescription = if (playing) "Pause" else "Play",
-                            tint = OnPrimaryDark,
+                            tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -231,7 +232,7 @@ fun MiniPlayerBar(
                     Icon(
                         imageVector = PeerlessIcons.SkipNext,
                         contentDescription = "Next Track",
-                        tint = OnSurfaceDark,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(22.dp)
                     )
                 }

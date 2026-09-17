@@ -10,8 +10,11 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.materialkolor.DynamicMaterialExpressiveTheme
+import com.materialkolor.PaletteStyle
 
 /**
  * Window size class breakpoints aligning with Google Large Screen Guidelines:
@@ -98,6 +101,7 @@ val ExpressiveDarkColorScheme = darkColorScheme(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ExpressiveTheme(
+    seedColor: Color? = null,
     windowSizeClass: WindowWidthSizeClass = WindowWidthSizeClass.COMPACT,
     darkTheme: Boolean = true,
     content: @Composable () -> Unit
@@ -105,12 +109,22 @@ fun ExpressiveTheme(
     CompositionLocalProvider(
         LocalWindowWidthSizeClass provides windowSizeClass
     ) {
-        MaterialExpressiveTheme(
-            colorScheme = ExpressiveDarkColorScheme,
-            motionScheme = MotionScheme.expressive(),
-            typography = ExpressiveTypography,
-            shapes = ExpressiveShapes,
-            content = content
-        )
+        if (seedColor != null) {
+            DynamicMaterialExpressiveTheme(
+                seedColor = seedColor,
+                isDark = darkTheme,
+                style = PaletteStyle.Expressive,
+                animate = true,
+                content = content
+            )
+        } else {
+            MaterialExpressiveTheme(
+                colorScheme = ExpressiveDarkColorScheme,
+                motionScheme = MotionScheme.expressive(),
+                typography = ExpressiveTypography,
+                shapes = ExpressiveShapes,
+                content = content
+            )
+        }
     }
 }

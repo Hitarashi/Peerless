@@ -66,6 +66,7 @@ kotlin {
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.coil3.compose)
             implementation(libs.coil3.network.ktor3)
+            implementation(libs.materialkolor)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
