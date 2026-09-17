@@ -3,19 +3,16 @@ package org.shilpo.peerless
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import org.shilpo.peerless.model.ExchangeResponse
-import org.shilpo.peerless.model.PlaybackInfo
-import org.shilpo.peerless.model.SearchResponse
-import org.shilpo.peerless.model.TrackSummaryDto
+import org.shilpo.peerless.auth.InMemoryTokenStorage
+import org.shilpo.peerless.model.*
 import org.shilpo.peerless.network.PeerlessApiClient
 import org.shilpo.peerless.player.AudioEngine
 import org.shilpo.peerless.player.AudioEngineState
 import org.shilpo.peerless.player.PlaybackCoordinator
 import org.shilpo.peerless.player.PlaybackStatus
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class FakeAudioEngine : AudioEngine {
     val _state = MutableStateFlow(AudioEngineState())
@@ -88,6 +85,92 @@ class SharedCommonTest {
     }
 
     @Test
+    fun testCanonicalTrackMultiSourceResolution() {
+        val appleSource = TrackSource(
+            id = 10,
+            provider = Provider.Apple,
+            providerTrackId = "apple_100",
+            codec = Codec.Alac,
+            bitDepth = 24,
+            sampleRate = 48000,
+            isCached = false
+        )
+        val qobuzSource = TrackSource(
+            id = 20,
+            provider = Provider.Qobuz,
+            providerTrackId = "qobuz_200",
+            codec = Codec.Flac,
+            bitDepth = 24,
+            sampleRate = 192000,
+            isCached = true
+        )
+
+        val track = CanonicalTrack(
+            id = "canonical_work_1",
+            title = "Midnight City",
+            artist = "M83",
+            album = "Hurry Up, We're Dreaming",
+            durationSeconds = 244,
+            sources = listOf(appleSource, qobuzSource)
+        )
+
+        assertTrue(track.isCached)
+        // Best source should resolve to cached Qobuz 24-bit/192kHz stream
+        val best = track.bestSource
+        assertNotNull(best)
+        assertEquals(Provider.Qobuz, best.provider)
+        assertEquals(192000, best.sampleRate)
+        assertTrue(best.isCached)
+    }
+
+    @Test
+    fun testPowerampStyleAudioSpecsBadge() {
+        val alacSpecs = AudioSpecs(
+            codec = Codec.Alac,
+            bitDepth = 24,
+            sampleRate = 44100,
+            bitrateKbps = 1671
+        )
+        assertEquals("24 BIT  44.1 KHZ  1671 KBPS  ALAC", alacSpecs.badgeText)
+        assertTrue(alacSpecs.isHiRes)
+
+        val hiResFlacSpecs = AudioSpecs(
+            codec = Codec.Flac,
+            bitDepth = 24,
+            sampleRate = 192000,
+            bitrateKbps = null
+        )
+        assertEquals("24 BIT  192 KHZ  FLAC", hiResFlacSpecs.badgeText)
+        assertTrue(hiResFlacSpecs.isHiRes)
+
+        val standardAac = AudioSpecs(
+            codec = Codec.Aac,
+            bitDepth = 16,
+            sampleRate = 44100,
+            bitrateKbps = 256
+        )
+        assertEquals("16 BIT  44.1 KHZ  256 KBPS  AAC", standardAac.badgeText)
+        assertFalse(standardAac.isHiRes)
+    }
+
+    @Test
+    fun testInMemoryTokenStorageFlow() = runTest {
+        val storage = InMemoryTokenStorage()
+        assertNull(storage.getToken())
+        assertNull(storage.tokenFlow.value)
+
+        val testToken = "256bit_opaque_csprng_random_test_token"
+        storage.saveToken(testToken)
+
+        assertEquals(testToken, storage.getToken())
+        assertEquals(testToken, storage.tokenFlow.value)
+
+        storage.clearToken()
+        assertNull(storage.getToken())
+        assertNull(storage.tokenFlow.value)
+    }
+
+    @Test
     fun testSearchResponseSerialization() {
         val sampleJson = """
             {
@@ -125,24 +208,39 @@ class SharedCommonTest {
     }
 
     @Test
-    fun testPlaybackInfoSerialization() {
+    fun testAlbumSummaryDtoSerialization() {
         val sampleJson = """
             {
-                "stream_url": "/api/v1/stream?ticket=abc",
-                "expires_in": 7200,
-                "mime_type": "audio/mp4",
-                "codec": "alac",
-                "duration": 231,
-                "bit_depth": 24,
-                "sample_rate": 44100,
-                "file_size": 48920110
+                "album": "Random Access Memories",
+                "artist": "Daft Punk"
             }
         """.trimIndent()
 
-        val info = json.decodeFromString<PlaybackInfo>(sampleJson)
-        assertEquals("/api/v1/stream?ticket=abc", info.stream_url)
-        assertEquals(7200L, info.expires_in)
-        assertEquals(48920110L, info.file_size)
+        val album = json.decodeFromString<AlbumSummaryDto>(sampleJson)
+        assertEquals("Random Access Memories", album.album)
+        assertEquals("Daft Punk", album.artist)
+    }
+
+    @Test
+    fun testRipTaskDtoSerialization() {
+        val reqJson = """{"task_id":"task_789","status":"queued"}"""
+        val resp = json.decodeFromString<RipTaskResponse>(reqJson)
+        assertEquals("task_789", resp.task_id)
+        assertEquals("queued", resp.status)
+
+        val eventJson = """
+            {
+                "task_id": "task_789",
+                "status": "tagging",
+                "progress_percent": 65.5,
+                "message": "Writing FLAC metadata tags",
+                "track_id": 42
+            }
+        """.trimIndent()
+        val event = json.decodeFromString<TaskProgressEvent>(eventJson)
+        assertEquals("tagging", event.status)
+        assertEquals(65.5f, event.progress_percent)
+        assertEquals(42, event.track_id)
     }
 
     @Test
@@ -175,10 +273,12 @@ class SharedCommonTest {
         val client = PeerlessApiClient("http://localhost:4444")
         assertEquals("http://localhost:4444", client.baseUrl)
 
-        val directUrl = client.getStreamUrl(42)
+        // In Dev mode: direct track_id stream URL
+        val directUrl = client.resolveStreamUrl(42)
         assertEquals("http://localhost:4444/api/v1/stream?track_id=42", directUrl)
 
-        val ticketUrl = client.getStreamUrl(42, "xyz_ticket")
+        // In Prod mode with ticket: signed ticket URL
+        val ticketUrl = client.resolveStreamUrl(42, "xyz_ticket")
         assertEquals("http://localhost:4444/api/v1/stream?ticket=xyz_ticket", ticketUrl)
 
         val artworkUrl = client.getArtworkUrl(42, 300)
@@ -186,7 +286,7 @@ class SharedCommonTest {
 
         client.baseUrl = "https://music.example.com/"
         assertEquals("https://music.example.com", client.baseUrl)
-        assertEquals("https://music.example.com/api/v1/stream?track_id=42", client.getStreamUrl(42))
+        assertEquals("https://music.example.com/api/v1/stream?track_id=42", client.resolveStreamUrl(42))
     }
 
     @Test
