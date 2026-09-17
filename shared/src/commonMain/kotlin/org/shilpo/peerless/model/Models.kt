@@ -1,6 +1,15 @@
 package org.shilpo.peerless.model
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 
 // ============================================================================
 // 1. Core Domain Enums & Entities (Single Source of Truth / TMDB Architecture)
@@ -40,6 +49,17 @@ enum class Codec(val raw: String, val displayName: String) {
     }
 }
 
+@Serializable
+enum class SearchFilter(val label: String, val providerQuery: String? = null) {
+    ALL("All"),
+    TRACKS("Tracks"),
+    ALBUMS("Albums"),
+    ARTISTS("Artists"),
+    APPLE_MUSIC("Apple Music", "apple"),
+    QOBUZ("Qobuz", "qobuz"),
+    CACHED("Cached")
+}
+
 /**
  * Technical audio specification encapsulation used for Poweramp-style badge rendering.
  */
@@ -57,6 +77,20 @@ data class AudioSpecs(
      * Compact uppercase badge text matching Poweramp audiophile styling:
      * e.g. "24 BIT  44.1 KHZ  1671 KBPS  ALAC" or "24 BIT  192 KHZ  FLAC"
      */
+    val effectiveBitrateKbps: Int?
+        get() {
+            if (bitrateKbps != null && bitrateKbps > 0) return bitrateKbps
+            if (bitDepth == null || sampleRate == null) return null
+            val pcmBitrate = (bitDepth * sampleRate * 2) / 1000
+            return when (codec) {
+                Codec.Alac -> if (bitDepth == 24 && sampleRate == 44100) 1671 else (pcmBitrate * 0.78).toInt()
+                Codec.Flac -> (pcmBitrate * 0.65).toInt()
+                Codec.Aac -> 256
+                Codec.Opus -> 128
+                Codec.Unknown -> (pcmBitrate * 0.70).toInt()
+            }
+        }
+
     val badgeText: String
         get() = buildString {
             if (bitDepth != null) append("${bitDepth} BIT  ")
@@ -70,6 +104,24 @@ data class AudioSpecs(
             }
             if (bitrateKbps != null && bitrateKbps > 0) {
                 append("${bitrateKbps} KBPS  ")
+            }
+            append(codec.displayName.uppercase())
+        }.trim()
+
+    val fullBadgeText: String
+        get() = buildString {
+            if (bitDepth != null) append("${bitDepth} BIT  ")
+            if (sampleRate != null) {
+                val khz = if (sampleRate % 1000 == 0) {
+                    "${sampleRate / 1000}"
+                } else {
+                    "${sampleRate / 1000.0}"
+                }
+                append("${khz} KHZ  ")
+            }
+            val kbps = effectiveBitrateKbps
+            if (kbps != null && kbps > 0) {
+                append("${kbps} KBPS  ")
             }
             append(codec.displayName.uppercase())
         }.trim()
@@ -147,7 +199,8 @@ data class TrackSummaryDto(
     val codec: String,
     val bit_depth: Int? = null,
     val sample_rate: Int? = null,
-    val is_cached: Boolean = true
+    val is_cached: Boolean = true,
+    val artwork_url: String? = null
 )
 
 @Serializable
@@ -260,11 +313,8 @@ data class RefreshResponse(
 @Serializable
 data class MeResponse(
     val user: UserDto,
-    val sessions: VecOrList<SessionDto> = emptyList()
+    val sessions: List<SessionDto> = emptyList()
 )
-
-// Type alias for compatibility
-typealias VecOrList<T> = List<T>
 
 // Library DTOs
 @Serializable
@@ -309,13 +359,78 @@ data class RipTaskResponse(
     val status: String
 )
 
+object StringOrIntSerializer : KSerializer<String> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("StringOrInt", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): String {
+        val jsonDecoder = decoder as? JsonDecoder
+        if (jsonDecoder != null) {
+            val element = jsonDecoder.decodeJsonElement()
+            if (element is JsonPrimitive && element !is JsonNull) {
+                return element.content
+            }
+            return element.toString()
+        }
+        return decoder.decodeString()
+    }
+
+    override fun serialize(encoder: Encoder, value: String) {
+        encoder.encodeString(value)
+    }
+}
+
 @Serializable
 data class TaskProgressEvent(
     val task_id: String,
-    val status: String,
-    val progress_percent: Float? = null,
-    val message: String? = null,
-    val track_id: Int? = null
+    val stage: String = "",
+    val percent: Float? = null,
+    val speed: String? = null,
+    @Serializable(with = StringOrIntSerializer::class)
+    val track_id: String? = null,
+    val is_cached: Boolean? = null,
+    val completed: Boolean = false,
+    val error: String? = null
+) {
+    val effectiveStage: String get() = stage.ifBlank { "queued" }
+    val effectivePercent: Float get() = percent ?: 0f
+    val isFinished: Boolean get() = completed || error != null || effectiveStage == "completed" || effectiveStage == "error" || effectiveStage == "failed"
+}
+
+@Serializable
+enum class RipStage(val displayName: String, val emoji: String) {
+    QUEUED("Queued", "⏳"),
+    DOWNLOADING("Downloading", "⬇️"),
+    DECRYPTING("Decrypting", "🔓"),
+    TAGGING("Tagging", "🏷️"),
+    UPLOADING("Uploading to Telegram", "☁️"),
+    COMPLETED("Ready to Stream", "✅"),
+    ERROR("Rip Failed", "❌");
+
+    companion object {
+        fun fromStage(stage: String): RipStage = when (stage.lowercase().trim()) {
+            "queued" -> QUEUED
+            "downloading" -> DOWNLOADING
+            "decrypting" -> DECRYPTING
+            "tagging" -> TAGGING
+            "uploading", "uploading_telegram", "uploading to telegram" -> UPLOADING
+            "completed" -> COMPLETED
+            "error", "failed" -> ERROR
+            else -> QUEUED
+        }
+    }
+}
+
+@Serializable
+data class ActiveRipTask(
+    val taskId: String,
+    val track: TrackSummaryDto,
+    val stage: RipStage = RipStage.QUEUED,
+    val percent: Float = 0f,
+    val speed: String? = null,
+    val completed: Boolean = false,
+    val error: String? = null,
+    val resultingTrackId: String? = null
 )
 
 // Lyrics DTOs
@@ -419,3 +534,166 @@ fun TrackDetailDto.toCanonicalTrack(baseUrl: String = ""): CanonicalTrack {
         sources = listOf(source)
     )
 }
+
+// ============================================================================
+// 4. Canonical Track Deduplication Utility
+// ============================================================================
+
+object CanonicalDeduplicator {
+    private fun normalize(str: String): String =
+        str.trim().lowercase().replace(Regex("\\s+"), " ")
+
+    private data class TrackMetadata(
+        var id: String,
+        val title: String,
+        val artist: String,
+        var album: String,
+        var durationSeconds: Int,
+        var artworkUrl: String? = null,
+        var isrc: String? = null
+    )
+
+    /**
+     * Merges cached tracks and live search results into unified CanonicalTrack items.
+     * If the same title & artist appear in both, their sources are aggregated into a single CanonicalTrack,
+     * prioritizing cached Telegram streams while retaining access to high-res live provider sources.
+     */
+    fun deduplicate(
+        cachedTracks: List<TrackSummaryDto>,
+        liveTracks: List<UncachedTrackDto>,
+        baseUrl: String = ""
+    ): List<CanonicalTrack> {
+        val sourcesMap = LinkedHashMap<Pair<String, String>, MutableList<TrackSource>>()
+        val metadataMap = LinkedHashMap<Pair<String, String>, TrackMetadata>()
+
+        for (cached in cachedTracks) {
+            val key = normalize(cached.title) to normalize(cached.artist)
+            val providerEnum = Provider.fromString(cached.provider)
+            val codecEnum = Codec.fromString(cached.codec)
+            val source = TrackSource(
+                id = cached.id,
+                provider = providerEnum,
+                providerTrackId = cached.track_id,
+                codec = codecEnum,
+                bitDepth = cached.bit_depth,
+                sampleRate = cached.sample_rate,
+                isCached = cached.is_cached
+            )
+
+            val existingSources = sourcesMap.getOrPut(key) { mutableListOf() }
+            if (existingSources.none { it.provider == source.provider && it.providerTrackId == source.providerTrackId }) {
+                existingSources.add(source)
+            }
+
+            if (!metadataMap.containsKey(key)) {
+                val artworkUrl = if (cached.id > 0 && baseUrl.isNotBlank()) {
+                    "${baseUrl.trimEnd('/')}/api/v1/assets/tracks/${cached.id}/artwork"
+                } else null
+
+                metadataMap[key] = TrackMetadata(
+                    id = if (cached.id > 0) cached.id.toString() else "${cached.provider}_${cached.track_id}",
+                    title = cached.title,
+                    artist = cached.artist,
+                    album = cached.album,
+                    durationSeconds = cached.duration,
+                    artworkUrl = artworkUrl
+                )
+            } else {
+                val meta = metadataMap[key]!!
+                if (cached.id > 0 && meta.id.contains("_")) {
+                    meta.id = cached.id.toString()
+                    if (baseUrl.isNotBlank()) {
+                        meta.artworkUrl = "${baseUrl.trimEnd('/')}/api/v1/assets/tracks/${cached.id}/artwork"
+                    }
+                }
+                if (meta.album.isBlank() && cached.album.isNotBlank()) {
+                    meta.album = cached.album
+                }
+                if (meta.durationSeconds <= 0 && cached.duration > 0) {
+                    meta.durationSeconds = cached.duration
+                }
+            }
+        }
+
+        for (live in liveTracks) {
+            val key = normalize(live.title) to normalize(live.artist)
+            val providerEnum = Provider.fromString(live.provider)
+            val codecEnum = if (providerEnum == Provider.Qobuz) Codec.Flac else Codec.Alac
+            val source = TrackSource(
+                id = 0,
+                provider = providerEnum,
+                providerTrackId = live.track_id,
+                codec = codecEnum,
+                isCached = false
+            )
+
+            val existingSources = sourcesMap.getOrPut(key) { mutableListOf() }
+            if (existingSources.none { it.provider == source.provider && it.providerTrackId == source.providerTrackId }) {
+                existingSources.add(source)
+            }
+
+            if (!metadataMap.containsKey(key)) {
+                metadataMap[key] = TrackMetadata(
+                    id = "${live.provider}_${live.track_id}",
+                    title = live.title,
+                    artist = live.artist,
+                    album = live.album,
+                    durationSeconds = live.duration
+                )
+            } else {
+                val meta = metadataMap[key]!!
+                if (meta.album.isBlank() && live.album.isNotBlank()) {
+                    meta.album = live.album
+                }
+                if (meta.durationSeconds <= 0 && live.duration > 0) {
+                    meta.durationSeconds = live.duration
+                }
+            }
+        }
+
+        return metadataMap.map { (key, meta) ->
+            val sources = sourcesMap[key] ?: emptyList()
+            val sortedSources = sources.sortedWith(
+                compareByDescending<TrackSource> { it.isCached }
+                    .thenByDescending { it.bitDepth ?: 16 }
+                    .thenByDescending { it.sampleRate ?: 44100 }
+            )
+
+            CanonicalTrack(
+                id = meta.id,
+                title = meta.title,
+                artist = meta.artist,
+                album = meta.album,
+                durationSeconds = meta.durationSeconds,
+                artworkUrl = meta.artworkUrl,
+                isrc = meta.isrc,
+                sources = sortedSources
+            )
+        }
+    }
+}
+
+// ============================================================================
+// 5. Last.fm Intelligence Models
+// ============================================================================
+
+@Serializable
+data class LastFmTag(val name: String, val count: Int = 0)
+
+@Serializable
+data class LastFmArtist(
+    val name: String,
+    val bioSummary: String? = null,
+    val tags: List<LastFmTag> = emptyList(),
+    val similarArtists: List<String> = emptyList(),
+    val imageUrl: String? = null
+)
+
+@Serializable
+data class LastFmTrackInfo(
+    val title: String,
+    val artist: String,
+    val wikiSummary: String? = null,
+    val tags: List<LastFmTag> = emptyList(),
+    val playcount: Long = 0L
+)

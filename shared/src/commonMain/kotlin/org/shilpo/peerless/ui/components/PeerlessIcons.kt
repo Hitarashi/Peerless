@@ -710,4 +710,186 @@ object PeerlessIcons {
             }
         }.build()
     }
+
+    val MoreVert: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "MoreVert",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.White)) {
+                moveTo(12f, 8f)
+                curveTo(13.1f, 8f, 14f, 7.1f, 14f, 6f)
+                curveTo(14f, 4.9f, 13.1f, 4f, 12f, 4f)
+                curveTo(10.9f, 4f, 10f, 4.9f, 10f, 6f)
+                curveTo(10f, 7.1f, 10.9f, 8f, 12f, 8f)
+                close()
+                moveTo(12f, 10f)
+                curveTo(10.9f, 10f, 10f, 10.9f, 10f, 12f)
+                curveTo(10f, 13.1f, 10.9f, 14f, 12f, 14f)
+                curveTo(13.1f, 14f, 14f, 13.1f, 14f, 12f)
+                curveTo(14f, 10.9f, 13.1f, 10f, 12f, 10f)
+                close()
+                moveTo(12f, 16f)
+                curveTo(10.9f, 16f, 10f, 16.9f, 10f, 18f)
+                curveTo(10f, 19.1f, 10.9f, 20f, 12f, 20f)
+                curveTo(13.1f, 20f, 14f, 19.1f, 14f, 18f)
+                curveTo(14f, 16.9f, 13.1f, 16f, 12f, 16f)
+                close()
+            }
+        }.build()
+    }
+
+    val Heart: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Heart",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.White)) {
+                moveTo(12f, 21.35f)
+                lineTo(10.55f, 20.03f)
+                curveTo(5.4f, 15.36f, 2f, 12.28f, 2f, 8.5f)
+                curveTo(2f, 5.42f, 4.42f, 3f, 7.5f, 3f)
+                curveTo(9.24f, 3f, 10.91f, 3.81f, 12f, 5.09f)
+                curveTo(13.09f, 3.81f, 14.76f, 3f, 16.5f, 3f)
+                curveTo(19.58f, 3f, 22f, 5.42f, 22f, 8.5f)
+                curveTo(22f, 12.28f, 18.6f, 15.36f, 13.45f, 20.04f)
+                lineTo(12f, 21.35f)
+                close()
+            }
+        }.build()
+    }
+
+    val Sparkle: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Sparkle",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.White)) {
+                moveTo(10.5f, 1.5f)
+                lineTo(8.2f, 6.7f)
+                lineTo(3f, 9f)
+                lineTo(8.2f, 11.3f)
+                lineTo(10.5f, 16.5f)
+                lineTo(12.8f, 11.3f)
+                lineTo(18f, 9f)
+                lineTo(12.8f, 6.7f)
+                close()
+                moveTo(19f, 14f)
+                lineTo(17.7f, 16.7f)
+                lineTo(15f, 18f)
+                lineTo(17.7f, 19.3f)
+                lineTo(19f, 22f)
+                lineTo(20.3f, 19.3f)
+                lineTo(23f, 18f)
+                lineTo(20.3f, 16.7f)
+                close()
+            }
+        }.build()
+    }
+
+    val Compass: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Compass",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.White)) {
+                moveTo(12f, 2f)
+                curveTo(6.48f, 2f, 2f, 6.48f, 2f, 12f)
+                curveTo(2f, 17.52f, 6.48f, 22f, 12f, 22f)
+                curveTo(17.52f, 22f, 22f, 17.52f, 22f, 12f)
+                curveTo(22f, 6.48f, 17.52f, 2f, 12f, 2f)
+                close()
+                moveTo(14.19f, 14.19f)
+                lineTo(6f, 18f)
+                lineTo(9.81f, 9.81f)
+                lineTo(18f, 6f)
+                lineTo(14.19f, 14.19f)
+                close()
+            }
+        }.build()
+    }
+
+    val BarChart: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "BarChart",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.White)) {
+                moveTo(4f, 9f)
+                horizontalLineTo(7f)
+                verticalLineTo(19f)
+                horizontalLineTo(4f)
+                close()
+                moveTo(10.5f, 4f)
+                horizontalLineTo(13.5f)
+                verticalLineTo(19f)
+                horizontalLineTo(10.5f)
+                close()
+                moveTo(17f, 13f)
+                horizontalLineTo(20f)
+                verticalLineTo(19f)
+                horizontalLineTo(17f)
+                close()
+            }
+        }.build()
+    }
+
+    val Database: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Database",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.White)) {
+                moveTo(12f, 2f)
+                curveTo(7.58f, 2f, 4f, 3.79f, 4f, 6f)
+                verticalLineTo(18f)
+                curveTo(4f, 20.21f, 7.58f, 22f, 12f, 22f)
+                curveTo(16.42f, 22f, 20f, 20.21f, 20f, 18f)
+                verticalLineTo(6f)
+                curveTo(20f, 3.79f, 16.42f, 2f, 12f, 2f)
+                close()
+                moveTo(18f, 18f)
+                curveTo(18f, 18.78f, 15.31f, 20f, 12f, 20f)
+                curveTo(8.69f, 20f, 6f, 18.78f, 6f, 18f)
+                verticalLineTo(16.14f)
+                curveTo(7.53f, 17.29f, 9.64f, 18f, 12f, 18f)
+                curveTo(14.36f, 18f, 16.47f, 17.29f, 18f, 16.14f)
+                verticalLineTo(18f)
+                close()
+                moveTo(18f, 13f)
+                curveTo(18f, 13.78f, 15.31f, 15f, 12f, 15f)
+                curveTo(8.69f, 15f, 6f, 13.78f, 6f, 13f)
+                verticalLineTo(11.14f)
+                curveTo(7.53f, 12.29f, 9.64f, 13f, 12f, 13f)
+                curveTo(14.36f, 13f, 16.47f, 12.29f, 18f, 11.14f)
+                verticalLineTo(13f)
+                close()
+                moveTo(12f, 4f)
+                curveTo(15.31f, 4f, 18f, 5.22f, 18f, 6f)
+                curveTo(18f, 6.78f, 15.31f, 8f, 12f, 8f)
+                curveTo(8.69f, 8f, 6f, 6.78f, 6f, 6f)
+                curveTo(6f, 5.22f, 8.69f, 4f, 12f, 4f)
+                close()
+            }
+        }.build()
+    }
 }
+

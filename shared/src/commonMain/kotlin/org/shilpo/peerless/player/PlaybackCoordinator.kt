@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import org.shilpo.peerless.config.AppConfig
 import org.shilpo.peerless.model.PlaybackInfo
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.network.PeerlessApiClient
@@ -17,7 +18,7 @@ data class PlayerState(
     val durationMs: Long = 0L,
     val queue: List<TrackSummaryDto> = emptyList(),
     val isDevMode: Boolean = true,
-    val serverUrl: String = "http://localhost:4444"
+    val serverUrl: String = AppConfig.DEFAULT_SERVER_URL
 )
 
 class PlaybackCoordinator(

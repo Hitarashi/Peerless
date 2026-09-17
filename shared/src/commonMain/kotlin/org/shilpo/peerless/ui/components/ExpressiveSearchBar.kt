@@ -1,38 +1,71 @@
 package org.shilpo.peerless.ui.components
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import org.shilpo.peerless.model.SearchFilter
 import org.shilpo.peerless.theme.*
+
+val DefaultSearchFilters = listOf(
+    SearchFilter.ALL,
+    SearchFilter.TRACKS,
+    SearchFilter.ALBUMS,
+    SearchFilter.ARTISTS,
+    SearchFilter.APPLE_MUSIC,
+    SearchFilter.QOBUZ,
+    SearchFilter.CACHED
+)
 
 @Composable
 fun ExpressiveSearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     onClearQuery: () -> Unit,
-    selectedFilter: String,
-    onFilterSelect: (String) -> Unit,
+    selectedFilter: SearchFilter,
+    onFilterSelect: (SearchFilter) -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    isSearching: Boolean = false,
     isDevMode: Boolean = true,
-    serverUrl: String = ""
+    serverUrl: String = "",
+    filters: List<SearchFilter> = DefaultSearchFilters
 ) {
-    val filters = listOf("All", "Cached", "Apple Music", "Qobuz")
+    val infiniteTransition = rememberInfiniteTransition(label = "SearchLoadingAnimation")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(550, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "SearchPulseAlpha"
+    )
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 1.25f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(550, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "SearchPulseScale"
+    )
 
     Column(
         modifier = modifier
@@ -51,12 +84,30 @@ fun ExpressiveSearchBar(
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = PeerlessIcons.Search,
-                contentDescription = "Search",
-                tint = PrimaryDark,
-                modifier = Modifier.size(20.dp)
-            )
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = PeerlessIcons.Search,
+                    contentDescription = "Search",
+                    tint = if (isSearching) SecondaryDark else PrimaryDark,
+                    modifier = Modifier.size(20.dp)
+                )
+
+                if (isSearching) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 2.dp, y = (-2).dp)
+                            .size(7.dp)
+                            .graphicsLayer {
+                                scaleX = pulseScale
+                                scaleY = pulseScale
+                                alpha = pulseAlpha
+                            }
+                            .clip(CircleShape)
+                            .background(SecondaryDark)
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -83,6 +134,35 @@ fun ExpressiveSearchBar(
                     cursorBrush = SolidColor(PrimaryDark),
                     modifier = Modifier.fillMaxWidth()
                 )
+            }
+
+            if (isSearching) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier
+                        .clip(PillShape)
+                        .background(SecondaryDark.copy(alpha = 0.12f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .graphicsLayer {
+                                scaleX = pulseScale
+                                scaleY = pulseScale
+                                alpha = pulseAlpha
+                            }
+                            .clip(CircleShape)
+                            .background(SecondaryDark)
+                    )
+                    Text(
+                        text = "SEARCHING",
+                        style = SpecBadgeTypography.copy(fontSize = 8.sp),
+                        color = SecondaryDark
+                    )
+                }
+                Spacer(modifier = Modifier.width(4.dp))
             }
 
             if (query.isNotEmpty()) {
@@ -127,7 +207,7 @@ fun ExpressiveSearchBar(
             }
         }
 
-        // Horizontal Filter Chips
+        // Horizontal Filter Chips using official M3 FilterChip
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -137,52 +217,82 @@ fun ExpressiveSearchBar(
         ) {
             filters.forEach { filter ->
                 val isSelected = filter == selectedFilter
-                val chipBg by animateColorAsState(
-                    targetValue = if (isSelected) PrimaryContainerDark else SurfaceContainerDark,
-                    animationSpec = tween(200)
-                )
-                val chipText by animateColorAsState(
-                    targetValue = if (isSelected) OnPrimaryContainerDark else OnSurfaceVariantDark,
-                    animationSpec = tween(200)
-                )
-                val chipBorder by animateColorAsState(
-                    targetValue = if (isSelected) PrimaryDark.copy(alpha = 0.6f) else OutlineVariantDark,
-                    animationSpec = tween(200)
-                )
 
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(chipBg)
-                        .border(1.dp, chipBorder, RoundedCornerShape(12.dp))
-                        .clickable { onFilterSelect(filter) }
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    if (filter == "Cached") {
-                        Icon(
-                            imageVector = PeerlessIcons.CloudDone,
-                            contentDescription = null,
-                            tint = if (isSelected) SecondaryDark else OnSurfaceVariantDark,
-                            modifier = Modifier.size(14.dp)
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onFilterSelect(filter) },
+                    label = {
+                        Text(
+                            text = filter.label,
+                            style = ExpressiveTypography.labelMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                         )
-                    } else if (filter == "Qobuz") {
-                        Icon(
-                            imageVector = PeerlessIcons.LosslessWave,
-                            contentDescription = null,
-                            tint = if (isSelected) LosslessGold else OnSurfaceVariantDark,
-                            modifier = Modifier.size(13.dp)
-                        )
-                    }
+                    },
+                    leadingIcon = when (filter) {
+                        SearchFilter.CACHED -> {
+                            {
+                                Icon(
+                                    imageVector = PeerlessIcons.CloudDone,
+                                    contentDescription = null,
+                                    tint = if (isSelected) SecondaryDark else OnSurfaceVariantDark,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
 
-                    Text(
-                        text = filter,
-                        style = ExpressiveTypography.labelMedium,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = chipText
+                        SearchFilter.QOBUZ -> {
+                            {
+                                Icon(
+                                    imageVector = PeerlessIcons.LosslessWave,
+                                    contentDescription = null,
+                                    tint = if (isSelected) LosslessGold else OnSurfaceVariantDark,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
+                        }
+
+                        SearchFilter.APPLE_MUSIC -> {
+                            {
+                                Icon(
+                                    imageVector = PeerlessIcons.MusicNote,
+                                    contentDescription = null,
+                                    tint = if (isSelected) LosslessPurple else OnSurfaceVariantDark,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
+                        }
+
+                        SearchFilter.TRACKS, SearchFilter.ALBUMS, SearchFilter.ARTISTS -> {
+                            {
+                                Icon(
+                                    imageVector = when (filter) {
+                                        SearchFilter.ALBUMS -> PeerlessIcons.Library
+                                        SearchFilter.ARTISTS -> PeerlessIcons.Home
+                                        else -> PeerlessIcons.MusicNote
+                                    },
+                                    contentDescription = null,
+                                    tint = if (isSelected) PrimaryDark else OnSurfaceVariantDark,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
+                        }
+
+                        SearchFilter.ALL -> null
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = SurfaceContainerDark,
+                        labelColor = OnSurfaceVariantDark,
+                        selectedContainerColor = PrimaryContainerDark,
+                        selectedLabelColor = OnPrimaryContainerDark
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = isSelected,
+                        borderColor = OutlineVariantDark,
+                        selectedBorderColor = PrimaryDark.copy(alpha = 0.6f)
                     )
-                }
+                )
             }
         }
     }

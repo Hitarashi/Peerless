@@ -9,10 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,15 +23,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.player.PlaybackCoordinator
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerState
 import org.shilpo.peerless.theme.*
+import org.shilpo.peerless.ui.HomeExpressiveContent
 import org.shilpo.peerless.ui.SampleLosslessLibrary
 import org.shilpo.peerless.ui.components.*
 import org.shilpo.peerless.ui.navigation.NavigationDestination
+import org.shilpo.peerless.ui.screens.SearchScreen
 import org.shilpo.peerless.ui.toTrackSummary
+
 
 /**
  * Multiplatform Adaptive Shell implementing Google Large Screen Guidelines & ADR 0002.
@@ -124,6 +125,22 @@ fun AdaptiveShell(
                     .fillMaxSize()
                     .background(BackgroundDark)
             ) {
+                val coroutineScope = rememberCoroutineScope()
+                val onRipClick: (TrackSummaryDto) -> Unit = { track ->
+                    coroutineScope.launch {
+                        println("[Peerless] Initiating rip task for ${track.title} (${track.provider}:${track.track_id})")
+                        coordinator.apiClient.createRipTask(
+                            provider = track.provider,
+                            trackId = track.track_id,
+                            codec = track.codec
+                        ).onSuccess { resp ->
+                            println("[Peerless] Rip task started: ${resp.task_id} (status: ${resp.status})")
+                        }.onFailure { err ->
+                            println("[Peerless] Rip task error: ${err.message}")
+                        }
+                    }
+                }
+
                 when (windowSizeClass) {
                     WindowWidthSizeClass.COMPACT -> {
                         CompactLayout(
@@ -137,8 +154,10 @@ fun AdaptiveShell(
                             selectedFilter = selectedFilter,
                             onSelectFilter = { selectedFilter = it },
                             displayedTracks = displayedTracks,
+                            allTracks = activeLibrary,
                             onOpenNowPlaying = { isNowPlayingOpen = true },
-                            onOpenSettings = { isSettingsOpen = true }
+                            onOpenSettings = { isSettingsOpen = true },
+                            onRipClick = onRipClick
                         )
                     }
 
@@ -154,8 +173,10 @@ fun AdaptiveShell(
                             selectedFilter = selectedFilter,
                             onSelectFilter = { selectedFilter = it },
                             displayedTracks = displayedTracks,
+                            allTracks = activeLibrary,
                             onOpenNowPlaying = { isNowPlayingOpen = true },
-                            onOpenSettings = { isSettingsOpen = true }
+                            onOpenSettings = { isSettingsOpen = true },
+                            onRipClick = onRipClick
                         )
                     }
 
@@ -175,6 +196,7 @@ fun AdaptiveShell(
                             selectedFilter = selectedFilter,
                             onSelectFilter = { selectedFilter = it },
                             displayedTracks = displayedTracks,
+                            allTracks = activeLibrary,
                             volume = volume,
                             onVolumeChange = { volume = it },
                             isShuffle = isShuffle,
@@ -182,10 +204,12 @@ fun AdaptiveShell(
                             isRepeat = isRepeat,
                             onToggleRepeat = { isRepeat = !isRepeat },
                             onOpenNowPlaying = { isNowPlayingOpen = true },
-                            onOpenSettings = { isSettingsOpen = true }
+                            onOpenSettings = { isSettingsOpen = true },
+                            onRipClick = onRipClick
                         )
                     }
                 }
+
 
                 // Full-screen expandable Now Playing Sheet modal
                 AnimatedVisibility(
@@ -206,7 +230,7 @@ fun AdaptiveShell(
                             status = playerState.status,
                             positionMs = playerState.positionMs,
                             durationMs = playerState.durationMs,
-                            artworkUrl = coordinator.apiClient.getArtworkUrl(track.id, 600),
+                            artworkUrl = coordinator.apiClient.getArtworkUrl(track, 600),
                             serverUrl = playerState.serverUrl,
                             isDevMode = playerState.isDevMode,
                             onTogglePlayPause = { coordinator.togglePlayPause() },
@@ -251,8 +275,10 @@ private fun CompactLayout(
     selectedFilter: String,
     onSelectFilter: (String) -> Unit,
     displayedTracks: List<TrackSummaryDto>,
+    allTracks: List<TrackSummaryDto>,
     onOpenNowPlaying: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         // Destination Content Area
@@ -263,6 +289,7 @@ private fun CompactLayout(
         ) {
             DestinationContent(
                 destination = currentDestination,
+                onSelectDestination = onSelectDestination,
                 coordinator = coordinator,
                 playerState = playerState,
                 serverConnected = serverConnected,
@@ -271,11 +298,15 @@ private fun CompactLayout(
                 selectedFilter = selectedFilter,
                 onSelectFilter = onSelectFilter,
                 displayedTracks = displayedTracks,
+                allTracks = allTracks,
                 onOpenSettings = onOpenSettings,
+                onOpenNowPlaying = onOpenNowPlaying,
                 // Extra bottom padding for MiniPlayer + Floating Dock clearance
-                contentBottomPadding = if (playerState.currentTrack != null) 160.dp else 90.dp
+                contentBottomPadding = if (playerState.currentTrack != null) 160.dp else 90.dp,
+                onRipClick = onRipClick
             )
         }
+
 
         // Floating Dock & MiniPlayer Container
         Column(
@@ -300,7 +331,7 @@ private fun CompactLayout(
                         status = playerState.status,
                         positionMs = playerState.positionMs,
                         durationMs = playerState.durationMs,
-                        artworkUrl = coordinator.apiClient.getArtworkUrl(track.id, 200),
+                        artworkUrl = coordinator.apiClient.getArtworkUrl(track, 200),
                         onTogglePlayPause = { coordinator.togglePlayPause() },
                         onPlayNext = { coordinator.playNext() },
                         onOpenNowPlaying = onOpenNowPlaying,
@@ -322,69 +353,65 @@ private fun CompactLayout(
  * Floating pill navigation dock hovering near the bottom with 4 primary destinations.
  * Styled with LiquidGlass translucent surface and frosted gradient borders.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun FloatingNavDock(
     selectedDestination: NavigationDestination,
     onSelectDestination: (NavigationDestination) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LiquidGlassSurface(
+    HorizontalFloatingToolbar(
+        expanded = true,
+        colors = FloatingToolbarDefaults.standardFloatingToolbarColors(
+            toolbarContainerColor = SurfaceContainerHighDark,
+            toolbarContentColor = OnSurfaceDark
+        ),
         shape = PillShape,
-        containerColor = LiquidGlassDefaults.ElevatedContainerColor,
-        borderBrush = LiquidGlassDefaults.BorderBrush,
         modifier = modifier
             .padding(horizontal = 24.dp)
             .height(58.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            NavigationDestination.PrimaryDestinations.forEach { dest ->
-                val isSelected = dest == selectedDestination
-                val pillColor = if (isSelected) PrimaryDark.copy(alpha = 0.22f) else Color.Transparent
-                val iconTint = if (isSelected) PrimaryDark else OnSurfaceVariantDark.copy(alpha = 0.65f)
-                val borderColor = if (isSelected) PrimaryDark.copy(alpha = 0.40f) else Color.Transparent
+        NavigationDestination.PrimaryDestinations.forEach { dest ->
+            val isSelected = dest == selectedDestination
+            val pillColor = if (isSelected) PrimaryDark.copy(alpha = 0.22f) else Color.Transparent
+            val iconTint = if (isSelected) PrimaryDark else OnSurfaceVariantDark.copy(alpha = 0.65f)
+            val borderColor = if (isSelected) PrimaryDark.copy(alpha = 0.40f) else Color.Transparent
 
-                Box(
-                    modifier = Modifier
-                        .clip(PillShape)
-                        .background(pillColor)
-                        .border(1.dp, borderColor, PillShape)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = { onSelectDestination(dest) }
-                        )
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    contentAlignment = Alignment.Center
+            Box(
+                modifier = Modifier
+                    .clip(PillShape)
+                    .background(pillColor)
+                    .border(1.dp, borderColor, PillShape)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { onSelectDestination(dest) }
+                    )
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = dest.icon,
-                            contentDescription = dest.title,
-                            tint = iconTint,
-                            modifier = Modifier.size(20.dp)
-                        )
+                    Icon(
+                        imageVector = dest.icon,
+                        contentDescription = dest.title,
+                        tint = iconTint,
+                        modifier = Modifier.size(20.dp)
+                    )
 
-                        AnimatedVisibility(
-                            visible = isSelected,
-                            enter = expandHorizontally() + fadeIn(),
-                            exit = shrinkHorizontally() + fadeOut()
-                        ) {
-                            Text(
-                                text = dest.title,
-                                style = ExpressiveTypography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = PrimaryDark
-                            )
-                        }
+                    AnimatedVisibility(
+                        visible = isSelected,
+                        enter = expandHorizontally() + fadeIn(),
+                        exit = shrinkHorizontally() + fadeOut()
+                    ) {
+                        Text(
+                            text = dest.title,
+                            style = ExpressiveTypography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = PrimaryDark
+                        )
                     }
                 }
             }
@@ -407,38 +434,24 @@ private fun MediumLayout(
     selectedFilter: String,
     onSelectFilter: (String) -> Unit,
     displayedTracks: List<TrackSummaryDto>,
+    allTracks: List<TrackSummaryDto>,
     onOpenNowPlaying: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
+
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            // Vertical NavigationRail on the start side
-            LiquidGlassSurface(
-                shape = RectangleShape,
-                containerColor = SurfaceContainerLowestDark,
-                borderBrush = Brush.horizontalGradient(
-                    listOf(OutlineVariantDark.copy(alpha = 0.5f), Color.Transparent)
-                ),
-                borderWidth = 1.dp,
-                modifier = Modifier
-                    .width(76.dp)
-                    .fillMaxHeight()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding()
-                        .padding(vertical = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    // Brand Icon
+            // Vertical NavigationRail on the start side using official M3 NavigationRail
+            NavigationRail(
+                header = {
                     Box(
                         modifier = Modifier
+                            .padding(top = 12.dp)
                             .size(40.dp)
                             .clip(SquircleShapeSmall)
                             .background(
@@ -453,44 +466,38 @@ private fun MediumLayout(
                             modifier = Modifier.size(22.dp)
                         )
                     }
-
-                    // Destinations
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        NavigationDestination.PrimaryDestinations.forEach { dest ->
-                            val isSelected = dest == currentDestination
-                            IconButton(
-                                onClick = { onSelectDestination(dest) },
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(SquircleShapeSmall)
-                                    .background(
-                                        if (isSelected) PrimaryDark.copy(alpha = 0.20f) else Color.Transparent
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) PrimaryDark.copy(alpha = 0.45f) else Color.Transparent,
-                                        SquircleShapeSmall
-                                    )
-                            ) {
-                                Icon(
-                                    imageVector = dest.icon,
-                                    contentDescription = dest.title,
-                                    tint = if (isSelected) PrimaryDark else OnSurfaceVariantDark.copy(alpha = 0.65f),
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    // Server status indicator dot
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(if (serverConnected) SecondaryDark else LosslessGold)
+                },
+                containerColor = SurfaceContainerLowestDark,
+                contentColor = OnSurfaceDark,
+                modifier = Modifier
+                    .width(76.dp)
+                    .fillMaxHeight()
+            ) {
+                Spacer(modifier = Modifier.height(16.dp))
+                NavigationDestination.PrimaryDestinations.forEach { dest ->
+                    val isSelected = dest == currentDestination
+                    NavigationRailItem(
+                        selected = isSelected,
+                        onClick = { onSelectDestination(dest) },
+                        icon = {
+                            Icon(
+                                imageVector = dest.icon,
+                                contentDescription = dest.title
+                            )
+                        },
+                        label = {
+                            Text(
+                                text = dest.title,
+                                style = ExpressiveTypography.labelSmall
+                            )
+                        },
+                        colors = NavigationRailItemDefaults.colors(
+                            selectedIconColor = PrimaryDark,
+                            selectedTextColor = PrimaryDark,
+                            indicatorColor = PrimaryDark.copy(alpha = 0.20f),
+                            unselectedIconColor = OnSurfaceVariantDark.copy(alpha = 0.65f),
+                            unselectedTextColor = OnSurfaceVariantDark.copy(alpha = 0.65f)
+                        )
                     )
                 }
             }
@@ -504,6 +511,7 @@ private fun MediumLayout(
             ) {
                 DestinationContent(
                     destination = currentDestination,
+                    onSelectDestination = onSelectDestination,
                     coordinator = coordinator,
                     playerState = playerState,
                     serverConnected = serverConnected,
@@ -512,9 +520,13 @@ private fun MediumLayout(
                     selectedFilter = selectedFilter,
                     onSelectFilter = onSelectFilter,
                     displayedTracks = displayedTracks,
+                    allTracks = allTracks,
                     onOpenSettings = onOpenSettings,
-                    contentBottomPadding = if (playerState.currentTrack != null) 90.dp else 16.dp
+                    onOpenNowPlaying = onOpenNowPlaying,
+                    contentBottomPadding = if (playerState.currentTrack != null) 90.dp else 16.dp,
+                    onRipClick = onRipClick
                 )
+
             }
         }
 
@@ -531,7 +543,7 @@ private fun MediumLayout(
                     status = playerState.status,
                     positionMs = playerState.positionMs,
                     durationMs = playerState.durationMs,
-                    artworkUrl = coordinator.apiClient.getArtworkUrl(track.id, 200),
+                    artworkUrl = coordinator.apiClient.getArtworkUrl(track, 200),
                     onTogglePlayPause = { coordinator.togglePlayPause() },
                     onPlayNext = { coordinator.playNext() },
                     onOpenNowPlaying = onOpenNowPlaying,
@@ -559,6 +571,7 @@ private fun ExpandedLayout(
     selectedFilter: String,
     onSelectFilter: (String) -> Unit,
     displayedTracks: List<TrackSummaryDto>,
+    allTracks: List<TrackSummaryDto>,
     volume: Float,
     onVolumeChange: (Float) -> Unit,
     isShuffle: Boolean,
@@ -566,7 +579,8 @@ private fun ExpandedLayout(
     isRepeat: Boolean,
     onToggleRepeat: () -> Unit,
     onOpenNowPlaying: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         // Main Three-Zone Body
@@ -598,6 +612,7 @@ private fun ExpandedLayout(
             ) {
                 DestinationContent(
                     destination = currentDestination,
+                    onSelectDestination = onSelectDestination,
                     coordinator = coordinator,
                     playerState = playerState,
                     serverConnected = serverConnected,
@@ -606,10 +621,15 @@ private fun ExpandedLayout(
                     selectedFilter = selectedFilter,
                     onSelectFilter = onSelectFilter,
                     displayedTracks = displayedTracks,
+                    allTracks = allTracks,
                     onOpenSettings = onOpenSettings,
-                    contentBottomPadding = 16.dp
+                    onOpenNowPlaying = onOpenNowPlaying,
+                    onToggleStats = { onToggleSupportingPane(SupportingPaneType.SIGNAL_PATH) },
+                    contentBottomPadding = 16.dp,
+                    onRipClick = onRipClick
                 )
             }
+
 
             // ----------------------------------------------------
             // ZONE 3: Right Contextual Supporting Pane (~340dp)
@@ -1201,6 +1221,7 @@ private fun SignalPathStageCard(
 @Composable
 private fun DestinationContent(
     destination: NavigationDestination,
+    onSelectDestination: (NavigationDestination) -> Unit,
     coordinator: PlaybackCoordinator,
     playerState: PlayerState,
     serverConnected: Boolean,
@@ -1209,8 +1230,12 @@ private fun DestinationContent(
     selectedFilter: String,
     onSelectFilter: (String) -> Unit,
     displayedTracks: List<TrackSummaryDto>,
+    allTracks: List<TrackSummaryDto>,
     onOpenSettings: () -> Unit,
-    contentBottomPadding: androidx.compose.ui.unit.Dp
+    onOpenNowPlaying: () -> Unit,
+    onToggleStats: (() -> Unit)? = null,
+    contentBottomPadding: androidx.compose.ui.unit.Dp,
+    onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
     when (destination) {
         NavigationDestination.HOME -> {
@@ -1223,8 +1248,12 @@ private fun DestinationContent(
                 selectedFilter = selectedFilter,
                 onSelectFilter = onSelectFilter,
                 displayedTracks = displayedTracks,
+                allTracks = allTracks,
                 onOpenSettings = onOpenSettings,
-                contentBottomPadding = contentBottomPadding
+                onNavigateToSearch = { onSelectDestination(NavigationDestination.SEARCH) },
+                onToggleStats = onToggleStats ?: onOpenNowPlaying,
+                contentBottomPadding = contentBottomPadding,
+                onRipClick = onRipClick
             )
         }
 
@@ -1232,13 +1261,9 @@ private fun DestinationContent(
             SearchDestinationView(
                 coordinator = coordinator,
                 playerState = playerState,
-                searchQuery = searchQuery,
-                onQueryChange = onQueryChange,
-                selectedFilter = selectedFilter,
-                onSelectFilter = onSelectFilter,
-                displayedTracks = displayedTracks,
                 onOpenSettings = onOpenSettings,
-                contentBottomPadding = contentBottomPadding
+                contentBottomPadding = contentBottomPadding,
+                onRipClick = onRipClick
             )
         }
 
@@ -1272,97 +1297,45 @@ private fun HomeDestinationView(
     selectedFilter: String,
     onSelectFilter: (String) -> Unit,
     displayedTracks: List<TrackSummaryDto>,
+    allTracks: List<TrackSummaryDto>,
     onOpenSettings: () -> Unit,
-    contentBottomPadding: androidx.compose.ui.unit.Dp
+    onNavigateToSearch: () -> Unit,
+    onToggleStats: () -> Unit,
+    contentBottomPadding: androidx.compose.ui.unit.Dp,
+    onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Expressive Search Bar
-        ExpressiveSearchBar(
-            query = searchQuery,
-            onQueryChange = onQueryChange,
-            onClearQuery = { onQueryChange("") },
-            selectedFilter = selectedFilter,
-            onFilterSelect = onSelectFilter,
-            onOpenSettings = onOpenSettings,
-            isDevMode = playerState.isDevMode,
-            serverUrl = playerState.serverUrl
-        )
-
-        // Section Title
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = if (searchQuery.isBlank()) "Lossless Library" else "Search Results",
-                style = ExpressiveTypography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = OnSurfaceDark
-            )
-
-            Text(
-                text = "${displayedTracks.size} tracks",
-                style = SpecBadgeTypography,
-                color = OnSurfaceVariantDark
-            )
-        }
-
-        // Track List
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            contentPadding = PaddingValues(
-                start = 12.dp,
-                end = 12.dp,
-                top = 4.dp,
-                bottom = contentBottomPadding
-            ),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            items(displayedTracks, key = { it.id }) { track ->
-                val isPlaying = playerState.currentTrack?.id == track.id &&
-                        playerState.status == PlaybackStatus.PLAYING
-
-                TrackRow(
-                    track = track,
-                    artworkUrl = coordinator.apiClient.getArtworkUrl(track.id, 200),
-                    isPlaying = isPlaying,
-                    onTrackClick = { clicked ->
-                        coordinator.playTrack(clicked, displayedTracks)
-                    }
-                )
-            }
-        }
-    }
+    HomeExpressiveContent(
+        coordinator = coordinator,
+        playerState = playerState,
+        serverConnected = serverConnected,
+        searchQuery = searchQuery,
+        onQueryChange = onQueryChange,
+        selectedFilter = selectedFilter,
+        onSelectFilter = onSelectFilter,
+        displayedTracks = displayedTracks,
+        allTracks = allTracks,
+        onOpenSettings = onOpenSettings,
+        onNavigateToSearch = onNavigateToSearch,
+        onToggleStats = onToggleStats,
+        contentBottomPadding = contentBottomPadding,
+        onRipClick = onRipClick
+    )
 }
 
 @Composable
 private fun SearchDestinationView(
     coordinator: PlaybackCoordinator,
     playerState: PlayerState,
-    searchQuery: String,
-    onQueryChange: (String) -> Unit,
-    selectedFilter: String,
-    onSelectFilter: (String) -> Unit,
-    displayedTracks: List<TrackSummaryDto>,
     onOpenSettings: () -> Unit,
-    contentBottomPadding: androidx.compose.ui.unit.Dp
+    contentBottomPadding: androidx.compose.ui.unit.Dp,
+    onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
-    HomeDestinationView(
+    SearchScreen(
         coordinator = coordinator,
         playerState = playerState,
-        serverConnected = true,
-        searchQuery = searchQuery,
-        onQueryChange = onQueryChange,
-        selectedFilter = selectedFilter,
-        onSelectFilter = onSelectFilter,
-        displayedTracks = displayedTracks,
         onOpenSettings = onOpenSettings,
-        contentBottomPadding = contentBottomPadding
+        contentBottomPadding = contentBottomPadding,
+        onRipClick = onRipClick
     )
 }
 
@@ -1428,7 +1401,7 @@ private fun LibraryDestinationView(
 
                 TrackRow(
                     track = track,
-                    artworkUrl = coordinator.apiClient.getArtworkUrl(track.id, 200),
+                    artworkUrl = coordinator.apiClient.getArtworkUrl(track, 200),
                     isPlaying = isPlaying,
                     onTrackClick = { clicked ->
                         coordinator.playTrack(clicked, tracksToShow)

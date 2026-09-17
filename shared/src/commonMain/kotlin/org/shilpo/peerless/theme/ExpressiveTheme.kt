@@ -3,7 +3,9 @@ package org.shilpo.peerless.theme
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -93,6 +95,7 @@ val ExpressiveDarkColorScheme = darkColorScheme(
     surfaceBright = SurfaceBrightDark
 )
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ExpressiveTheme(
     windowSizeClass: WindowWidthSizeClass = WindowWidthSizeClass.COMPACT,
@@ -102,8 +105,9 @@ fun ExpressiveTheme(
     CompositionLocalProvider(
         LocalWindowWidthSizeClass provides windowSizeClass
     ) {
-        MaterialTheme(
+        MaterialExpressiveTheme(
             colorScheme = ExpressiveDarkColorScheme,
+            motionScheme = MotionScheme.expressive(),
             typography = ExpressiveTypography,
             shapes = ExpressiveShapes,
             content = content

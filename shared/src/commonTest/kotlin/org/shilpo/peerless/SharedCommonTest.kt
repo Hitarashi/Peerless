@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.shilpo.peerless.auth.InMemoryTokenStorage
+import org.shilpo.peerless.lastfm.LastFmClient
 import org.shilpo.peerless.model.*
 import org.shilpo.peerless.network.PeerlessApiClient
 import org.shilpo.peerless.player.AudioEngine
@@ -231,16 +232,17 @@ class SharedCommonTest {
         val eventJson = """
             {
                 "task_id": "task_789",
-                "status": "tagging",
-                "progress_percent": 65.5,
-                "message": "Writing FLAC metadata tags",
+                "stage": "tagging",
+                "percent": 65.5,
                 "track_id": 42
             }
         """.trimIndent()
         val event = json.decodeFromString<TaskProgressEvent>(eventJson)
-        assertEquals("tagging", event.status)
-        assertEquals(65.5f, event.progress_percent)
-        assertEquals(42, event.track_id)
+        assertEquals("tagging", event.stage)
+        assertEquals("tagging", event.effectiveStage)
+        assertEquals(65.5f, event.percent)
+        assertEquals(65.5f, event.effectivePercent)
+        assertEquals("42", event.track_id)
     }
 
     @Test
@@ -344,5 +346,206 @@ class SharedCommonTest {
         coordinator.playPrevious()
         assertEquals(track1, coordinator.currentTrack)
         assertEquals(0, coordinator.currentIndex)
+    }
+
+    @Test
+    fun testSearchFilterLabels() {
+        assertEquals("All", SearchFilter.ALL.label)
+        assertNull(SearchFilter.ALL.providerQuery)
+
+        assertEquals("Tracks", SearchFilter.TRACKS.label)
+        assertNull(SearchFilter.TRACKS.providerQuery)
+
+        assertEquals("Albums", SearchFilter.ALBUMS.label)
+        assertNull(SearchFilter.ALBUMS.providerQuery)
+
+        assertEquals("Artists", SearchFilter.ARTISTS.label)
+        assertNull(SearchFilter.ARTISTS.providerQuery)
+
+        assertEquals("Apple Music", SearchFilter.APPLE_MUSIC.label)
+        assertEquals("apple", SearchFilter.APPLE_MUSIC.providerQuery)
+
+        assertEquals("Qobuz", SearchFilter.QOBUZ.label)
+        assertEquals("qobuz", SearchFilter.QOBUZ.providerQuery)
+
+        assertEquals("Cached", SearchFilter.CACHED.label)
+        assertNull(SearchFilter.CACHED.providerQuery)
+    }
+
+    @Test
+    fun testCanonicalDeduplicator() {
+        val cached = listOf(
+            TrackSummaryDto(
+                id = 10,
+                provider = "apple",
+                track_id = "apple_101",
+                title = "Midnight City",
+                artist = "M83",
+                album = "Hurry Up, We're Dreaming",
+                duration = 244,
+                codec = "alac",
+                bit_depth = 24,
+                sample_rate = 48000,
+                is_cached = true
+            )
+        )
+
+        val live = listOf(
+            UncachedTrackDto(
+                provider = "qobuz",
+                item_id = "qobuz_202",
+                track_id = "qobuz_202",
+                title = "Midnight City",
+                artist = "M83",
+                album = "Hurry Up, We're Dreaming",
+                duration = 244,
+                is_cached = false
+            ),
+            UncachedTrackDto(
+                provider = "qobuz",
+                item_id = "qobuz_303",
+                track_id = "qobuz_303",
+                title = "Get Lucky",
+                artist = "Daft Punk",
+                album = "Random Access Memories",
+                duration = 369,
+                is_cached = false
+            )
+        )
+
+        val deduplicated = CanonicalDeduplicator.deduplicate(
+            cachedTracks = cached,
+            liveTracks = live,
+            baseUrl = "http://127.0.0.1:4444"
+        )
+
+        assertEquals(2, deduplicated.size)
+
+        // Verify the merged Midnight City track
+        val midnightCity = deduplicated.first { it.title == "Midnight City" }
+        assertEquals("10", midnightCity.id)
+        assertEquals("M83", midnightCity.artist)
+        assertEquals("Hurry Up, We're Dreaming", midnightCity.album)
+        assertEquals(244, midnightCity.durationSeconds)
+        assertEquals("http://127.0.0.1:4444/api/v1/assets/tracks/10/artwork", midnightCity.artworkUrl)
+        assertEquals(2, midnightCity.sources.size)
+
+        // Cached Apple source should be the best source
+        val bestSource = midnightCity.bestSource
+        assertNotNull(bestSource)
+        assertEquals(Provider.Apple, bestSource.provider)
+        assertTrue(bestSource.isCached)
+        assertEquals(24, bestSource.bitDepth)
+        assertEquals(48000, bestSource.sampleRate)
+
+        // Qobuz live source should be present in sources
+        val qobuzSource = midnightCity.sources.firstOrNull { it.provider == Provider.Qobuz }
+        assertNotNull(qobuzSource)
+        assertEquals("qobuz_202", qobuzSource.providerTrackId)
+        assertFalse(qobuzSource.isCached)
+
+        // Verify Get Lucky track (live-only)
+        val getLucky = deduplicated.first { it.title == "Get Lucky" }
+        assertEquals("qobuz_qobuz_303", getLucky.id)
+        assertEquals("Daft Punk", getLucky.artist)
+        assertEquals(1, getLucky.sources.size)
+        assertFalse(getLucky.isCached)
+    }
+
+    @Test
+    fun testLastFmClientFallback() = runTest {
+        // Point to an unreachable port to trigger the fallback pathway
+        val client = LastFmClient(
+            baseUrl = "http://127.0.0.1:59999",
+            enableFallback = true
+        )
+
+        // Test fallback artist info
+        val artistResult = client.getArtistInfo("M83")
+        assertTrue(artistResult.isSuccess)
+        val artist = artistResult.getOrNull()
+        assertNotNull(artist)
+        assertEquals("M83", artist.name)
+        assertNotNull(artist.bioSummary)
+        assertTrue(artist.tags.isNotEmpty())
+        assertTrue(artist.tags.any { it.name == "Electronic" })
+        assertTrue(artist.similarArtists.isNotEmpty())
+
+        // Test fallback track info
+        val trackResult = client.getTrackInfo("M83", "Midnight City")
+        assertTrue(trackResult.isSuccess)
+        val trackInfo = trackResult.getOrNull()
+        assertNotNull(trackInfo)
+        assertEquals("Midnight City", trackInfo.title)
+        assertEquals("M83", trackInfo.artist)
+        assertNotNull(trackInfo.wikiSummary)
+        assertTrue(trackInfo.tags.isNotEmpty())
+        assertTrue(trackInfo.playcount > 0L)
+
+        // Test fallback top tags
+        val tagsResult = client.getTopTags()
+        assertTrue(tagsResult.isSuccess)
+        val tags = tagsResult.getOrNull()
+        assertNotNull(tags)
+        assertTrue(tags.size >= 5)
+        assertTrue(tags.any { it.name == "Electronic" })
+        assertTrue(tags.any { it.name == "Rock" })
+    }
+
+    @Test
+    fun testPowerampLosslessBadgeWithBitrate() {
+        // Spec test: 24 BIT 44.1 KHZ 1671 KBPS ALAC
+        val alacSpecs = AudioSpecs(
+            codec = Codec.Alac,
+            bitDepth = 24,
+            sampleRate = 44100
+        )
+        assertTrue(alacSpecs.isHiRes)
+        assertEquals(1671, alacSpecs.effectiveBitrateKbps)
+        assertEquals("24 BIT  44.1 KHZ  1671 KBPS  ALAC", alacSpecs.fullBadgeText)
+
+        // Hi-Res Studio Master FLAC test
+        val flacSpecs = AudioSpecs(
+            codec = Codec.Flac,
+            bitDepth = 24,
+            sampleRate = 96000
+        )
+        assertTrue(flacSpecs.isHiRes)
+        assertNotNull(flacSpecs.effectiveBitrateKbps)
+        assertTrue(flacSpecs.fullBadgeText.contains("24 BIT  96 KHZ"))
+        assertTrue(flacSpecs.fullBadgeText.endsWith("FLAC"))
+    }
+
+    @Test
+    fun testRipStageAndTaskProgressEventServerJson() {
+        val serverJson = """
+            {
+                "task_id": "task_abc123",
+                "stage": "uploading",
+                "percent": 88.5,
+                "speed": "4.2 MB/s",
+                "track_id": "cuid_999",
+                "is_cached": true,
+                "completed": false,
+                "error": null
+            }
+        """.trimIndent()
+        val event = json.decodeFromString<TaskProgressEvent>(serverJson)
+        assertEquals("task_abc123", event.task_id)
+        assertEquals("uploading", event.stage)
+        assertEquals("uploading", event.effectiveStage)
+        assertEquals(88.5f, event.percent)
+        assertEquals(88.5f, event.effectivePercent)
+        assertEquals("4.2 MB/s", event.speed)
+        assertEquals("cuid_999", event.track_id)
+        assertEquals(true, event.is_cached)
+        assertFalse(event.completed)
+        assertFalse(event.isFinished)
+
+        // Test RipStage mapping
+        assertEquals(RipStage.UPLOADING, RipStage.fromStage(event.effectiveStage))
+        assertEquals(RipStage.COMPLETED, RipStage.fromStage("completed"))
+        assertEquals(RipStage.DOWNLOADING, RipStage.fromStage("downloading"))
+        assertEquals(RipStage.ERROR, RipStage.fromStage("failed"))
     }
 }
