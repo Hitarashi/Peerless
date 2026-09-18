@@ -26,10 +26,6 @@ import org.shilpo.peerless.model.Codec
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.theme.*
 
-/**
- * Poweramp-inspired Audiophile Signal Path & Lossless Technical Inspector Dialog.
- * Triggered on long-pressing a track row or tapping the PowerampLosslessBadge.
- */
 @Composable
 fun AudioDetailsModal(
     track: TrackSummaryDto,
@@ -65,7 +61,6 @@ fun AudioDetailsModal(
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Header: Poweramp Title & Tier Chip
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -111,7 +106,6 @@ fun AudioDetailsModal(
                     }
                 }
 
-                // Track Summary Card
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -173,7 +167,6 @@ fun AudioDetailsModal(
                     }
                 }
 
-                // Audiophile Technical Specifications Grid
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -202,7 +195,6 @@ fun AudioDetailsModal(
                     SpecRow("Duration", formatDuration(track.duration))
                 }
 
-                // Actions: Play / Dismiss
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,

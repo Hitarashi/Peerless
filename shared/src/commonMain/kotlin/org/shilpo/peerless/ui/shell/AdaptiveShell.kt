@@ -36,18 +36,6 @@ import org.shilpo.peerless.ui.navigation.NavigationDestination
 import org.shilpo.peerless.ui.screens.SearchScreen
 import org.shilpo.peerless.ui.toTrackSummary
 
-
-/**
- * Multiplatform Adaptive Shell implementing Google Large Screen Guidelines & ADR 0002.
- *
- * Viewport Form Factors:
- * - Compact (< 600dp, Mobile):
- *     Content area + Floating docked MiniPlayer + Floating pill navigation dock (FloatingNavDock) + NowPlayingSheet
- * - Medium (600dp .. 839dp, Foldable/Tablet):
- *     Vertical NavigationRail on start side + Center content + MiniPlayerBar docked at bottom
- * - Expanded (>= 840dp, Desktop/Landscape Tablet):
- *     Canonical Supporting Pane Layout (Persistent Left Drawer + Center Content + Right Supporting Pane + Persistent Bottom Player)
- */
 @Composable
 fun AdaptiveShell(
     coordinator: PlaybackCoordinator = remember { PlaybackCoordinator() },
@@ -60,22 +48,19 @@ fun AdaptiveShell(
     var isNowPlayingOpen by remember { mutableStateOf(false) }
     var isSettingsOpen by remember { mutableStateOf(false) }
 
-    // Volume state for desktop player
     var volume by remember { mutableFloatStateOf(0.85f) }
     var isShuffle by remember { mutableStateOf(false) }
     var isRepeat by remember { mutableStateOf(false) }
 
-    // Search and catalog state
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("All") }
     var isSearching by remember { mutableStateOf(false) }
     var serverConnected by remember { mutableStateOf(false) }
     var serverTracks by remember { mutableStateOf<List<TrackSummaryDto>>(emptyList()) }
 
-    // Query server on filter or query change
     LaunchedEffect(searchQuery, selectedFilter, playerState.serverUrl) {
         isSearching = true
-        delay(300) // Debounce
+        delay(300)
 
         val providerParam = when (selectedFilter) {
             "Apple Music" -> "apple_music"
@@ -223,8 +208,6 @@ fun AdaptiveShell(
                     }
                 }
 
-
-                // Full-screen expandable Now Playing Sheet modal
                 AnimatedVisibility(
                     visible = isNowPlayingOpen && playerState.currentTrack != null,
                     enter = slideInVertically(
@@ -256,7 +239,6 @@ fun AdaptiveShell(
                     }
                 }
 
-                // Server Settings Dialog
                 if (isSettingsOpen) {
                     ServerSettingsDialog(
                         currentServerUrl = playerState.serverUrl,
@@ -273,9 +255,6 @@ fun AdaptiveShell(
     }
 }
 
-// =========================================================================
-// 1. COMPACT VIEWPORT (< 600dp): Floating Dock + Clearance MiniPlayer
-// =========================================================================
 @Composable
 private fun CompactLayout(
     currentDestination: NavigationDestination,
@@ -294,7 +273,6 @@ private fun CompactLayout(
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        // Destination Content Area
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -314,28 +292,24 @@ private fun CompactLayout(
                 allTracks = allTracks,
                 onOpenSettings = onOpenSettings,
                 onOpenNowPlaying = onOpenNowPlaying,
-                // Extra bottom padding for MiniPlayer + Floating Dock clearance
-                contentBottomPadding = if (playerState.currentTrack != null) 160.dp else 90.dp,
+                contentBottomPadding = if (playerState.currentTrack != null) 175.dp else 98.dp,
                 onRipClick = onRipClick
             )
         }
 
-
-        // Floating Dock & MiniPlayer Container
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(bottom = 12.dp),
+                .padding(bottom = NavigationBarBottomPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Floating MiniPlayerBar with 8dp floating clearance above dock
             AnimatedVisibility(
                 visible = playerState.currentTrack != null,
                 enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
                 exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-                modifier = Modifier.padding(bottom = 8.dp)
+                modifier = Modifier.padding(bottom = MiniPlayerBottomSpacing)
             ) {
                 playerState.currentTrack?.let { track ->
                     MiniPlayerBar(
@@ -347,25 +321,34 @@ private fun CompactLayout(
                         artworkUrl = coordinator.apiClient.getArtworkUrl(track, 200),
                         onTogglePlayPause = { coordinator.togglePlayPause() },
                         onPlayNext = { coordinator.playNext() },
+                        onPlayPrevious = { coordinator.playPrevious() },
                         onOpenNowPlaying = onOpenNowPlaying,
-                        modifier = Modifier.padding(horizontal = 12.dp)
+                        onDismiss = { coordinator.stopAndDismiss() },
+                        canSkipNext = coordinator.canSkipNext,
+                        canSkipPrevious = coordinator.canSkipPrevious,
+                        isPairedWithNavigation = true,
+                        modifier = Modifier
+                            .widthIn(max = NavigationBarMaxWidth)
+                            .fillMaxWidth()
+                            .padding(horizontal = NavigationBarHorizontalPadding)
                     )
                 }
             }
 
-            // Floating Pill Navigation Dock (LastWave-Native inspiration)
-            FloatingNavDock(
+            FloatingNavigationToolbar(
+                items = NavigationDestination.MainDestinations,
                 selectedDestination = currentDestination,
-                onSelectDestination = onSelectDestination
+                onSelectDestination = onSelectDestination,
+                isPairedWithMiniPlayer = playerState.currentTrack != null,
+                modifier = Modifier
+                    .widthIn(max = NavigationBarMaxWidth)
+                    .fillMaxWidth()
+                    .padding(horizontal = NavigationBarHorizontalPadding)
             )
         }
     }
 }
 
-/**
- * Floating pill navigation dock hovering near the bottom with 4 primary destinations.
- * Styled with LiquidGlass translucent surface and frosted gradient borders.
- */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun FloatingNavDock(
@@ -436,9 +419,6 @@ fun FloatingNavDock(
     }
 }
 
-// =========================================================================
-// 2. MEDIUM VIEWPORT (600dp .. 839dp): Vertical NavigationRail + Docked MiniPlayer
-// =========================================================================
 @Composable
 private fun MediumLayout(
     currentDestination: NavigationDestination,
@@ -463,7 +443,6 @@ private fun MediumLayout(
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            // Vertical NavigationRail on the start side using official M3 NavigationRail
             NavigationRail(
                 header = {
                     Box(
@@ -519,7 +498,6 @@ private fun MediumLayout(
                 }
             }
 
-            // Primary Content Area
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -547,7 +525,6 @@ private fun MediumLayout(
             }
         }
 
-        // MiniPlayerBar docked at bottom
         AnimatedVisibility(
             visible = playerState.currentTrack != null,
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
@@ -563,7 +540,12 @@ private fun MediumLayout(
                     artworkUrl = coordinator.apiClient.getArtworkUrl(track, 200),
                     onTogglePlayPause = { coordinator.togglePlayPause() },
                     onPlayNext = { coordinator.playNext() },
+                    onPlayPrevious = { coordinator.playPrevious() },
                     onOpenNowPlaying = onOpenNowPlaying,
+                    onDismiss = { coordinator.stopAndDismiss() },
+                    canSkipNext = coordinator.canSkipNext,
+                    canSkipPrevious = coordinator.canSkipPrevious,
+                    isPairedWithNavigation = false,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
@@ -571,9 +553,6 @@ private fun MediumLayout(
     }
 }
 
-// =========================================================================
-// 3. EXPANDED VIEWPORT (>= 840dp): Canonical Google Supporting Pane Layout
-// =========================================================================
 @Composable
 private fun ExpandedLayout(
     currentDestination: NavigationDestination,
@@ -600,15 +579,11 @@ private fun ExpandedLayout(
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        // Main Three-Zone Body
         Row(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            // ----------------------------------------------------
-            // ZONE 1: Left Persistent Navigation Drawer (~240dp)
-            // ----------------------------------------------------
             PersistentNavigationDrawer(
                 selectedDestination = currentDestination,
                 onSelectDestination = onSelectDestination,
@@ -619,9 +594,6 @@ private fun ExpandedLayout(
                     .fillMaxHeight()
             )
 
-            // ----------------------------------------------------
-            // ZONE 2: Primary Content Pane (Center, flex weight)
-            // ----------------------------------------------------
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -647,10 +619,6 @@ private fun ExpandedLayout(
                 )
             }
 
-
-            // ----------------------------------------------------
-            // ZONE 3: Right Contextual Supporting Pane (~340dp)
-            // ----------------------------------------------------
             AnimatedVisibility(
                 visible = activeSupportingPane != null,
                 enter = slideInHorizontally(
@@ -676,14 +644,13 @@ private fun ExpandedLayout(
             }
         }
 
-        // Persistent Full-Width Bottom Player Bar
         PersistentBottomPlayer(
             track = playerState.currentTrack,
             playbackInfo = playerState.playbackInfo,
             status = playerState.status,
             positionMs = playerState.positionMs,
             durationMs = playerState.durationMs,
-            artworkUrl = playerState.currentTrack?.let { coordinator.apiClient.getArtworkUrl(it.id, 200) } ?: "",
+            artworkUrl = playerState.currentTrack?.let { coordinator.apiClient.getArtworkUrl(it, 200) } ?: "",
             onTogglePlayPause = { coordinator.togglePlayPause() },
             onSeekTo = { pos -> coordinator.seekTo(pos) },
             onPlayNext = { coordinator.playNext() },
@@ -701,9 +668,6 @@ private fun ExpandedLayout(
     }
 }
 
-/**
- * Left Persistent Navigation Drawer for Expanded viewports.
- */
 @Composable
 private fun PersistentNavigationDrawer(
     selectedDestination: NavigationDestination,
@@ -728,7 +692,6 @@ private fun PersistentNavigationDrawer(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Top: Brand Header & Status Pill
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -768,7 +731,6 @@ private fun PersistentNavigationDrawer(
                     }
                 }
 
-                // Daemon status pill
                 Row(
                     modifier = Modifier
                         .clip(PillShape)
@@ -798,7 +760,6 @@ private fun PersistentNavigationDrawer(
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
 
-                // Destination Items
                 NavigationDestination.PrimaryDestinations.forEach { dest ->
                     val isSelected = dest == selectedDestination
                     val containerColor = if (isSelected) PrimaryDark.copy(alpha = 0.16f) else Color.Transparent
@@ -845,7 +806,6 @@ private fun PersistentNavigationDrawer(
                 }
             }
 
-            // Bottom Audio Engine Badge
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -871,10 +831,6 @@ private fun PersistentNavigationDrawer(
     }
 }
 
-/**
- * Right Contextual Supporting Pane container for Expanded viewports.
- * Displays Queue, Lyrics, or Poweramp Signal Path Inspector.
- */
 @Composable
 private fun SupportingPaneContainer(
     paneType: SupportingPaneType,
@@ -895,7 +851,6 @@ private fun SupportingPaneContainer(
             )
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Pane Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -943,7 +898,6 @@ private fun SupportingPaneContainer(
 
             HorizontalDivider(color = OutlineVariantDark.copy(alpha = 0.4f))
 
-            // Pane Body
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -978,9 +932,6 @@ private fun SupportingPaneContainer(
     }
 }
 
-/**
- * Supporting Pane: Playback Queue
- */
 @Composable
 private fun QueuePaneContent(
     coordinator: PlaybackCoordinator,
@@ -1018,7 +969,7 @@ private fun QueuePaneContent(
                 val isPlaying = playerState.currentTrack?.id == track.id
                 TrackRow(
                     track = track,
-                    artworkUrl = coordinator.apiClient.getArtworkUrl(track.id, 120),
+                    artworkUrl = coordinator.apiClient.getArtworkUrl(track, 120),
                     isPlaying = isPlaying && playerState.status == PlaybackStatus.PLAYING,
                     onTrackClick = { coordinator.playTrack(it, queue) }
                 )
@@ -1027,9 +978,6 @@ private fun QueuePaneContent(
     }
 }
 
-/**
- * Supporting Pane: Synced Lyrics Preview
- */
 @Composable
 private fun LyricsPaneContent(currentTrack: TrackSummaryDto?) {
     if (currentTrack == null) {
@@ -1068,7 +1016,6 @@ private fun LyricsPaneContent(currentTrack: TrackSummaryDto?) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Sample expressive kinetic synced lyrics lines
             val sampleLyrics = listOf(
                 "Ticking away the moments that make up a dull day",
                 "Fritter and waste the hours in an offhand way",
@@ -1092,10 +1039,6 @@ private fun LyricsPaneContent(currentTrack: TrackSummaryDto?) {
     }
 }
 
-/**
- * Supporting Pane: Poweramp Signal Path Inspector (ADR 0002 & CONTEXT.md)
- * Maps the bit-perfect lossless audio chain from storage origin to output hardware sink.
- */
 @Composable
 private fun SignalPathPaneContent(
     track: TrackSummaryDto?,
@@ -1122,7 +1065,6 @@ private fun SignalPathPaneContent(
                 .padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Stage 1: Source
             SignalPathStageCard(
                 stageNumber = "1",
                 stageName = "SOURCE ORIGIN",
@@ -1131,7 +1073,6 @@ private fun SignalPathPaneContent(
                 accentColor = SecondaryDark
             )
 
-            // Stage 2: Track Format & Specs
             val codec = playbackInfo?.codec ?: track.codec
             val bitDepth = playbackInfo?.bit_depth ?: track.bit_depth
             val sampleRate = playbackInfo?.sample_rate ?: track.sample_rate
@@ -1143,7 +1084,6 @@ private fun SignalPathPaneContent(
                 accentColor = LosslessGold
             )
 
-            // Stage 3: Platform Decoder Engine
             SignalPathStageCard(
                 stageNumber = "3",
                 stageName = "PLATFORM DECODER",
@@ -1152,7 +1092,6 @@ private fun SignalPathPaneContent(
                 accentColor = PrimaryDark
             )
 
-            // Stage 4: Stream Pipe & Cache
             SignalPathStageCard(
                 stageNumber = "4",
                 stageName = "STREAM PIPE / CACHE",
@@ -1161,7 +1100,6 @@ private fun SignalPathPaneContent(
                 accentColor = SecondaryDark
             )
 
-            // Stage 5: Output & Hardware Sink
             SignalPathStageCard(
                 stageNumber = "5",
                 stageName = "OUTPUT & SINK",
@@ -1232,9 +1170,6 @@ private fun SignalPathStageCard(
     }
 }
 
-// =========================================================================
-// DESTINATION CONTENT DISPATCHER
-// =========================================================================
 @Composable
 private fun DestinationContent(
     destination: NavigationDestination,
@@ -1374,7 +1309,6 @@ private fun LibraryDestinationView(
             .fillMaxSize()
             .padding(top = 12.dp)
     ) {
-        // Library Sub-tabs
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1451,7 +1385,6 @@ private fun SettingsDestinationView(
             color = OnSurfaceDark
         )
 
-        // Server Connection Card
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1494,7 +1427,6 @@ private fun SettingsDestinationView(
             }
         }
 
-        // Audio Engine Card
         Box(
             modifier = Modifier
                 .fillMaxWidth()

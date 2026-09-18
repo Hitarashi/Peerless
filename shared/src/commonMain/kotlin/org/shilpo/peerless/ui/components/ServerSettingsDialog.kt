@@ -37,7 +37,6 @@ fun ServerSettingsDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
-                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -66,7 +65,6 @@ fun ServerSettingsDialog(
 
                 HorizontalDivider(color = OutlineVariantDark)
 
-                // Server URL input
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = "API Base URL",
@@ -97,7 +95,6 @@ fun ServerSettingsDialog(
                     )
                 }
 
-                // Dev Mode Switch
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -134,7 +131,6 @@ fun ServerSettingsDialog(
                     )
                 }
 
-                // Action Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,

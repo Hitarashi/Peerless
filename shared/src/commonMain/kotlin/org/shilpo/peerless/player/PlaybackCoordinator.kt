@@ -93,7 +93,6 @@ class PlaybackCoordinator(
 
             if (devMode) {
                 streamUrl = apiClient.getStreamUrl(track.id)
-                // Optionally resolve playback info in parallel for metadata display
                 launch {
                     val infoResult = apiClient.getPlaybackInfo(track.id)
                     infoResult.onSuccess { info ->
@@ -113,7 +112,6 @@ class PlaybackCoordinator(
                         "$base/$path"
                     }
                 } else {
-                    // Fallback to direct stream URL if playback info failed
                     streamUrl = apiClient.getStreamUrl(track.id)
                 }
             }
@@ -136,7 +134,6 @@ class PlaybackCoordinator(
             }
 
             PlaybackStatus.BUFFERING -> {
-                // Already buffering, pause if requested
                 audioEngine.pause()
             }
         }
@@ -174,6 +171,32 @@ class PlaybackCoordinator(
             } else {
                 seekTo(0L)
             }
+        }
+    }
+
+    val canSkipNext: Boolean
+        get() {
+            val q = _state.value.queue
+            return q.isNotEmpty() && (currentIndex + 1 in q.indices)
+        }
+
+    val canSkipPrevious: Boolean
+        get() {
+            val q = _state.value.queue
+            return q.isNotEmpty() && (currentIndex - 1 in q.indices || audioEngine.state.value.positionMs > 3000L)
+        }
+
+    fun stopAndDismiss() {
+        loadJob?.cancel()
+        audioEngine.pause()
+        _state.update {
+            it.copy(
+                currentTrack = null,
+                status = PlaybackStatus.IDLE,
+                positionMs = 0L,
+                durationMs = 0L,
+                playbackInfo = null
+            )
         }
     }
 

@@ -114,7 +114,6 @@ val ExpressiveTypography = Typography(
     )
 )
 
-// Monospace / Spec badge typography
 val SpecBadgeTypography = TextStyle(
     fontFamily = FontFamily.Monospace,
     fontWeight = FontWeight.Bold,

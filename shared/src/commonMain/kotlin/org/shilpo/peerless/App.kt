@@ -17,11 +17,7 @@ fun App() {
     val playerState by coordinator.state.collectAsState()
 
     val currentArtworkUrl = playerState.currentTrack?.let { track ->
-        if (track.id > 0 && playerState.serverUrl.isNotBlank()) {
-            "${playerState.serverUrl.trimEnd('/')}/api/v1/assets/tracks/${track.id}/artwork"
-        } else {
-            track.artwork_url
-        }
+        coordinator.apiClient.getArtworkUrl(track, 300)
     }
 
     val dynamicSeedColor = rememberArtworkSeedColor(artworkUrl = currentArtworkUrl)

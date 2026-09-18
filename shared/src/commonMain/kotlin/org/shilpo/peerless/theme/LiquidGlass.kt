@@ -17,10 +17,6 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/**
- * LiquidGlass styling inspired by LastWave-Native and modern translucent glassmorphism.
- * Features subtle dark translucent container, specular top sheen, and frosted gradient borders.
- */
 object LiquidGlassDefaults {
     val ContainerColor: Color = Color(0xFF14141B).copy(alpha = 0.78f)
     val ElevatedContainerColor: Color = Color(0xFF181824).copy(alpha = 0.88f)
@@ -54,9 +50,6 @@ object LiquidGlassDefaults {
     val DefaultShape: Shape = RoundedCornerShape(24.dp)
 }
 
-/**
- * Modifier that applies translucent liquid glass styling to any Composable.
- */
 fun Modifier.liquidGlass(
     shape: Shape = LiquidGlassDefaults.DefaultShape,
     containerColor: Color = LiquidGlassDefaults.ContainerColor,
@@ -75,9 +68,6 @@ fun Modifier.liquidGlass(
     )
     .border(width = borderWidth, brush = borderBrush, shape = shape)
 
-/**
- * Composable surface for floating glass panels, docks, and modal sheets.
- */
 @Composable
 fun LiquidGlassSurface(
     modifier: Modifier = Modifier,
@@ -100,10 +90,6 @@ fun LiquidGlassSurface(
     )
 }
 
-/**
- * Ambient glow modifier that renders atmospheric multi-color radial gradients
- * behind artwork, player controls, or surface backgrounds.
- */
 fun Modifier.ambientGlow(
     primaryGlow: Color = PrimaryDark,
     secondaryGlow: Color = SecondaryDark,
@@ -113,7 +99,6 @@ fun Modifier.ambientGlow(
     val canvasWidth = size.width
     val canvasHeight = size.height
 
-    // Top-left primary ambient glow
     drawCircle(
         brush = Brush.radialGradient(
             colors = listOf(
@@ -126,7 +111,6 @@ fun Modifier.ambientGlow(
         )
     )
 
-    // Center-right secondary ambient glow
     drawCircle(
         brush = Brush.radialGradient(
             colors = listOf(
@@ -139,7 +123,6 @@ fun Modifier.ambientGlow(
         )
     )
 
-    // Bottom subtle tertiary violet glow
     drawCircle(
         brush = Brush.radialGradient(
             colors = listOf(
@@ -152,9 +135,6 @@ fun Modifier.ambientGlow(
     )
 }
 
-/**
- * Background container rendering atmospheric ambient lighting behind player or screen content.
- */
 @Composable
 fun AmbientGlowBackground(
     modifier: Modifier = Modifier,

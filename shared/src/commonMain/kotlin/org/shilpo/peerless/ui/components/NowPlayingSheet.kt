@@ -1,11 +1,10 @@
 package org.shilpo.peerless.ui.components
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -19,6 +18,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,7 +52,6 @@ fun NowPlayingSheet(
     var isShuffle by remember { mutableStateOf(false) }
     var isRepeat by remember { mutableStateOf(false) }
 
-    // Scrubbing state
     var isDraggingSlider by remember { mutableStateOf(false) }
     var sliderDragPosition by remember { mutableFloatStateOf(0f) }
 
@@ -73,6 +72,12 @@ fun NowPlayingSheet(
         targetValue = if (isPlayPressed) 0.92f else 1f,
         label = "HeroPlayScale"
     )
+
+    val currentOnClose by rememberUpdatedState(onClose)
+    val density = LocalDensity.current
+    val dismissThresholdPx = with(density) { 60.dp.toPx() }
+    var cumulativeDragY by remember { mutableFloatStateOf(0f) }
+    var hasTriggeredClose by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier
@@ -96,11 +101,32 @@ fun NowPlayingSheet(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Top Bar: Collapse handle, Provider label, Settings icon
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp),
+                    .padding(bottom = 12.dp)
+                    .draggable(
+                        orientation = Orientation.Vertical,
+                        state = rememberDraggableState { delta ->
+                            cumulativeDragY += delta
+                            if (!hasTriggeredClose && cumulativeDragY > dismissThresholdPx) {
+                                hasTriggeredClose = true
+                                currentOnClose()
+                            }
+                        },
+                        onDragStarted = {
+                            cumulativeDragY = 0f
+                            hasTriggeredClose = false
+                        },
+                        onDragStopped = { velocity ->
+                            if (!hasTriggeredClose && (cumulativeDragY > dismissThresholdPx || velocity > 600f)) {
+                                hasTriggeredClose = true
+                                currentOnClose()
+                            }
+                            cumulativeDragY = 0f
+                            hasTriggeredClose = false
+                        }
+                    ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -152,7 +178,6 @@ fun NowPlayingSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Hero Album Artwork with glow & squircle shape
             Box(
                 modifier = Modifier
                     .size(270.dp)
@@ -184,7 +209,6 @@ fun NowPlayingSheet(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Track Title, Artist, Album
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -222,7 +246,6 @@ fun NowPlayingSheet(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Lossless Audio Spec Chip (Full Hero Details)
             LosslessBadge(
                 bitDepth = playbackInfo?.bit_depth ?: track.bit_depth,
                 sampleRate = playbackInfo?.sample_rate ?: track.sample_rate,
@@ -233,7 +256,6 @@ fun NowPlayingSheet(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Playback Position Slider & Timestamps
             Column(modifier = Modifier.fillMaxWidth()) {
                 Slider(
                     value = displayFraction,
@@ -276,7 +298,6 @@ fun NowPlayingSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Central Control Cluster: Shuffle, Prev, Play/Pause, Next, Repeat
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -284,7 +305,6 @@ fun NowPlayingSheet(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Shuffle Button
                 IconButton(
                     onClick = { isShuffle = !isShuffle },
                     modifier = Modifier.size(44.dp)
@@ -297,7 +317,6 @@ fun NowPlayingSheet(
                     )
                 }
 
-                // Previous Track Button
                 IconButton(
                     onClick = onPlayPrevious,
                     modifier = Modifier.size(52.dp)
@@ -310,7 +329,6 @@ fun NowPlayingSheet(
                     )
                 }
 
-                // Hero Play/Pause Button (68dp filled squircle)
                 Box(
                     modifier = Modifier
                         .scale(playButtonScale)
@@ -324,21 +342,13 @@ fun NowPlayingSheet(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    AnimatedContent(
-                        targetState = isPlaying,
-                        transitionSpec = { fadeIn() togetherWith fadeOut() },
-                        label = "HeroPlayPauseAnim"
-                    ) { playing ->
-                        Icon(
-                            imageVector = if (playing) PeerlessIcons.Pause else PeerlessIcons.Play,
-                            contentDescription = if (playing) "Pause" else "Play",
-                            tint = OnPrimaryDark,
-                            modifier = Modifier.size(36.dp)
-                        )
-                    }
+                    PlayPauseMorphIcon(
+                        isPlaying = isPlaying,
+                        tint = OnPrimaryDark,
+                        size = 36.dp
+                    )
                 }
 
-                // Next Track Button
                 IconButton(
                     onClick = onPlayNext,
                     modifier = Modifier.size(52.dp)
@@ -351,7 +361,6 @@ fun NowPlayingSheet(
                     )
                 }
 
-                // Repeat Button
                 IconButton(
                     onClick = { isRepeat = !isRepeat },
                     modifier = Modifier.size(44.dp)
@@ -367,7 +376,6 @@ fun NowPlayingSheet(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Bottom Server & Stream Diagnostics Pill
             Row(
                 modifier = Modifier
                     .clip(PillShape)

@@ -11,10 +11,6 @@ import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 
-// ============================================================================
-// 1. Core Domain Enums & Entities (Single Source of Truth / TMDB Architecture)
-// ============================================================================
-
 @Serializable
 enum class Provider(val raw: String, val displayName: String) {
     Apple("apple", "Apple Music"),
@@ -60,9 +56,6 @@ enum class SearchFilter(val label: String, val providerQuery: String? = null) {
     CACHED("Cached")
 }
 
-/**
- * Technical audio specification encapsulation used for Poweramp-style badge rendering.
- */
 @Serializable
 data class AudioSpecs(
     val codec: Codec,
@@ -73,10 +66,6 @@ data class AudioSpecs(
     val isHiRes: Boolean
         get() = (bitDepth ?: 16) > 16 || (sampleRate ?: 44100) > 48000
 
-    /**
-     * Compact uppercase badge text matching Poweramp audiophile styling:
-     * e.g. "24 BIT  44.1 KHZ  1671 KBPS  ALAC" or "24 BIT  192 KHZ  FLAC"
-     */
     val effectiveBitrateKbps: Int?
         get() {
             if (bitrateKbps != null && bitrateKbps > 0) return bitrateKbps
@@ -127,9 +116,6 @@ data class AudioSpecs(
         }.trim()
 }
 
-/**
- * Concrete provider-specific offering of a track (e.g. Apple ALAC 24/48 or Qobuz FLAC 24/192).
- */
 @Serializable
 data class TrackSource(
     val id: Int,
@@ -151,10 +137,6 @@ data class TrackSource(
         )
 }
 
-/**
- * Canonical musical work entity (TMDB / IMDb style single source of truth),
- * uniquely identified across the ecosystem and aggregating multiple provider sources.
- */
 @Serializable
 data class CanonicalTrack(
     val id: String,
@@ -169,12 +151,6 @@ data class CanonicalTrack(
     val isCached: Boolean
         get() = sources.any { it.isCached }
 
-    /**
-     * Resolves the optimal available source:
-     * 1. Cached in Telegram dump channel first.
-     * 2. Highest bit-depth (e.g. 24-bit over 16-bit).
-     * 3. Highest sample rate (e.g. 192kHz over 96kHz).
-     */
     val bestSource: TrackSource?
         get() = sources.maxWithOrNull(
             compareBy<TrackSource> { it.isCached }
@@ -182,10 +158,6 @@ data class CanonicalTrack(
                 .thenBy { it.sampleRate ?: 44100 }
         ) ?: sources.firstOrNull()
 }
-
-// ============================================================================
-// 2. Server DTOs (Directly aligning with peerless-server Rust Axum API)
-// ============================================================================
 
 @Serializable
 data class TrackSummaryDto(
@@ -212,7 +184,8 @@ data class UncachedTrackDto(
     val artist: String,
     val album: String,
     val duration: Int,
-    val is_cached: Boolean = false
+    val is_cached: Boolean = false,
+    val artwork_url: String? = null
 )
 
 @Serializable
@@ -261,7 +234,6 @@ data class PlaybackInfo(
     val file_size: Long
 )
 
-// Auth DTOs
 @Serializable
 data class ExchangeRequest(
     val code: String,
@@ -316,7 +288,6 @@ data class MeResponse(
     val sessions: List<SessionDto> = emptyList()
 )
 
-// Library DTOs
 @Serializable
 data class FavoriteItemDto(
     val id: Int,
@@ -345,7 +316,6 @@ data class UpdatePlaylistRequest(
     val track_ids: List<Int>? = null
 )
 
-// Tasks & SSE Ripping DTOs
 @Serializable
 data class RipTaskRequest(
     val provider: String,
@@ -433,7 +403,6 @@ data class ActiveRipTask(
     val resultingTrackId: String? = null
 )
 
-// Lyrics DTOs
 @Serializable
 data class LyricsWordDto(
     val text: String,
@@ -456,10 +425,6 @@ data class LyricsResponse(
     val plain_text: String? = null,
     val lines: List<LyricsLineDto> = emptyList()
 )
-
-// ============================================================================
-// 3. Domain Mapping Extensions
-// ============================================================================
 
 fun TrackSummaryDto.toCanonicalTrack(baseUrl: String = ""): CanonicalTrack {
     val providerEnum = Provider.fromString(provider)
@@ -535,10 +500,6 @@ fun TrackDetailDto.toCanonicalTrack(baseUrl: String = ""): CanonicalTrack {
     )
 }
 
-// ============================================================================
-// 4. Canonical Track Deduplication Utility
-// ============================================================================
-
 object CanonicalDeduplicator {
     private fun normalize(str: String): String =
         str.trim().lowercase().replace(Regex("\\s+"), " ")
@@ -553,11 +514,6 @@ object CanonicalDeduplicator {
         var isrc: String? = null
     )
 
-    /**
-     * Merges cached tracks and live search results into unified CanonicalTrack items.
-     * If the same title & artist appear in both, their sources are aggregated into a single CanonicalTrack,
-     * prioritizing cached Telegram streams while retaining access to high-res live provider sources.
-     */
     fun deduplicate(
         cachedTracks: List<TrackSummaryDto>,
         liveTracks: List<UncachedTrackDto>,
@@ -672,10 +628,6 @@ object CanonicalDeduplicator {
         }
     }
 }
-
-// ============================================================================
-// 5. Last.fm Intelligence Models
-// ============================================================================
 
 @Serializable
 data class LastFmTag(val name: String, val count: Int = 0)

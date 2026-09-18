@@ -107,7 +107,6 @@ fun PowerampLosslessBadge(
     }
 }
 
-
 @Composable
 fun AnimatedEqualizer(
     isPlaying: Boolean,
@@ -216,7 +215,6 @@ fun TrackRow(
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // High-res artwork thumbnail with fallback placeholder
         Box(
             modifier = Modifier
                 .size(52.dp)
@@ -239,7 +237,6 @@ fun TrackRow(
             )
 
             if (isPlaying) {
-                // Subtle scrim overlay with animated equalizer
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -258,7 +255,6 @@ fun TrackRow(
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        // Title, Artist, Album, Specs
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(3.dp)
@@ -396,7 +392,6 @@ fun TrackRow(
 
         Spacer(modifier = Modifier.width(6.dp))
 
-        // Duration / 1-tap RIP / 3-dot options menu
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp)

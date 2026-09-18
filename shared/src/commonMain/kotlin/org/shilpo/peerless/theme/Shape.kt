@@ -13,7 +13,6 @@ val ExpressiveShapes = Shapes(
     extraLarge = RoundedCornerShape(32.dp)
 )
 
-// Expressive squircle & pill shapes
 val PillShape = RoundedCornerShape(50)
 val SquircleShapeLarge = RoundedCornerShape(28.dp)
 val SquircleShapeMedium = RoundedCornerShape(20.dp)
@@ -21,7 +20,6 @@ val SquircleShapeSmall = RoundedCornerShape(14.dp)
 val ArtworkShape = RoundedCornerShape(14.dp)
 val HeroArtworkShape = RoundedCornerShape(26.dp)
 
-// Asymmetric expressive pill shapes for accents / cards
 val AsymmetricCardShape = RoundedCornerShape(
     topStart = CornerSize(24.dp),
     topEnd = CornerSize(12.dp),

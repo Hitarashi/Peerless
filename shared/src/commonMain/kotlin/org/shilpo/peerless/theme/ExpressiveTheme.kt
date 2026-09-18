@@ -16,12 +16,6 @@ import androidx.compose.ui.unit.dp
 import com.materialkolor.DynamicMaterialExpressiveTheme
 import com.materialkolor.PaletteStyle
 
-/**
- * Window size class breakpoints aligning with Google Large Screen Guidelines:
- * - Compact: < 600dp (Phones in portrait)
- * - Medium: 600dp .. 839dp (Foldables, tablets in portrait)
- * - Expanded: >= 840dp (Desktop, tablets in landscape)
- */
 enum class WindowWidthSizeClass {
     COMPACT,
     MEDIUM,
@@ -41,9 +35,6 @@ enum class WindowWidthSizeClass {
 
 val LocalWindowWidthSizeClass = staticCompositionLocalOf { WindowWidthSizeClass.COMPACT }
 
-/**
- * Material 3 Expressive smooth motion curves and spring physics.
- */
 object ExpressiveMotion {
     val EmphasizedEasing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
     val EmphasizedDecelerateEasing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f)
@@ -113,7 +104,7 @@ fun ExpressiveTheme(
             DynamicMaterialExpressiveTheme(
                 seedColor = seedColor,
                 isDark = darkTheme,
-                style = PaletteStyle.Expressive,
+                style = PaletteStyle.TonalSpot,
                 animate = true,
                 content = content
             )

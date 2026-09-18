@@ -116,7 +116,6 @@ class SharedCommonTest {
         )
 
         assertTrue(track.isCached)
-        // Best source should resolve to cached Qobuz 24-bit/192kHz stream
         val best = track.bestSource
         assertNotNull(best)
         assertEquals(Provider.Qobuz, best.provider)
@@ -275,11 +274,9 @@ class SharedCommonTest {
         val client = PeerlessApiClient("http://localhost:4444")
         assertEquals("http://localhost:4444", client.baseUrl)
 
-        // In Dev mode: direct track_id stream URL
         val directUrl = client.resolveStreamUrl(42)
         assertEquals("http://localhost:4444/api/v1/stream?track_id=42", directUrl)
 
-        // In Prod mode with ticket: signed ticket URL
         val ticketUrl = client.resolveStreamUrl(42, "xyz_ticket")
         assertEquals("http://localhost:4444/api/v1/stream?ticket=xyz_ticket", ticketUrl)
 
@@ -327,21 +324,17 @@ class SharedCommonTest {
         assertEquals(0, coordinator.currentIndex)
         assertEquals(200_000L, coordinator.state.value.durationMs)
 
-        // Test seekTo
         coordinator.seekTo(15000L)
         assertEquals(15000L, coordinator.state.value.positionMs)
 
-        // Test togglePlayPause
         fakeEngine._state.value = fakeEngine._state.value.copy(status = PlaybackStatus.PLAYING)
         coordinator.togglePlayPause()
         assertEquals(PlaybackStatus.PAUSED, fakeEngine.state.value.status)
 
-        // Test playNext
         coordinator.playNext()
         assertEquals(track2, coordinator.currentTrack)
         assertEquals(1, coordinator.currentIndex)
 
-        // Test playPrevious
         fakeEngine._state.value = fakeEngine._state.value.copy(positionMs = 1000L)
         coordinator.playPrevious()
         assertEquals(track1, coordinator.currentTrack)
@@ -421,7 +414,6 @@ class SharedCommonTest {
 
         assertEquals(2, deduplicated.size)
 
-        // Verify the merged Midnight City track
         val midnightCity = deduplicated.first { it.title == "Midnight City" }
         assertEquals("10", midnightCity.id)
         assertEquals("M83", midnightCity.artist)
@@ -430,7 +422,6 @@ class SharedCommonTest {
         assertEquals("http://127.0.0.1:4444/api/v1/assets/tracks/10/artwork", midnightCity.artworkUrl)
         assertEquals(2, midnightCity.sources.size)
 
-        // Cached Apple source should be the best source
         val bestSource = midnightCity.bestSource
         assertNotNull(bestSource)
         assertEquals(Provider.Apple, bestSource.provider)
@@ -438,13 +429,11 @@ class SharedCommonTest {
         assertEquals(24, bestSource.bitDepth)
         assertEquals(48000, bestSource.sampleRate)
 
-        // Qobuz live source should be present in sources
         val qobuzSource = midnightCity.sources.firstOrNull { it.provider == Provider.Qobuz }
         assertNotNull(qobuzSource)
         assertEquals("qobuz_202", qobuzSource.providerTrackId)
         assertFalse(qobuzSource.isCached)
 
-        // Verify Get Lucky track (live-only)
         val getLucky = deduplicated.first { it.title == "Get Lucky" }
         assertEquals("qobuz_qobuz_303", getLucky.id)
         assertEquals("Daft Punk", getLucky.artist)
@@ -454,13 +443,11 @@ class SharedCommonTest {
 
     @Test
     fun testLastFmClientFallback() = runTest {
-        // Point to an unreachable port to trigger the fallback pathway
         val client = LastFmClient(
             baseUrl = "http://127.0.0.1:59999",
             enableFallback = true
         )
 
-        // Test fallback artist info
         val artistResult = client.getArtistInfo("M83")
         assertTrue(artistResult.isSuccess)
         val artist = artistResult.getOrNull()
@@ -471,7 +458,6 @@ class SharedCommonTest {
         assertTrue(artist.tags.any { it.name == "Electronic" })
         assertTrue(artist.similarArtists.isNotEmpty())
 
-        // Test fallback track info
         val trackResult = client.getTrackInfo("M83", "Midnight City")
         assertTrue(trackResult.isSuccess)
         val trackInfo = trackResult.getOrNull()
@@ -482,7 +468,6 @@ class SharedCommonTest {
         assertTrue(trackInfo.tags.isNotEmpty())
         assertTrue(trackInfo.playcount > 0L)
 
-        // Test fallback top tags
         val tagsResult = client.getTopTags()
         assertTrue(tagsResult.isSuccess)
         val tags = tagsResult.getOrNull()
@@ -494,7 +479,6 @@ class SharedCommonTest {
 
     @Test
     fun testPowerampLosslessBadgeWithBitrate() {
-        // Spec test: 24 BIT 44.1 KHZ 1671 KBPS ALAC
         val alacSpecs = AudioSpecs(
             codec = Codec.Alac,
             bitDepth = 24,
@@ -504,7 +488,6 @@ class SharedCommonTest {
         assertEquals(1671, alacSpecs.effectiveBitrateKbps)
         assertEquals("24 BIT  44.1 KHZ  1671 KBPS  ALAC", alacSpecs.fullBadgeText)
 
-        // Hi-Res Studio Master FLAC test
         val flacSpecs = AudioSpecs(
             codec = Codec.Flac,
             bitDepth = 24,
@@ -542,7 +525,6 @@ class SharedCommonTest {
         assertFalse(event.completed)
         assertFalse(event.isFinished)
 
-        // Test RipStage mapping
         assertEquals(RipStage.UPLOADING, RipStage.fromStage(event.effectiveStage))
         assertEquals(RipStage.COMPLETED, RipStage.fromStage("completed"))
         assertEquals(RipStage.DOWNLOADING, RipStage.fromStage("downloading"))

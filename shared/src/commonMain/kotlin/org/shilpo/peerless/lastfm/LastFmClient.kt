@@ -11,13 +11,6 @@ import org.shilpo.peerless.model.LastFmTag
 import org.shilpo.peerless.model.LastFmTrackInfo
 import org.shilpo.peerless.network.createDefaultPeerlessHttpClient
 
-/**
- * Client for Last.fm API 2.0 delivering rich taste intelligence, artist bios, genre tags,
- * and scrobbler metadata directly to the client without burdening the Telegram streaming server.
- *
- * Includes built-in offline fallback data to ensure UI screens remain richly populated with
- * genres, taste suggestions, and biographical information even during network failures.
- */
 class LastFmClient(
     val apiKey: String = AppConfig.DEFAULT_LASTFM_API_KEY,
     val baseUrl: String = AppConfig.LASTFM_API_BASE_URL,
@@ -30,9 +23,6 @@ class LastFmClient(
         coerceInputValues = true
     }
 
-    /**
-     * Retrieves artist biography, genre tags, and similar artists.
-     */
     suspend fun getArtistInfo(artist: String): Result<LastFmArtist> = runCatching {
         try {
             val response = httpClient.get(baseUrl) {
@@ -64,9 +54,6 @@ class LastFmClient(
         }
     }
 
-    /**
-     * Retrieves track wiki details, tags, and playcount.
-     */
     suspend fun getTrackInfo(artist: String, track: String): Result<LastFmTrackInfo> = runCatching {
         try {
             val response = httpClient.get(baseUrl) {
@@ -99,9 +86,6 @@ class LastFmClient(
         }
     }
 
-    /**
-     * Retrieves global top tags / genres for taste exploration.
-     */
     suspend fun getTopTags(): Result<List<LastFmTag>> = runCatching {
         try {
             val response = httpClient.get(baseUrl) {
@@ -133,10 +117,6 @@ class LastFmClient(
             }
         }
     }
-
-    // ========================================================================
-    // Internal Parsers (Handling Last.fm XML-to-JSON polymorphic quirks)
-    // ========================================================================
 
     private fun parseArtist(artistObj: JsonObject, requestedArtist: String): LastFmArtist {
         val name = artistObj["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: requestedArtist

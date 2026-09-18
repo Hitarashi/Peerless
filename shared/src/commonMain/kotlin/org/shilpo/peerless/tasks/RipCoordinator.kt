@@ -5,11 +5,6 @@ import kotlinx.coroutines.flow.*
 import org.shilpo.peerless.model.*
 import org.shilpo.peerless.network.PeerlessApiClient
 
-/**
- * Deep module coordinating and tracking on-demand audio ripping tasks across the app.
- * Handles job dispatch, real-time SSE progress observation, task state updates,
- * and mapping to domain tracks upon completion.
- */
 class RipCoordinator(
     val apiClient: PeerlessApiClient = PeerlessApiClient(),
     val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -19,10 +14,6 @@ class RipCoordinator(
 
     private val runningJobs = mutableMapOf<String, Job>()
 
-    /**
-     * Dispatches an on-demand rip task to the backend server and begins streaming events.
-     * Returns Result.success(taskId) on success, or Result.failure on error.
-     */
     suspend fun startRip(
         track: TrackSummaryDto,
         provider: String? = null,
@@ -52,9 +43,6 @@ class RipCoordinator(
         }
     }
 
-    /**
-     * Convenience overload for ripping uncached tracks discovered via live search.
-     */
     suspend fun startRip(
         track: UncachedTrackDto,
         provider: String? = null,
@@ -75,9 +63,6 @@ class RipCoordinator(
         return startRip(summary, provider, codec, token)
     }
 
-    /**
-     * Asynchronously starts a rip job without suspending.
-     */
     fun startRipAsync(
         track: TrackSummaryDto,
         provider: String? = null,
@@ -89,16 +74,10 @@ class RipCoordinator(
         onResult?.invoke(res)
     }
 
-    /**
-     * Connects to the SSE endpoint of the backend and tracks the task progress.
-     */
     fun monitorTask(taskId: String, track: TrackSummaryDto, token: String? = null): Job {
         return monitorTaskFlow(taskId, track, apiClient.streamTaskEvents(taskId, token))
     }
 
-    /**
-     * Internal/testable worker that monitors any Flow of TaskProgressEvent and updates ActiveRipTask state.
-     */
     fun monitorTaskFlow(taskId: String, track: TrackSummaryDto, eventsFlow: Flow<TaskProgressEvent>): Job {
         runningJobs[taskId]?.cancel()
         val job = coroutineScope.launch {
@@ -133,17 +112,11 @@ class RipCoordinator(
         return job
     }
 
-    /**
-     * Dismisses or clears a task from the active tasks map and cancels active monitoring.
-     */
     fun dismissTask(taskId: String) {
         runningJobs.remove(taskId)?.cancel()
         _activeTasks.update { it - taskId }
     }
 
-    /**
-     * Looks up an active or recent rip task for a given TrackSummaryDto.
-     */
     fun getTaskForTrack(trackSummaryDto: TrackSummaryDto): ActiveRipTask? {
         return _activeTasks.value.values.firstOrNull { task ->
             (task.track.id > 0 && task.track.id == trackSummaryDto.id) ||
@@ -152,9 +125,6 @@ class RipCoordinator(
         }
     }
 
-    /**
-     * Looks up an active or recent rip task for a given UncachedTrackDto.
-     */
     fun getTaskForTrack(track: UncachedTrackDto): ActiveRipTask? {
         return _activeTasks.value.values.firstOrNull { task ->
             task.track.provider.equals(track.provider, ignoreCase = true) &&
@@ -162,14 +132,8 @@ class RipCoordinator(
         }
     }
 
-    /**
-     * Gets a single task snapshot by taskId.
-     */
     fun getTask(taskId: String): ActiveRipTask? = _activeTasks.value[taskId]
 
-    /**
-     * Returns a Flow observing a single task by taskId.
-     */
     fun getTaskFlow(taskId: String): Flow<ActiveRipTask?> = activeTasks.map { it[taskId] }
 
     companion object {

@@ -4,9 +4,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/**
- * Unified deep seam for persisting the 256-bit opaque session token across platforms.
- */
 interface TokenStorage {
     val tokenFlow: StateFlow<String?>
 
@@ -15,9 +12,6 @@ interface TokenStorage {
     suspend fun clearToken()
 }
 
-/**
- * In-memory implementation of TokenStorage for unit tests and Compose previews.
- */
 class InMemoryTokenStorage(initialToken: String? = null) : TokenStorage {
     private val _tokenFlow = MutableStateFlow(initialToken)
     override val tokenFlow: StateFlow<String?> = _tokenFlow.asStateFlow()
@@ -33,7 +27,4 @@ class InMemoryTokenStorage(initialToken: String? = null) : TokenStorage {
     }
 }
 
-/**
- * Factory function providing platform-specific secure storage.
- */
 expect fun createPlatformTokenStorage(): TokenStorage

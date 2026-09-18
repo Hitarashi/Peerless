@@ -1,10 +1,6 @@
 package org.shilpo.peerless.ui.components
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -40,14 +36,6 @@ import org.shilpo.peerless.ui.shell.SupportingPaneType
 import kotlin.math.PI
 import kotlin.math.sin
 
-/**
- * Full-width persistent bottom playback bar for Expanded (>= 840dp Desktop/Tablet) viewports.
- * Conforms to Google Large Screen Guidelines & ADR 0002.
- *
- * Left: Artwork thumbnail + Track Title + Artist + Poweramp-style Lossless Badge
- * Center: Playback controls (Shuffle, Previous, Play/Pause, Next, Repeat) + Wavy progress bar + timestamps
- * Right: Volume slider + Supporting Pane toggles (Queue, Lyrics, Signal Path)
- */
 @Composable
 fun PersistentBottomPlayer(
     track: TrackSummaryDto?,
@@ -73,7 +61,6 @@ fun PersistentBottomPlayer(
 ) {
     val isPlaying = status == PlaybackStatus.PLAYING
 
-    // Play button press animation
     val playButtonInteractionSource = remember { MutableInteractionSource() }
     val isPlayPressed by playButtonInteractionSource.collectIsPressedAsState()
     val playButtonScale by animateFloatAsState(
@@ -81,7 +68,6 @@ fun PersistentBottomPlayer(
         label = "PersistentPlayScale"
     )
 
-    // Liquid glass frosted bottom container
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -93,7 +79,6 @@ fun PersistentBottomPlayer(
                 shape = RectangleShape
             )
     ) {
-        // Specular top highlight line
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -117,9 +102,6 @@ fun PersistentBottomPlayer(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // ==========================================
-            // LEFT: Artwork, Title, Artist, Lossless Badge
-            // ==========================================
             Row(
                 modifier = Modifier
                     .weight(1f)
@@ -131,7 +113,6 @@ fun PersistentBottomPlayer(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Miniature artwork
                 Box(
                     modifier = Modifier
                         .size(54.dp)
@@ -194,9 +175,6 @@ fun PersistentBottomPlayer(
                 }
             }
 
-            // ==========================================
-            // CENTER: Controls + Expressive Wavy Progress
-            // ==========================================
             Column(
                 modifier = Modifier
                     .weight(1.8f)
@@ -204,12 +182,10 @@ fun PersistentBottomPlayer(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Transport control buttons
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Shuffle button
                     IconButton(
                         onClick = onToggleShuffle,
                         modifier = Modifier.size(32.dp)
@@ -222,7 +198,6 @@ fun PersistentBottomPlayer(
                         )
                     }
 
-                    // Previous button
                     IconButton(
                         onClick = onPlayPrevious,
                         modifier = Modifier.size(36.dp)
@@ -235,7 +210,6 @@ fun PersistentBottomPlayer(
                         )
                     }
 
-                    // Play / Pause central squircle
                     Box(
                         modifier = Modifier
                             .scale(playButtonScale)
@@ -249,21 +223,13 @@ fun PersistentBottomPlayer(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        AnimatedContent(
-                            targetState = isPlaying,
-                            transitionSpec = { fadeIn() togetherWith fadeOut() },
-                            label = "BottomPlayPauseAnim"
-                        ) { playing ->
-                            Icon(
-                                imageVector = if (playing) PeerlessIcons.Pause else PeerlessIcons.Play,
-                                contentDescription = if (playing) "Pause" else "Play",
-                                tint = OnPrimaryDark,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
+                        PlayPauseMorphIcon(
+                            isPlaying = isPlaying,
+                            tint = OnPrimaryDark,
+                            size = 22.dp
+                        )
                     }
 
-                    // Next button
                     IconButton(
                         onClick = onPlayNext,
                         modifier = Modifier.size(36.dp)
@@ -276,7 +242,6 @@ fun PersistentBottomPlayer(
                         )
                     }
 
-                    // Repeat button
                     IconButton(
                         onClick = onToggleRepeat,
                         modifier = Modifier.size(32.dp)
@@ -292,7 +257,6 @@ fun PersistentBottomPlayer(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Wavy Scrubber & Timestamps
                 ExpressiveWavySeekBar(
                     positionMs = positionMs,
                     durationMs = durationMs,
@@ -302,15 +266,11 @@ fun PersistentBottomPlayer(
                 )
             }
 
-            // ==========================================
-            // RIGHT: Volume + Supporting Pane Toggles
-            // ==========================================
             Row(
                 modifier = Modifier.weight(1.1f),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End
             ) {
-                // Volume controls
                 var isMuted by remember { mutableStateOf(false) }
                 var lastVolume by remember { mutableFloatStateOf(volume) }
 
@@ -353,7 +313,6 @@ fun PersistentBottomPlayer(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // Subtle vertical separator
                 Box(
                     modifier = Modifier
                         .height(24.dp)
@@ -363,7 +322,6 @@ fun PersistentBottomPlayer(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                // Supporting Pane Action Toggles
                 SupportingPaneToggleButton(
                     icon = PeerlessIcons.Queue,
                     contentDescription = "Queue Pane",
@@ -389,10 +347,6 @@ fun PersistentBottomPlayer(
     }
 }
 
-/**
- * Expressive Wavy Scrubber that animates an authentic sinusoidal wave along the active track
- * when playback is active, morphing to a clean flat bar when paused.
- */
 @Composable
 fun ExpressiveWavySeekBar(
     positionMs: Long,
@@ -416,7 +370,6 @@ fun ExpressiveWavySeekBar(
     val elapsedText = formatDuration((displayPositionMs / 1000).toInt())
     val totalText = formatDuration((durationMs / 1000).toInt())
 
-    // Infinite wave phase animation when playing
     val infiniteTransition = rememberInfiniteTransition(label = "WavySeekBarTransition")
     val wavePhase by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -428,7 +381,6 @@ fun ExpressiveWavySeekBar(
         label = "WavePhase"
     )
 
-    // Animated wave amplitude (flattens out when paused or dragging)
     val waveAmplitude by animateFloatAsState(
         targetValue = if (isPlaying && !isDragging) 2.2f else 0f,
         animationSpec = tween(durationMillis = 350, easing = ExpressiveMotion.EmphasizedEasing),
@@ -489,7 +441,6 @@ fun ExpressiveWavySeekBar(
                 val centerY = size.height / 2f
                 val activeWidth = totalWidth * displayFraction
 
-                // 1. Draw inactive background track
                 if (activeWidth < totalWidth) {
                     drawLine(
                         color = SurfaceContainerHighestDark,
@@ -500,7 +451,6 @@ fun ExpressiveWavySeekBar(
                     )
                 }
 
-                // 2. Draw active wavy track
                 if (activeWidth > 0f) {
                     val path = Path()
                     path.moveTo(0f, centerY)
@@ -526,7 +476,6 @@ fun ExpressiveWavySeekBar(
                         )
                     )
 
-                    // 3. Draw seeker thumb
                     val currentY =
                         centerY + sin((activeWidth / waveWavelengthPx) * (2 * PI).toFloat() + wavePhase) * waveAmplitudePx
                     val thumbRadius = if (isDragging) 6.dp.toPx() else 4.5.dp.toPx()
@@ -548,9 +497,6 @@ fun ExpressiveWavySeekBar(
     }
 }
 
-/**
- * Supporting Pane action toggle button with active pill highlight.
- */
 @Composable
 private fun SupportingPaneToggleButton(
     icon: ImageVector,

@@ -73,7 +73,6 @@ fun ExpressiveSearchBar(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Floating Search Input Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -181,7 +180,6 @@ fun ExpressiveSearchBar(
 
             Spacer(modifier = Modifier.width(4.dp))
 
-            // Server Settings Button with status indicator dot
             Box(
                 contentAlignment = Alignment.TopEnd
             ) {
@@ -197,7 +195,6 @@ fun ExpressiveSearchBar(
                     )
                 }
 
-                // Small pulse/status badge dot
                 Box(
                     modifier = Modifier
                         .size(8.dp)
@@ -207,7 +204,6 @@ fun ExpressiveSearchBar(
             }
         }
 
-        // Horizontal Filter Chips using official M3 FilterChip
         Row(
             modifier = Modifier
                 .fillMaxWidth()

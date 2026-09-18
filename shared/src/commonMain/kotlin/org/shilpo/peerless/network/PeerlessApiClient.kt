@@ -52,10 +52,6 @@ open class PeerlessApiClient(
         return explicitToken ?: tokenStorage?.getToken()
     }
 
-    // ========================================================================
-    // Catalog & Search
-    // ========================================================================
-
     suspend fun search(
         query: String,
         provider: String? = null,
@@ -111,10 +107,6 @@ open class PeerlessApiClient(
         response.body<List<TrackSummaryDto>>()
     }
 
-    // ========================================================================
-    // Streaming & Playback
-    // ========================================================================
-
     suspend fun getPlaybackInfo(
         trackId: Int,
         token: String? = null
@@ -131,11 +123,6 @@ open class PeerlessApiClient(
         response.body<PlaybackInfo>()
     }
 
-    /**
-     * Resolves the stream URL.
-     * In DEV mode: resolves directly to `/api/v1/stream?track_id=...` for testing.
-     * In PROD mode with ticket: resolves to `/api/v1/stream?ticket=...`.
-     */
     fun resolveStreamUrl(trackId: Int, ticket: String? = null): String {
         return when {
             AppConfig.IS_DEV_MODE && ticket.isNullOrBlank() -> {
@@ -154,13 +141,15 @@ open class PeerlessApiClient(
 
     fun getStreamUrl(trackId: Int, ticket: String? = null): String = resolveStreamUrl(trackId, ticket)
 
-
-    // ========================================================================
-    // Assets & Lyrics
-    // ========================================================================
-
     fun getArtworkUrl(track: TrackSummaryDto, size: Int = 600): String {
-        if (!track.artwork_url.isNullOrBlank()) return track.artwork_url
+        if (!track.artwork_url.isNullOrBlank()) {
+            val regex = Regex("""\d+x\d+bb""")
+            return if (track.artwork_url.contains(regex)) {
+                track.artwork_url.replace(regex, "${size}x${size}bb")
+            } else {
+                track.artwork_url
+            }
+        }
         return getArtworkUrl(track.id, size)
     }
 
@@ -189,10 +178,6 @@ open class PeerlessApiClient(
         }
         response.body<LyricsResponse>()
     }
-
-    // ========================================================================
-    // Tasks & On-Demand Ripping
-    // ========================================================================
 
     open suspend fun createRipTask(
         provider: String,
@@ -279,10 +264,6 @@ open class PeerlessApiClient(
         }
     }
 
-    // ========================================================================
-    // Authentication & Sliding Session (256-bit Opaque Refresh Token)
-    // ========================================================================
-
     suspend fun exchangeOtp(
         code: String,
         deviceName: String? = null,
@@ -336,10 +317,6 @@ open class PeerlessApiClient(
         }
         response.body<MeResponse>()
     }
-
-    // ========================================================================
-    // User Library (Favorites & Playlists)
-    // ========================================================================
 
     suspend fun getFavorites(token: String? = null): Result<List<FavoriteItemDto>> = runCatching {
         val authToken = resolveToken(token) ?: error("Not authenticated")

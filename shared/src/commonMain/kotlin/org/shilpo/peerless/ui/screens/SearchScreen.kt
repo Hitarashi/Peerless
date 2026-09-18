@@ -34,9 +34,6 @@ import org.shilpo.peerless.ui.components.PeerlessIcons
 import org.shilpo.peerless.ui.components.TrackRow
 import org.shilpo.peerless.ui.toTrackSummary
 
-/**
- * Curated taste mix item used for zero-state discovery.
- */
 data class TasteMixCardData(
     val id: String,
     val title: String,
@@ -91,11 +88,6 @@ val CuratedTasteMixes = listOf(
     )
 )
 
-/**
- * Dedicated Multiplatform Search Screen featuring Material 3 Expressive styling,
- * LiquidGlass aesthetics, Last.fm Artist Spotlight, 300ms debounced queries,
- * Playable Now (<200ms) instant cached tracks, and Live Catalog on-demand ripping.
- */
 @Composable
 fun SearchScreen(
     coordinator: PlaybackCoordinator,
@@ -118,13 +110,11 @@ fun SearchScreen(
 
     val lastFmClient = remember { LastFmClient() }
 
-    // Initial zero-state discovery tags from Last.fm
     LaunchedEffect(Unit) {
         val tagsRes = lastFmClient.getTopTags()
         zeroStateTags = tagsRes.getOrElse { LastFmClient.fallbackTopTags() }
     }
 
-    // Debounced search query & Last.fm artist intelligence fetching
     LaunchedEffect(searchQuery, selectedFilter, playerState.serverUrl) {
         val trimmedQuery = searchQuery.trim()
         if (trimmedQuery.isBlank()) {
@@ -136,12 +126,11 @@ fun SearchScreen(
         }
 
         isSearching = true
-        delay(300) // 300ms debounce
+        delay(300)
 
         val providerParam = selectedFilter.providerQuery
 
         coroutineScope {
-            // Concurrent job 1: Server Search (Cached Telegram Dump + Live Apple/Qobuz)
             launch {
                 val searchRes = coordinator.apiClient.search(
                     query = trimmedQuery,
@@ -223,7 +212,6 @@ fun SearchScreen(
                         else -> response.live
                     }
 
-                    // Remove tracks from live results if already cached in Telegram dump channel
                     val cachedKeys =
                         filteredCached.map { it.title.trim().lowercase() to it.artist.trim().lowercase() }.toSet()
                     val filteredLive = rawLive.filter {
@@ -234,7 +222,6 @@ fun SearchScreen(
                     cachedTracks = filteredCached
                     liveTracks = filteredLive
                 }.onFailure {
-                    // Fallback to local sample library
                     val localMatches = SampleLosslessLibrary.filter {
                         val matchesQuery = it.title.contains(trimmedQuery, ignoreCase = true) ||
                                 it.artist.contains(trimmedQuery, ignoreCase = true) ||
@@ -280,7 +267,6 @@ fun SearchScreen(
                 }
             }
 
-            // Concurrent job 2: Last.fm Artist Intelligence
             launch {
                 if (selectedFilter != SearchFilter.TRACKS && selectedFilter != SearchFilter.ALBUMS) {
                     val artistRes = lastFmClient.getArtistInfo(trimmedQuery)
@@ -295,24 +281,11 @@ fun SearchScreen(
     }
 
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        SurfaceContainerLowestDark,
-                        BackgroundDark,
-                        SurfaceDark
-                    )
-                )
-            )
+        modifier = modifier.fillMaxSize()
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Top Bar: Expressive Search Bar & Filter Chips
             ExpressiveSearchBar(
                 query = searchQuery,
                 onQueryChange = { searchQuery = it },
@@ -325,9 +298,7 @@ fun SearchScreen(
                 serverUrl = playerState.serverUrl
             )
 
-            // Dynamic Main Body
             if (searchQuery.isBlank()) {
-                // Zero-State Discovery View
                 ZeroStateDiscovery(
                     tags = zeroStateTags,
                     onSelectTag = { tag -> searchQuery = tag.name },
@@ -338,7 +309,6 @@ fun SearchScreen(
                     contentBottomPadding = contentBottomPadding
                 )
             } else {
-                // Active Search Results View
                 SearchResultsContent(
                     query = searchQuery,
                     isSearching = isSearching,
@@ -356,10 +326,6 @@ fun SearchScreen(
         }
     }
 }
-
-// =============================================================================
-// ZERO-STATE DISCOVERY
-// =============================================================================
 
 @Composable
 private fun ZeroStateDiscovery(
@@ -381,7 +347,6 @@ private fun ZeroStateDiscovery(
         ),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // Section 1: Curated Genres / Soundscapes from Last.fm
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(
@@ -412,7 +377,6 @@ private fun ZeroStateDiscovery(
                     )
                 }
 
-                // Horizontal Genre Chips
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -446,7 +410,6 @@ private fun ZeroStateDiscovery(
             }
         }
 
-        // Section 2: Featured Lossless Taste Mixes
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
@@ -477,7 +440,6 @@ private fun ZeroStateDiscovery(
                     )
                 }
 
-                // Grid of 4 Curated Mix Cards
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     CuratedTasteMixes.chunked(2).forEach { rowMixes ->
                         Row(
@@ -498,7 +460,6 @@ private fun ZeroStateDiscovery(
             }
         }
 
-        // Section 3: Instant Telegram Dump Cache Highlights
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(
@@ -544,7 +505,6 @@ private fun ZeroStateDiscovery(
             }
         }
 
-        // Sample cached tracks
         items(cachedSampleTracks.take(4), key = { it.id }) { track ->
             val isPlaying = playerState.currentTrack?.id == track.id &&
                     playerState.status == PlaybackStatus.PLAYING
@@ -585,7 +545,6 @@ private fun TasteMixCard(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Top Badge with specs
             Row(
                 modifier = Modifier
                     .clip(PillShape)
@@ -635,10 +594,6 @@ private fun TasteMixCard(
     }
 }
 
-// =============================================================================
-// ACTIVE SEARCH RESULTS
-// =============================================================================
-
 @Composable
 private fun SearchResultsContent(
     query: String,
@@ -665,9 +620,6 @@ private fun SearchResultsContent(
         ),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // -----------------------------------------------------------------
-        // 1. Artist Spotlight (Last.fm Intelligence)
-        // -----------------------------------------------------------------
         if (artistSpotlight != null && !artistSpotlight.bioSummary.isNullOrBlank()) {
             item(key = "artist_spotlight") {
                 ArtistSpotlightCard(
@@ -678,9 +630,6 @@ private fun SearchResultsContent(
             }
         }
 
-        // -----------------------------------------------------------------
-        // 2. Playable Now (<200ms) - Telegram Dump Channel Cached Tracks
-        // -----------------------------------------------------------------
         if (cachedTracks.isNotEmpty()) {
             item(key = "header_cached") {
                 SectionHeader(
@@ -705,9 +654,6 @@ private fun SearchResultsContent(
             }
         }
 
-        // -----------------------------------------------------------------
-        // 3. Live Catalog (On-Demand Rip) - Uncached Apple Music / Qobuz
-        // -----------------------------------------------------------------
         if (liveTracks.isNotEmpty()) {
             item(key = "header_live") {
                 SectionHeader(
@@ -734,9 +680,6 @@ private fun SearchResultsContent(
             }
         }
 
-        // -----------------------------------------------------------------
-        // 4. Empty Result State
-        // -----------------------------------------------------------------
         if (isEmptyResult) {
             item(key = "empty_result") {
                 Box(
@@ -783,10 +726,6 @@ private fun SearchResultsContent(
     }
 }
 
-// =============================================================================
-// ARTIST SPOTLIGHT COMPONENT
-// =============================================================================
-
 @Composable
 fun ArtistSpotlightCard(
     artist: LastFmArtist,
@@ -812,7 +751,6 @@ fun ArtistSpotlightCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header: Artist Spotlight badge + Last.fm label
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -848,7 +786,6 @@ fun ArtistSpotlightCard(
                 )
             }
 
-            // Artist Name
             Text(
                 text = artist.name,
                 style = ExpressiveTypography.titleLarge,
@@ -856,7 +793,6 @@ fun ArtistSpotlightCard(
                 color = OnSurfaceDark
             )
 
-            // Bio Summary Excerpt
             artist.bioSummary?.let { bio ->
                 Text(
                     text = bio,
@@ -867,7 +803,6 @@ fun ArtistSpotlightCard(
                 )
             }
 
-            // Genre Chips
             if (artist.tags.isNotEmpty()) {
                 Row(
                     modifier = Modifier
@@ -900,7 +835,6 @@ fun ArtistSpotlightCard(
                 }
             }
 
-            // Similar Artists Pills
             if (artist.similarArtists.isNotEmpty()) {
                 Row(
                     modifier = Modifier
@@ -938,10 +872,6 @@ fun ArtistSpotlightCard(
         }
     }
 }
-
-// =============================================================================
-// SECTION HEADER
-// =============================================================================
 
 @Composable
 private fun SectionHeader(

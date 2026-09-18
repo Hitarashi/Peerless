@@ -1,18 +1,13 @@
 package org.shilpo.peerless.ui
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
@@ -20,10 +15,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.delay
-import org.shilpo.peerless.getGreetingAndDate
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.model.UncachedTrackDto
 import org.shilpo.peerless.player.PlaybackCoordinator
@@ -40,7 +32,6 @@ import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerState
 import org.shilpo.peerless.theme.*
 import org.shilpo.peerless.ui.components.*
-
 
 val SampleLosslessLibrary = listOf(
     TrackSummaryDto(
@@ -168,407 +159,24 @@ fun UncachedTrackDto.toTrackSummary(): TrackSummaryDto = TrackSummaryDto(
     codec = "FLAC",
     bit_depth = 24,
     sample_rate = 96000,
-    is_cached = false
+    is_cached = false,
+    artwork_url = artwork_url
 )
 
-/**
- * Top Header component with Brand, Circular Action Buttons, Time-of-day Greeting, and Date.
- * Directly styled after LastWave and ArchiveTune references.
- */
 @Composable
 fun HomeTopHeader(
-    greeting: String,
-    dateStr: String,
     serverConnected: Boolean,
     onNavigateToSearch: () -> Unit,
     onToggleStats: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        // Top bar: Brand & Circular Action Icons
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Brand Logo & Status
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(SquircleShapeSmall)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(PrimaryDark, TertiaryDark)
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = PeerlessIcons.MusicNote,
-                        contentDescription = "Peerless",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                Column {
-                    Text(
-                        text = "PEERLESS",
-                        style = ExpressiveTypography.titleLarge,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 2.sp,
-                        color = OnSurfaceDark
-                    )
-                    Text(
-                        text = if (serverConnected) "ONLINE • BIT-PERFECT" else "OFFLINE CACHE",
-                        style = SpecBadgeTypography.copy(fontSize = 8.5.sp),
-                        color = if (serverConnected) SecondaryDark else LosslessGold,
-                        letterSpacing = 1.sp
-                    )
-                }
-            }
-
-            // Circular action icon buttons (Explore/Stats, Search, Settings)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Explore & Stats button
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(SurfaceContainerDark)
-                        .border(1.dp, OutlineVariantDark.copy(alpha = 0.6f), CircleShape)
-                        .clickable(onClick = onToggleStats),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = PeerlessIcons.Compass,
-                        contentDescription = "Explore & Stats",
-                        tint = OnSurfaceVariantDark,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                // Search button
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(SurfaceContainerDark)
-                        .border(1.dp, OutlineVariantDark.copy(alpha = 0.6f), CircleShape)
-                        .clickable(onClick = onNavigateToSearch),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = PeerlessIcons.Search,
-                        contentDescription = "Search",
-                        tint = OnSurfaceVariantDark,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                // Server Settings button
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(SurfaceContainerDark)
-                        .border(1.dp, OutlineVariantDark.copy(alpha = 0.6f), CircleShape)
-                        .clickable(onClick = onOpenSettings),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = PeerlessIcons.Settings,
-                        contentDescription = "Settings",
-                        tint = OnSurfaceVariantDark,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-
-        // Time-of-Day Greeting & Date
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = greeting,
-                style = ExpressiveTypography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = OnSurfaceDark
-            )
-            Text(
-                text = dateStr,
-                style = ExpressiveTypography.bodySmall.copy(fontSize = 12.sp),
-                color = OnSurfaceVariantDark.copy(alpha = 0.75f)
-            )
-        }
-    }
-}
-
-/**
- * Filter Chips Row for rapid catalog narrowing.
- */
-@Composable
-fun HomeFilterChipsRow(
-    selectedFilter: String,
-    onFilterSelect: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val filters = listOf("All", "Cached", "Apple Music", "Qobuz")
-
-    LazyRow(
-        modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(filters) { filter ->
-            val isSelected = filter == selectedFilter
-            FilterChip(
-                selected = isSelected,
-                onClick = { onFilterSelect(filter) },
-                label = {
-                    Text(
-                        text = filter,
-                        style = ExpressiveTypography.labelMedium,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                    )
-                },
-                shape = PillShape,
-                colors = FilterChipDefaults.filterChipColors(
-                    containerColor = SurfaceContainerDark,
-                    labelColor = OnSurfaceVariantDark,
-                    selectedContainerColor = PrimaryDark.copy(alpha = 0.22f),
-                    selectedLabelColor = PrimaryDark
-                ),
-                border = FilterChipDefaults.filterChipBorder(
-                    enabled = true,
-                    selected = isSelected,
-                    borderColor = OutlineVariantDark.copy(alpha = 0.5f),
-                    selectedBorderColor = PrimaryDark.copy(alpha = 0.45f)
-                )
-            )
-        }
-    }
-}
-
-/**
- * Hero Feature Card ("Made for You" / "Lossless Spotlight").
- * Squircle card with sparkle badge, lossless station title, description, and prominent Play pill.
- */
-@Composable
-fun HeroFeatureCard(
-    onPlayClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .clip(SquircleShapeLarge)
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        Color(0xFF28243A),
-                        Color(0xFF1E1B2B),
-                        Color(0xFF151420)
-                    )
-                )
-            )
-            .border(
-                1.dp,
-                Brush.linearGradient(
-                    listOf(
-                        PrimaryDark.copy(alpha = 0.35f),
-                        TertiaryDark.copy(alpha = 0.25f),
-                        OutlineVariantDark.copy(alpha = 0.5f)
-                    )
-                ),
-                SquircleShapeLarge
-            )
-            .padding(22.dp)
-    ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Capsule badge with sparkle icon
-            Row(
-                modifier = Modifier
-                    .clip(PillShape)
-                    .background(PrimaryDark.copy(alpha = 0.16f))
-                    .border(1.dp, PrimaryDark.copy(alpha = 0.40f), PillShape)
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    imageVector = PeerlessIcons.Sparkle,
-                    contentDescription = null,
-                    tint = PrimaryDark,
-                    modifier = Modifier.size(13.dp)
-                )
-                Text(
-                    text = "MADE FOR YOU",
-                    style = SpecBadgeTypography.copy(
-                        fontSize = 8.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.2.sp
-                    ),
-                    color = PrimaryDark
-                )
-            }
-
-            // Title & Description
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "Infinite Lossless Radio",
-                    style = ExpressiveTypography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = OnSurfaceDark
-                )
-                Text(
-                    text = "Bit-perfect studio streams direct from your Telegram cache",
-                    style = ExpressiveTypography.bodyMedium,
-                    color = OnSurfaceVariantDark.copy(alpha = 0.8f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            // Prominent "▶ Play" pill button
-            val interactionSource = remember { MutableInteractionSource() }
-            val isPressed by interactionSource.collectIsPressedAsState()
-            val buttonScale by animateFloatAsState(if (isPressed) 0.94f else 1f, label = "HeroPlayScale")
-
-            Row(
-                modifier = Modifier
-                    .scale(buttonScale)
-                    .clip(PillShape)
-                    .background(Color(0xFFEDE7F6))
-                    .clickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                        onClick = onPlayClick
-                    )
-                    .padding(horizontal = 24.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = PeerlessIcons.Play,
-                    contentDescription = "Play",
-                    tint = Color(0xFF1E1438),
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = "Play",
-                    style = ExpressiveTypography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1E1438)
-                )
-            }
-        }
-    }
-}
-
-/**
- * 2x2 Quick Action Tiles:
- * Liked Songs (magenta), Telegram Vault (cyan), 24-bit Studio (gold), New Rips (purple).
- */
-@Composable
-fun QuickActionTiles(
-    onSelectFavorites: () -> Unit,
-    onSelectVault: () -> Unit,
-    onSelectHiRes: () -> Unit,
-    onSelectNewRips: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        // Row 1: Favorites & Telegram Vault
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            QuickActionTile(
-                title = "Liked Songs",
-                subtitle = "Your collection",
-                icon = PeerlessIcons.Heart,
-                accentColor = Color(0xFFFF4081),
-                onClick = onSelectFavorites,
-                modifier = Modifier.weight(1f)
-            )
-
-            QuickActionTile(
-                title = "Telegram Vault",
-                subtitle = "Instant cache",
-                icon = PeerlessIcons.Database,
-                accentColor = Color(0xFF00E5FF),
-                onClick = onSelectVault,
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        // Row 2: 24-bit Hi-Res & New Rips
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            QuickActionTile(
-                title = "24-bit Studio",
-                subtitle = "Master quality",
-                icon = PeerlessIcons.LosslessWave,
-                accentColor = LosslessGold,
-                onClick = onSelectHiRes,
-                modifier = Modifier.weight(1f)
-            )
-
-            QuickActionTile(
-                title = "New Rips",
-                subtitle = "Fresh dumps",
-                icon = PeerlessIcons.Sparkle,
-                accentColor = Color(0xFFBA68C8),
-                onClick = onSelectNewRips,
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
-
-@Composable
-fun QuickActionTile(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    accentColor: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(SurfaceContainerDark)
-            .border(
-                1.dp,
-                accentColor.copy(alpha = 0.25f),
-                RoundedCornerShape(18.dp)
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp)
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -576,48 +184,90 @@ fun QuickActionTile(
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(accentColor.copy(alpha = 0.15f))
-                    .border(1.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(12.dp)),
+                    .size(36.dp)
+                    .clip(SquircleShapeSmall)
+                    .background(
+                        Brush.linearGradient(
+                            listOf(PrimaryDark, TertiaryDark)
+                        )
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = accentColor,
+                    imageVector = PeerlessIcons.MusicNote,
+                    contentDescription = "Peerless",
+                    tint = Color.White,
                     modifier = Modifier.size(20.dp)
                 )
             }
 
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+            Text(
+                text = "PEERLESS",
+                style = ExpressiveTypography.titleLarge,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 2.sp,
+                color = OnSurfaceDark
+            )
+        }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(SurfaceContainerDark)
+                    .border(1.dp, OutlineVariantDark.copy(alpha = 0.6f), CircleShape)
+                    .clickable(onClick = onToggleStats),
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = title,
-                    style = ExpressiveTypography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = OnSurfaceDark,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                Icon(
+                    imageVector = PeerlessIcons.Compass,
+                    contentDescription = "Explore & Stats",
+                    tint = OnSurfaceVariantDark,
+                    modifier = Modifier.size(20.dp)
                 )
-                Text(
-                    text = subtitle,
-                    style = ExpressiveTypography.bodySmall.copy(fontSize = 11.sp),
-                    color = OnSurfaceVariantDark.copy(alpha = 0.7f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(SurfaceContainerDark)
+                    .border(1.dp, OutlineVariantDark.copy(alpha = 0.6f), CircleShape)
+                    .clickable(onClick = onNavigateToSearch),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = PeerlessIcons.Search,
+                    contentDescription = "Search",
+                    tint = OnSurfaceVariantDark,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(SurfaceContainerDark)
+                    .border(1.dp, OutlineVariantDark.copy(alpha = 0.6f), CircleShape)
+                    .clickable(onClick = onOpenSettings),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = PeerlessIcons.Settings,
+                    contentDescription = "Settings",
+                    tint = OnSurfaceVariantDark,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
     }
 }
 
-/**
- * "Quick picks" / Featured Lossless Horizontal Carousel.
- * Large squircle cards with high-res artwork, bottom text overlay, and floating play button.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuickPicksCarousel(
@@ -634,46 +284,46 @@ fun QuickPicksCarousel(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Section Header
-        Column(
-            modifier = Modifier.padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(
-                text = "Quick picks",
-                style = ExpressiveTypography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = OnSurfaceDark
-            )
-            Text(
-                text = "Matched to your taste profile",
-                style = ExpressiveTypography.bodySmall,
-                color = OnSurfaceVariantDark.copy(alpha = 0.75f)
-            )
-        }
+        Text(
+            text = "Quick picks",
+            style = ExpressiveTypography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = OnSurfaceDark,
+            modifier = Modifier.padding(horizontal = 20.dp)
+        )
 
-        // Official Material 3 Expressive Carousel
-        val carouselState = rememberCarouselState { tracks.size }
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val heroHeight = when {
+                maxWidth >= 840.dp -> 380.dp
+                maxWidth >= 600.dp -> 356.dp
+                else -> 332.dp
+            }
+            val heroMaxWidth = (maxWidth - 48.dp)
+                .coerceAtLeast(232.dp)
+                .coerceAtMost(440.dp)
 
-        HorizontalMultiBrowseCarousel(
-            state = carouselState,
-            preferredItemWidth = 160.dp,
-            itemSpacing = 12.dp,
-            contentPadding = PaddingValues(horizontal = 20.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(205.dp)
-        ) { index ->
-            val track = tracks[index]
-            val isCurrentPlaying = currentTrackId == track.id && isPlaying
+            val carouselState = rememberCarouselState { tracks.size }
 
-            QuickPickCard(
-                track = track,
-                artworkUrl = getArtworkUrl(track),
-                isPlaying = isCurrentPlaying,
-                onClick = { onTrackClick(track) },
-                modifier = Modifier.maskClip(RoundedCornerShape(20.dp))
-            )
+            HorizontalMultiBrowseCarousel(
+                state = carouselState,
+                preferredItemWidth = heroMaxWidth,
+                itemSpacing = 10.dp,
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(heroHeight)
+            ) { index ->
+                val track = tracks[index]
+                val isCurrentPlaying = currentTrackId == track.id && isPlaying
+
+                QuickPickCard(
+                    track = track,
+                    artworkUrl = getArtworkUrl(track),
+                    isPlaying = isCurrentPlaying,
+                    onClick = { onTrackClick(track) },
+                    modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge)
+                )
+            }
         }
     }
 }
@@ -693,11 +343,10 @@ fun QuickPickCard(
             .border(
                 1.dp,
                 if (isPlaying) PrimaryDark.copy(alpha = 0.6f) else OutlineVariantDark.copy(alpha = 0.5f),
-                RoundedCornerShape(20.dp)
+                MaterialTheme.shapes.extraLarge
             )
             .clickable(onClick = onClick)
     ) {
-        // Full Artwork
         AsyncImage(
             model = artworkUrl,
             contentDescription = "${track.title} cover",
@@ -705,46 +354,18 @@ fun QuickPickCard(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Gradient Scrim Overlay at bottom
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.35f),
-                            Color.Black.copy(alpha = 0.90f)
-                        ),
-                        startY = 60f
+                        0f to Color.Transparent,
+                        0.48f to Color.Black.copy(alpha = 0.08f),
+                        1f to Color.Black.copy(alpha = 0.84f)
                     )
                 )
         )
 
-        // Floating Play Button in top right
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(10.dp)
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(if (isPlaying) PrimaryDark else Color.Black.copy(alpha = 0.55f))
-                .border(
-                    1.dp,
-                    if (isPlaying) PrimaryDark else Color.White.copy(alpha = 0.3f),
-                    CircleShape
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = if (isPlaying) PeerlessIcons.Pause else PeerlessIcons.Play,
-                contentDescription = null,
-                tint = if (isPlaying) OnPrimaryDark else Color.White,
-                modifier = Modifier.size(16.dp)
-            )
-        }
-
-        // Bottom text info
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -783,9 +404,6 @@ fun QuickPickCard(
     }
 }
 
-/**
- * Section Header for the Lossless Library list with count badge, Shuffle button, and Play All pill.
- */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LosslessLibrarySectionHeader(
@@ -827,7 +445,6 @@ fun LosslessLibrarySectionHeader(
             }
         }
 
-        // Official Material 3 Expressive SplitButtonLayout
         SplitButtonLayout(
             leadingButton = {
                 SplitButtonDefaults.TonalLeadingButton(
@@ -871,9 +488,6 @@ fun LosslessLibrarySectionHeader(
     }
 }
 
-/**
- * Unified Home Expressive Content combining all sections in a fluid LazyColumn.
- */
 @Composable
 fun HomeExpressiveContent(
     coordinator: PlaybackCoordinator,
@@ -892,18 +506,13 @@ fun HomeExpressiveContent(
     onRipClick: ((TrackSummaryDto) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val (greeting, dateStr) = remember { getGreetingAndDate() }
-
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = contentBottomPadding),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 1. Top Bar & Greeting Header
         item(key = "top_header") {
             HomeTopHeader(
-                greeting = greeting,
-                dateStr = dateStr,
                 serverConnected = serverConnected,
                 onNavigateToSearch = onNavigateToSearch,
                 onToggleStats = onToggleStats,
@@ -911,38 +520,8 @@ fun HomeExpressiveContent(
             )
         }
 
-        // 2. Filter Chips
-        item(key = "filter_chips") {
-            HomeFilterChipsRow(
-                selectedFilter = selectedFilter,
-                onFilterSelect = onSelectFilter
-            )
-        }
-
-        // When not actively filtering by query, show the rich discover cards
         if (searchQuery.isBlank()) {
-            // 3. Hero Feature Card ("Made for You")
-            item(key = "hero_card") {
-                HeroFeatureCard(
-                    onPlayClick = {
-                        if (allTracks.isNotEmpty()) {
-                            coordinator.playTrack(allTracks.first(), allTracks)
-                        }
-                    }
-                )
-            }
 
-            // 4. Quick Action Tiles (2x2 Grid)
-            item(key = "quick_actions") {
-                QuickActionTiles(
-                    onSelectFavorites = { onSelectFilter("Cached") },
-                    onSelectVault = { onSelectFilter("Cached") },
-                    onSelectHiRes = { onSelectFilter("All") },
-                    onSelectNewRips = { onNavigateToSearch() }
-                )
-            }
-
-            // 5. "Quick Picks" Horizontal Carousel
             if (allTracks.isNotEmpty()) {
                 item(key = "quick_picks") {
                     QuickPicksCarousel(
@@ -960,7 +539,6 @@ fun HomeExpressiveContent(
             }
         }
 
-        // 6. Lossless Library Section Header
         item(key = "library_header") {
             LosslessLibrarySectionHeader(
                 trackCount = displayedTracks.size,
@@ -978,7 +556,6 @@ fun HomeExpressiveContent(
             )
         }
 
-        // 7. Track List Items
         if (displayedTracks.isEmpty()) {
             item(key = "empty_state") {
                 Box(
@@ -1045,10 +622,9 @@ fun HomeScreen(
     var serverConnected by remember { mutableStateOf(false) }
     var serverTracks by remember { mutableStateOf<List<TrackSummaryDto>>(emptyList()) }
 
-    // Query server on start or query/filter change
     LaunchedEffect(searchQuery, selectedFilter, playerState.serverUrl) {
         isSearching = true
-        delay(300) // Debounce
+        delay(300)
 
         val providerParam = when (selectedFilter) {
             "Apple Music" -> "apple_music"
@@ -1072,7 +648,6 @@ fun HomeScreen(
         }
     }
 
-    // Determine displayed tracks
     val activeLibrary = if (serverTracks.isNotEmpty()) serverTracks else SampleLosslessLibrary
     val displayedTracks = remember(activeLibrary, selectedFilter, searchQuery) {
         activeLibrary.filter { track ->
@@ -1124,8 +699,6 @@ fun HomeScreen(
             )
         }
 
-
-        // Floating MiniPlayer Bar
         AnimatedVisibility(
             visible = playerState.currentTrack != null,
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
@@ -1144,12 +717,15 @@ fun HomeScreen(
                     artworkUrl = coordinator.apiClient.getArtworkUrl(track, 200),
                     onTogglePlayPause = { coordinator.togglePlayPause() },
                     onPlayNext = { coordinator.playNext() },
-                    onOpenNowPlaying = { isNowPlayingOpen = true }
+                    onPlayPrevious = { coordinator.playPrevious() },
+                    onOpenNowPlaying = { isNowPlayingOpen = true },
+                    onDismiss = { coordinator.stopAndDismiss() },
+                    canSkipNext = coordinator.canSkipNext,
+                    canSkipPrevious = coordinator.canSkipPrevious
                 )
             }
         }
 
-        // Animated Fullscreen Now-Playing Modal
         AnimatedVisibility(
             visible = isNowPlayingOpen && playerState.currentTrack != null,
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
@@ -1175,7 +751,6 @@ fun HomeScreen(
             }
         }
 
-        // Server Settings Dialog
         if (isSettingsOpen) {
             ServerSettingsDialog(
                 currentServerUrl = playerState.serverUrl,
