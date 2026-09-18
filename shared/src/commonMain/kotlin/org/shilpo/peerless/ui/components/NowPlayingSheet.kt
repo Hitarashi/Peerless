@@ -26,9 +26,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import org.shilpo.peerless.model.PlaybackInfo
+import org.shilpo.peerless.model.RepeatMode
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.theme.*
+import kotlin.math.abs
+
+private const val SeekbarSettleToleranceMs = 1500L
 
 @Composable
 fun NowPlayingSheet(
@@ -46,21 +50,40 @@ fun NowPlayingSheet(
     onPlayPrevious: () -> Unit,
     onClose: () -> Unit,
     onOpenSettings: () -> Unit,
+    isShuffle: Boolean = false,
+    onToggleShuffle: () -> Unit = {},
+    repeatMode: RepeatMode = RepeatMode.OFF,
+    onToggleRepeat: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isPlaying = status == PlaybackStatus.PLAYING
-    var isShuffle by remember { mutableStateOf(false) }
-    var isRepeat by remember { mutableStateOf(false) }
 
     var isDraggingSlider by remember { mutableStateOf(false) }
+    var targetSeekPositionMs by remember { mutableStateOf<Long?>(null) }
     var sliderDragPosition by remember { mutableFloatStateOf(0f) }
 
-    val currentFraction = if (durationMs > 0L) {
-        (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
-    } else 0f
+    LaunchedEffect(track.id) {
+        targetSeekPositionMs = null
+    }
 
-    val displayFraction = if (isDraggingSlider) sliderDragPosition else currentFraction
-    val displayPositionMs = (displayFraction * durationMs).toLong()
+    if (!isDraggingSlider) {
+        targetSeekPositionMs?.let { target ->
+            val clampedTarget = if (durationMs > 0L) target.coerceIn(0L, durationMs) else target.coerceAtLeast(0L)
+            if (abs(positionMs - clampedTarget) <= SeekbarSettleToleranceMs) {
+                targetSeekPositionMs = null
+            }
+        }
+    }
+
+    val displayPositionMs = when {
+        isDraggingSlider -> (sliderDragPosition * durationMs).toLong()
+        targetSeekPositionMs != null -> targetSeekPositionMs!!
+        else -> positionMs
+    }
+
+    val displayFraction = if (durationMs > 0L) {
+        (displayPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+    } else 0f
 
     val elapsedText = formatDuration((displayPositionMs / 1000).toInt())
     val remainingMs = (durationMs - displayPositionMs).coerceAtLeast(0L)
@@ -265,7 +288,9 @@ fun NowPlayingSheet(
                     },
                     onValueChangeFinished = {
                         isDraggingSlider = false
-                        onSeekTo((sliderDragPosition * durationMs).toLong())
+                        val seekTarget = (sliderDragPosition * durationMs).toLong()
+                        targetSeekPositionMs = seekTarget
+                        onSeekTo(seekTarget)
                     },
                     colors = SliderDefaults.colors(
                         thumbColor = PrimaryDark,
@@ -306,7 +331,7 @@ fun NowPlayingSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = { isShuffle = !isShuffle },
+                    onClick = onToggleShuffle,
                     modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
@@ -362,13 +387,16 @@ fun NowPlayingSheet(
                 }
 
                 IconButton(
-                    onClick = { isRepeat = !isRepeat },
+                    onClick = onToggleRepeat,
                     modifier = Modifier.size(44.dp)
                 ) {
+                    val repeatIcon = if (repeatMode == RepeatMode.ONE) PeerlessIcons.RepeatOne else PeerlessIcons.Repeat
+                    val repeatTint =
+                        if (repeatMode != RepeatMode.OFF) SecondaryDark else OnSurfaceVariantDark.copy(alpha = 0.6f)
                     Icon(
-                        imageVector = PeerlessIcons.Repeat,
+                        imageVector = repeatIcon,
                         contentDescription = "Repeat",
-                        tint = if (isRepeat) SecondaryDark else OnSurfaceVariantDark.copy(alpha = 0.6f),
+                        tint = repeatTint,
                         modifier = Modifier.size(22.dp)
                     )
                 }

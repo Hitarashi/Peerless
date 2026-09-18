@@ -1,11 +1,10 @@
 package org.shilpo.peerless
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.tooling.preview.Preview
-import org.shilpo.peerless.player.PlaybackCoordinator
+import org.shilpo.peerless.player.LocalPlayerConnection
+import org.shilpo.peerless.player.RealPlayerConnection
+import org.shilpo.peerless.player.platformSetup
 import org.shilpo.peerless.theme.ExpressiveTheme
 import org.shilpo.peerless.theme.rememberArtworkSeedColor
 import org.shilpo.peerless.ui.shell.AdaptiveShell
@@ -13,16 +12,26 @@ import org.shilpo.peerless.ui.shell.AdaptiveShell
 @Composable
 @Preview
 fun App() {
-    val coordinator = remember { PlaybackCoordinator() }
-    val playerState by coordinator.state.collectAsState()
+    val playerConnection = remember { RealPlayerConnection() }
 
-    val currentArtworkUrl = playerState.currentTrack?.let { track ->
-        coordinator.apiClient.getArtworkUrl(track, 300)
+    LaunchedEffect(playerConnection) {
+        platformSetup(playerConnection)
+    }
+    SideEffect {
+        platformSetup(playerConnection)
+    }
+
+    val currentTrack by playerConnection.currentTrack.collectAsState()
+
+    val currentArtworkUrl = currentTrack?.let { track ->
+        playerConnection.apiClient.getArtworkUrl(track.toSummaryDto(), 300)
     }
 
     val dynamicSeedColor = rememberArtworkSeedColor(artworkUrl = currentArtworkUrl)
 
     ExpressiveTheme(seedColor = dynamicSeedColor) {
-        AdaptiveShell(coordinator = coordinator)
+        CompositionLocalProvider(LocalPlayerConnection provides playerConnection) {
+            AdaptiveShell()
+        }
     }
 }

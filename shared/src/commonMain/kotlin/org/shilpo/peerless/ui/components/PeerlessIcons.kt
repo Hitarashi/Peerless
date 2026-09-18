@@ -18,6 +18,7 @@ object PeerlessIcons {
     val SkipPrevious: ImageVector get() = Icons.Rounded.SkipPrevious
     val Shuffle: ImageVector get() = Icons.Rounded.Shuffle
     val Repeat: ImageVector get() = Icons.Rounded.Repeat
+    val RepeatOne: ImageVector get() = Icons.Rounded.RepeatOne
     val Search: ImageVector get() = Icons.Rounded.Search
     val Close: ImageVector get() = Icons.Rounded.Close
     val Settings: ImageVector get() = Icons.Rounded.Settings

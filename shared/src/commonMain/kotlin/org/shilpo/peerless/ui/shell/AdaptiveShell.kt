@@ -25,9 +25,11 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.shilpo.peerless.model.TrackSummaryDto
-import org.shilpo.peerless.player.PlaybackCoordinator
+import org.shilpo.peerless.model.toTrack
+import org.shilpo.peerless.player.LocalPlayerConnection
 import org.shilpo.peerless.player.PlaybackStatus
-import org.shilpo.peerless.player.PlayerState
+import org.shilpo.peerless.player.PlayerConnection
+import org.shilpo.peerless.player.RealPlayerConnection
 import org.shilpo.peerless.theme.*
 import org.shilpo.peerless.ui.HomeExpressiveContent
 import org.shilpo.peerless.ui.SampleLosslessLibrary
@@ -38,19 +40,28 @@ import org.shilpo.peerless.ui.toTrackSummary
 
 @Composable
 fun AdaptiveShell(
-    coordinator: PlaybackCoordinator = remember { PlaybackCoordinator() },
     modifier: Modifier = Modifier
 ) {
-    val playerState by coordinator.state.collectAsState()
+    val playerConnection = LocalPlayerConnection.current
+    val realConnection = playerConnection as RealPlayerConnection
+    val apiClient = realConnection.apiClient
+
+    val currentTrack by playerConnection.currentTrack.collectAsState()
+    val currentTrackDto = currentTrack?.toSummaryDto()
+    val status by playerConnection.status.collectAsState()
+    val isPlaying by playerConnection.isPlaying.collectAsState()
+    val queue by playerConnection.queue.collectAsState()
+    val queueDtos = remember(queue) { queue.map { it.toSummaryDto() } }
+    val shuffleMode by playerConnection.shuffleMode.collectAsState()
+    val repeatMode by playerConnection.repeatMode.collectAsState()
+    val canSkipNext by playerConnection.canSkipNext.collectAsState()
+    val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
+    val volume by playerConnection.volume.collectAsState()
 
     var currentDestination by remember { mutableStateOf(NavigationDestination.HOME) }
     var activeSupportingPane by remember { mutableStateOf<SupportingPaneType?>(SupportingPaneType.QUEUE) }
     var isNowPlayingOpen by remember { mutableStateOf(false) }
     var isSettingsOpen by remember { mutableStateOf(false) }
-
-    var volume by remember { mutableFloatStateOf(0.85f) }
-    var isShuffle by remember { mutableStateOf(false) }
-    var isRepeat by remember { mutableStateOf(false) }
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("All") }
@@ -58,7 +69,7 @@ fun AdaptiveShell(
     var serverConnected by remember { mutableStateOf(false) }
     var serverTracks by remember { mutableStateOf<List<TrackSummaryDto>>(emptyList()) }
 
-    LaunchedEffect(searchQuery, selectedFilter, playerState.serverUrl) {
+    LaunchedEffect(searchQuery, selectedFilter, apiClient.baseUrl) {
         isSearching = true
         delay(300)
 
@@ -68,7 +79,7 @@ fun AdaptiveShell(
             else -> null
         }
 
-        val result = coordinator.apiClient.search(
+        val result = apiClient.search(
             query = searchQuery.trim(),
             provider = providerParam
         )
@@ -127,7 +138,7 @@ fun AdaptiveShell(
                 val onRipClick: (TrackSummaryDto) -> Unit = { track ->
                     coroutineScope.launch {
                         println("[Peerless] Initiating rip task for ${track.title} (${track.provider}:${track.track_id})")
-                        coordinator.apiClient.createRipTask(
+                        apiClient.createRipTask(
                             provider = track.provider,
                             trackId = track.track_id,
                             codec = track.codec
@@ -144,8 +155,9 @@ fun AdaptiveShell(
                         CompactLayout(
                             currentDestination = currentDestination,
                             onSelectDestination = { currentDestination = it },
-                            coordinator = coordinator,
-                            playerState = playerState,
+                            playerConnection = playerConnection,
+                            currentTrackDto = currentTrackDto,
+                            status = status,
                             serverConnected = serverConnected,
                             searchQuery = searchQuery,
                             onQueryChange = { searchQuery = it },
@@ -163,8 +175,9 @@ fun AdaptiveShell(
                         MediumLayout(
                             currentDestination = currentDestination,
                             onSelectDestination = { currentDestination = it },
-                            coordinator = coordinator,
-                            playerState = playerState,
+                            playerConnection = playerConnection,
+                            currentTrackDto = currentTrackDto,
+                            status = status,
                             serverConnected = serverConnected,
                             searchQuery = searchQuery,
                             onQueryChange = { searchQuery = it },
@@ -186,8 +199,9 @@ fun AdaptiveShell(
                             onToggleSupportingPane = { pane ->
                                 activeSupportingPane = if (activeSupportingPane == pane) null else pane
                             },
-                            coordinator = coordinator,
-                            playerState = playerState,
+                            playerConnection = playerConnection,
+                            currentTrackDto = currentTrackDto,
+                            status = status,
                             serverConnected = serverConnected,
                             searchQuery = searchQuery,
                             onQueryChange = { searchQuery = it },
@@ -196,11 +210,18 @@ fun AdaptiveShell(
                             displayedTracks = displayedTracks,
                             allTracks = activeLibrary,
                             volume = volume,
-                            onVolumeChange = { volume = it },
-                            isShuffle = isShuffle,
-                            onToggleShuffle = { isShuffle = !isShuffle },
-                            isRepeat = isRepeat,
-                            onToggleRepeat = { isRepeat = !isRepeat },
+                            onVolumeChange = { playerConnection.setVolume(it) },
+                            isShuffle = shuffleMode,
+                            onToggleShuffle = { playerConnection.setShuffleMode(!shuffleMode) },
+                            repeatMode = repeatMode,
+                            onToggleRepeat = {
+                                val next = when (repeatMode) {
+                                    org.shilpo.peerless.model.RepeatMode.OFF -> org.shilpo.peerless.model.RepeatMode.ALL
+                                    org.shilpo.peerless.model.RepeatMode.ALL -> org.shilpo.peerless.model.RepeatMode.ONE
+                                    org.shilpo.peerless.model.RepeatMode.ONE -> org.shilpo.peerless.model.RepeatMode.OFF
+                                }
+                                playerConnection.setRepeatMode(next)
+                            },
                             onOpenNowPlaying = { isNowPlayingOpen = true },
                             onOpenSettings = { isSettingsOpen = true },
                             onRipClick = onRipClick
@@ -209,7 +230,7 @@ fun AdaptiveShell(
                 }
 
                 AnimatedVisibility(
-                    visible = isNowPlayingOpen && playerState.currentTrack != null,
+                    visible = isNowPlayingOpen && currentTrackDto != null,
                     enter = slideInVertically(
                         initialOffsetY = { it },
                         animationSpec = tween(350, easing = ExpressiveMotion.EmphasizedEasing)
@@ -219,33 +240,44 @@ fun AdaptiveShell(
                         animationSpec = tween(300, easing = ExpressiveMotion.EmphasizedAccelerateEasing)
                     ) + fadeOut()
                 ) {
-                    playerState.currentTrack?.let { track ->
+                    currentTrackDto?.let { trackDto ->
                         NowPlayingSheet(
-                            track = track,
-                            playbackInfo = playerState.playbackInfo,
-                            status = playerState.status,
-                            positionMs = playerState.positionMs,
-                            durationMs = playerState.durationMs,
-                            artworkUrl = coordinator.apiClient.getArtworkUrl(track, 600),
-                            serverUrl = playerState.serverUrl,
-                            isDevMode = playerState.isDevMode,
-                            onTogglePlayPause = { coordinator.togglePlayPause() },
-                            onSeekTo = { pos -> coordinator.seekTo(pos) },
-                            onPlayNext = { coordinator.playNext() },
-                            onPlayPrevious = { coordinator.playPrevious() },
+                            track = trackDto,
+                            playbackInfo = playerConnection.playbackInfo.collectAsState().value,
+                            status = status,
+                            positionMs = playerConnection.currentPositionMs,
+                            durationMs = playerConnection.durationMs,
+                            artworkUrl = apiClient.getArtworkUrl(trackDto, 600),
+                            serverUrl = apiClient.baseUrl,
+                            isDevMode = realConnection.isDevMode,
+                            onTogglePlayPause = { playerConnection.togglePlayPause() },
+                            onSeekTo = { pos -> playerConnection.seekTo(pos) },
+                            onPlayNext = { playerConnection.playNext() },
+                            onPlayPrevious = { playerConnection.playPrevious() },
                             onClose = { isNowPlayingOpen = false },
-                            onOpenSettings = { isSettingsOpen = true }
+                            onOpenSettings = { isSettingsOpen = true },
+                            isShuffle = shuffleMode,
+                            onToggleShuffle = { playerConnection.setShuffleMode(!shuffleMode) },
+                            repeatMode = repeatMode,
+                            onToggleRepeat = {
+                                val next = when (repeatMode) {
+                                    org.shilpo.peerless.model.RepeatMode.OFF -> org.shilpo.peerless.model.RepeatMode.ALL
+                                    org.shilpo.peerless.model.RepeatMode.ALL -> org.shilpo.peerless.model.RepeatMode.ONE
+                                    org.shilpo.peerless.model.RepeatMode.ONE -> org.shilpo.peerless.model.RepeatMode.OFF
+                                }
+                                playerConnection.setRepeatMode(next)
+                            }
                         )
                     }
                 }
 
                 if (isSettingsOpen) {
                     ServerSettingsDialog(
-                        currentServerUrl = playerState.serverUrl,
-                        currentDevMode = playerState.isDevMode,
+                        currentServerUrl = apiClient.baseUrl,
+                        currentDevMode = realConnection.isDevMode,
                         onSave = { newUrl, newDevMode ->
-                            coordinator.setServerUrl(newUrl)
-                            coordinator.setDevMode(newDevMode)
+                            apiClient.baseUrl = newUrl
+                            realConnection.isDevMode = newDevMode
                         },
                         onDismiss = { isSettingsOpen = false }
                     )
@@ -259,8 +291,9 @@ fun AdaptiveShell(
 private fun CompactLayout(
     currentDestination: NavigationDestination,
     onSelectDestination: (NavigationDestination) -> Unit,
-    coordinator: PlaybackCoordinator,
-    playerState: PlayerState,
+    playerConnection: PlayerConnection,
+    currentTrackDto: TrackSummaryDto?,
+    status: PlaybackStatus,
     serverConnected: Boolean,
     searchQuery: String,
     onQueryChange: (String) -> Unit,
@@ -272,6 +305,10 @@ private fun CompactLayout(
     onOpenSettings: () -> Unit,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
+    val apiClient = (playerConnection as RealPlayerConnection).apiClient
+    val canSkipNext by playerConnection.canSkipNext.collectAsState()
+    val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
+
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
@@ -281,8 +318,9 @@ private fun CompactLayout(
             DestinationContent(
                 destination = currentDestination,
                 onSelectDestination = onSelectDestination,
-                coordinator = coordinator,
-                playerState = playerState,
+                playerConnection = playerConnection,
+                currentTrackDto = currentTrackDto,
+                status = status,
                 serverConnected = serverConnected,
                 searchQuery = searchQuery,
                 onQueryChange = onQueryChange,
@@ -292,7 +330,7 @@ private fun CompactLayout(
                 allTracks = allTracks,
                 onOpenSettings = onOpenSettings,
                 onOpenNowPlaying = onOpenNowPlaying,
-                contentBottomPadding = if (playerState.currentTrack != null) 175.dp else 98.dp,
+                contentBottomPadding = if (currentTrackDto != null) 175.dp else 98.dp,
                 onRipClick = onRipClick
             )
         }
@@ -306,26 +344,26 @@ private fun CompactLayout(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             AnimatedVisibility(
-                visible = playerState.currentTrack != null,
+                visible = currentTrackDto != null,
                 enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
                 exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
                 modifier = Modifier.padding(bottom = MiniPlayerBottomSpacing)
             ) {
-                playerState.currentTrack?.let { track ->
+                currentTrackDto?.let { trackDto ->
                     MiniPlayerBar(
-                        track = track,
-                        playbackInfo = playerState.playbackInfo,
-                        status = playerState.status,
-                        positionMs = playerState.positionMs,
-                        durationMs = playerState.durationMs,
-                        artworkUrl = coordinator.apiClient.getArtworkUrl(track, 200),
-                        onTogglePlayPause = { coordinator.togglePlayPause() },
-                        onPlayNext = { coordinator.playNext() },
-                        onPlayPrevious = { coordinator.playPrevious() },
+                        track = trackDto,
+                        playbackInfo = playerConnection.playbackInfo.collectAsState().value,
+                        status = status,
+                        positionMs = playerConnection.currentPositionMs,
+                        durationMs = playerConnection.durationMs,
+                        artworkUrl = apiClient.getArtworkUrl(trackDto, 200),
+                        onTogglePlayPause = { playerConnection.togglePlayPause() },
+                        onPlayNext = { playerConnection.playNext() },
+                        onPlayPrevious = { playerConnection.playPrevious() },
                         onOpenNowPlaying = onOpenNowPlaying,
-                        onDismiss = { coordinator.stopAndDismiss() },
-                        canSkipNext = coordinator.canSkipNext,
-                        canSkipPrevious = coordinator.canSkipPrevious,
+                        onDismiss = { playerConnection.stopAndDismiss() },
+                        canSkipNext = canSkipNext,
+                        canSkipPrevious = canSkipPrevious,
                         isPairedWithNavigation = true,
                         modifier = Modifier
                             .widthIn(max = NavigationBarMaxWidth)
@@ -339,7 +377,7 @@ private fun CompactLayout(
                 items = NavigationDestination.MainDestinations,
                 selectedDestination = currentDestination,
                 onSelectDestination = onSelectDestination,
-                isPairedWithMiniPlayer = playerState.currentTrack != null,
+                isPairedWithMiniPlayer = currentTrackDto != null,
                 modifier = Modifier
                     .widthIn(max = NavigationBarMaxWidth)
                     .fillMaxWidth()
@@ -423,8 +461,9 @@ fun FloatingNavDock(
 private fun MediumLayout(
     currentDestination: NavigationDestination,
     onSelectDestination: (NavigationDestination) -> Unit,
-    coordinator: PlaybackCoordinator,
-    playerState: PlayerState,
+    playerConnection: PlayerConnection,
+    currentTrackDto: TrackSummaryDto?,
+    status: PlaybackStatus,
     serverConnected: Boolean,
     searchQuery: String,
     onQueryChange: (String) -> Unit,
@@ -436,6 +475,9 @@ private fun MediumLayout(
     onOpenSettings: () -> Unit,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
+    val apiClient = (playerConnection as RealPlayerConnection).apiClient
+    val canSkipNext by playerConnection.canSkipNext.collectAsState()
+    val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -507,8 +549,9 @@ private fun MediumLayout(
                 DestinationContent(
                     destination = currentDestination,
                     onSelectDestination = onSelectDestination,
-                    coordinator = coordinator,
-                    playerState = playerState,
+                    playerConnection = playerConnection,
+                    currentTrackDto = currentTrackDto,
+                    status = status,
                     serverConnected = serverConnected,
                     searchQuery = searchQuery,
                     onQueryChange = onQueryChange,
@@ -518,7 +561,7 @@ private fun MediumLayout(
                     allTracks = allTracks,
                     onOpenSettings = onOpenSettings,
                     onOpenNowPlaying = onOpenNowPlaying,
-                    contentBottomPadding = if (playerState.currentTrack != null) 90.dp else 16.dp,
+                    contentBottomPadding = if (currentTrackDto != null) 90.dp else 16.dp,
                     onRipClick = onRipClick
                 )
 
@@ -526,25 +569,25 @@ private fun MediumLayout(
         }
 
         AnimatedVisibility(
-            visible = playerState.currentTrack != null,
+            visible = currentTrackDto != null,
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
             exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
         ) {
-            playerState.currentTrack?.let { track ->
+            currentTrackDto?.let { trackDto ->
                 MiniPlayerBar(
-                    track = track,
-                    playbackInfo = playerState.playbackInfo,
-                    status = playerState.status,
-                    positionMs = playerState.positionMs,
-                    durationMs = playerState.durationMs,
-                    artworkUrl = coordinator.apiClient.getArtworkUrl(track, 200),
-                    onTogglePlayPause = { coordinator.togglePlayPause() },
-                    onPlayNext = { coordinator.playNext() },
-                    onPlayPrevious = { coordinator.playPrevious() },
+                    track = trackDto,
+                    playbackInfo = playerConnection.playbackInfo.collectAsState().value,
+                    status = status,
+                    positionMs = playerConnection.currentPositionMs,
+                    durationMs = playerConnection.durationMs,
+                    artworkUrl = apiClient.getArtworkUrl(trackDto, 200),
+                    onTogglePlayPause = { playerConnection.togglePlayPause() },
+                    onPlayNext = { playerConnection.playNext() },
+                    onPlayPrevious = { playerConnection.playPrevious() },
                     onOpenNowPlaying = onOpenNowPlaying,
-                    onDismiss = { coordinator.stopAndDismiss() },
-                    canSkipNext = coordinator.canSkipNext,
-                    canSkipPrevious = coordinator.canSkipPrevious,
+                    onDismiss = { playerConnection.stopAndDismiss() },
+                    canSkipNext = canSkipNext,
+                    canSkipPrevious = canSkipPrevious,
                     isPairedWithNavigation = false,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
@@ -559,8 +602,9 @@ private fun ExpandedLayout(
     onSelectDestination: (NavigationDestination) -> Unit,
     activeSupportingPane: SupportingPaneType?,
     onToggleSupportingPane: (SupportingPaneType) -> Unit,
-    coordinator: PlaybackCoordinator,
-    playerState: PlayerState,
+    playerConnection: PlayerConnection,
+    currentTrackDto: TrackSummaryDto?,
+    status: PlaybackStatus,
     serverConnected: Boolean,
     searchQuery: String,
     onQueryChange: (String) -> Unit,
@@ -572,12 +616,15 @@ private fun ExpandedLayout(
     onVolumeChange: (Float) -> Unit,
     isShuffle: Boolean,
     onToggleShuffle: () -> Unit,
-    isRepeat: Boolean,
+    repeatMode: org.shilpo.peerless.model.RepeatMode,
     onToggleRepeat: () -> Unit,
     onOpenNowPlaying: () -> Unit,
     onOpenSettings: () -> Unit,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
+    val apiClient = (playerConnection as RealPlayerConnection).apiClient
+    val isRepeat = repeatMode != org.shilpo.peerless.model.RepeatMode.OFF
+
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -602,8 +649,9 @@ private fun ExpandedLayout(
                 DestinationContent(
                     destination = currentDestination,
                     onSelectDestination = onSelectDestination,
-                    coordinator = coordinator,
-                    playerState = playerState,
+                    playerConnection = playerConnection,
+                    currentTrackDto = currentTrackDto,
+                    status = status,
                     serverConnected = serverConnected,
                     searchQuery = searchQuery,
                     onQueryChange = onQueryChange,
@@ -633,8 +681,9 @@ private fun ExpandedLayout(
                 activeSupportingPane?.let { paneType ->
                     SupportingPaneContainer(
                         paneType = paneType,
-                        coordinator = coordinator,
-                        playerState = playerState,
+                        playerConnection = playerConnection,
+                        currentTrackDto = currentTrackDto,
+                        status = status,
                         onClose = { onToggleSupportingPane(paneType) },
                         modifier = Modifier
                             .width(340.dp)
@@ -645,16 +694,16 @@ private fun ExpandedLayout(
         }
 
         PersistentBottomPlayer(
-            track = playerState.currentTrack,
-            playbackInfo = playerState.playbackInfo,
-            status = playerState.status,
-            positionMs = playerState.positionMs,
-            durationMs = playerState.durationMs,
-            artworkUrl = playerState.currentTrack?.let { coordinator.apiClient.getArtworkUrl(it, 200) } ?: "",
-            onTogglePlayPause = { coordinator.togglePlayPause() },
-            onSeekTo = { pos -> coordinator.seekTo(pos) },
-            onPlayNext = { coordinator.playNext() },
-            onPlayPrevious = { coordinator.playPrevious() },
+            track = currentTrackDto,
+            playbackInfo = playerConnection.playbackInfo.collectAsState().value,
+            status = status,
+            positionMs = playerConnection.currentPositionMs,
+            durationMs = playerConnection.durationMs,
+            artworkUrl = currentTrackDto?.let { apiClient.getArtworkUrl(it, 200) } ?: "",
+            onTogglePlayPause = { playerConnection.togglePlayPause() },
+            onSeekTo = { pos -> playerConnection.seekTo(pos) },
+            onPlayNext = { playerConnection.playNext() },
+            onPlayPrevious = { playerConnection.playPrevious() },
             activeSupportingPane = activeSupportingPane,
             onToggleSupportingPane = onToggleSupportingPane,
             volume = volume,
@@ -834,11 +883,18 @@ private fun PersistentNavigationDrawer(
 @Composable
 private fun SupportingPaneContainer(
     paneType: SupportingPaneType,
-    coordinator: PlaybackCoordinator,
-    playerState: PlayerState,
+    playerConnection: PlayerConnection,
+    currentTrackDto: TrackSummaryDto?,
+    status: PlaybackStatus,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val realConnection = playerConnection as RealPlayerConnection
+    val apiClient = realConnection.apiClient
+    val playbackInfo by playerConnection.playbackInfo.collectAsState()
+    val queue by playerConnection.queue.collectAsState()
+    val queueDtos = remember(queue) { queue.map { it.toSummaryDto() } }
+
     Box(
         modifier = modifier
             .background(SurfaceContainerLowDark)
@@ -907,23 +963,25 @@ private fun SupportingPaneContainer(
                 when (paneType) {
                     SupportingPaneType.QUEUE -> {
                         QueuePaneContent(
-                            coordinator = coordinator,
-                            playerState = playerState
+                            playerConnection = playerConnection,
+                            queueDtos = queueDtos,
+                            currentTrackDto = currentTrackDto,
+                            status = status
                         )
                     }
 
                     SupportingPaneType.LYRICS -> {
                         LyricsPaneContent(
-                            currentTrack = playerState.currentTrack
+                            currentTrack = currentTrackDto
                         )
                     }
 
                     SupportingPaneType.SIGNAL_PATH -> {
                         SignalPathPaneContent(
-                            track = playerState.currentTrack,
-                            playbackInfo = playerState.playbackInfo,
-                            serverUrl = playerState.serverUrl,
-                            isDevMode = playerState.isDevMode
+                            track = currentTrackDto,
+                            playbackInfo = playbackInfo,
+                            serverUrl = apiClient.baseUrl,
+                            isDevMode = realConnection.isDevMode
                         )
                     }
                 }
@@ -934,11 +992,14 @@ private fun SupportingPaneContainer(
 
 @Composable
 private fun QueuePaneContent(
-    coordinator: PlaybackCoordinator,
-    playerState: PlayerState
+    playerConnection: PlayerConnection,
+    queueDtos: List<TrackSummaryDto>,
+    currentTrackDto: TrackSummaryDto?,
+    status: PlaybackStatus
 ) {
-    val queue = playerState.queue
-    if (queue.isEmpty()) {
+    val apiClient = (playerConnection as RealPlayerConnection).apiClient
+
+    if (queueDtos.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -965,13 +1026,13 @@ private fun QueuePaneContent(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            items(items = queue, key = { it.id }) { track ->
-                val isPlaying = playerState.currentTrack?.id == track.id
+            items(items = queueDtos, key = { it.id }) { trackDto ->
+                val isPlaying = currentTrackDto?.id == trackDto.id
                 TrackRow(
-                    track = track,
-                    artworkUrl = coordinator.apiClient.getArtworkUrl(track, 120),
-                    isPlaying = isPlaying && playerState.status == PlaybackStatus.PLAYING,
-                    onTrackClick = { coordinator.playTrack(it, queue) }
+                    track = trackDto,
+                    artworkUrl = apiClient.getArtworkUrl(trackDto, 120),
+                    isPlaying = isPlaying && status == PlaybackStatus.PLAYING,
+                    onTrackClick = { playerConnection.play(it.toTrack(), queueDtos.map { t -> t.toTrack() }) }
                 )
             }
         }
@@ -1174,8 +1235,9 @@ private fun SignalPathStageCard(
 private fun DestinationContent(
     destination: NavigationDestination,
     onSelectDestination: (NavigationDestination) -> Unit,
-    coordinator: PlaybackCoordinator,
-    playerState: PlayerState,
+    playerConnection: PlayerConnection,
+    currentTrackDto: TrackSummaryDto?,
+    status: PlaybackStatus,
     serverConnected: Boolean,
     searchQuery: String,
     onQueryChange: (String) -> Unit,
@@ -1192,8 +1254,9 @@ private fun DestinationContent(
     when (destination) {
         NavigationDestination.HOME -> {
             HomeDestinationView(
-                coordinator = coordinator,
-                playerState = playerState,
+                playerConnection = playerConnection,
+                currentTrackDto = currentTrackDto,
+                status = status,
                 serverConnected = serverConnected,
                 searchQuery = searchQuery,
                 onQueryChange = onQueryChange,
@@ -1211,8 +1274,7 @@ private fun DestinationContent(
 
         NavigationDestination.SEARCH -> {
             SearchDestinationView(
-                coordinator = coordinator,
-                playerState = playerState,
+                playerConnection = playerConnection,
                 onOpenSettings = onOpenSettings,
                 contentBottomPadding = contentBottomPadding,
                 onRipClick = onRipClick
@@ -1221,8 +1283,9 @@ private fun DestinationContent(
 
         NavigationDestination.LIBRARY -> {
             LibraryDestinationView(
-                coordinator = coordinator,
-                playerState = playerState,
+                playerConnection = playerConnection,
+                currentTrackDto = currentTrackDto,
+                status = status,
                 allTracks = displayedTracks,
                 contentBottomPadding = contentBottomPadding
             )
@@ -1230,7 +1293,7 @@ private fun DestinationContent(
 
         NavigationDestination.SETTINGS -> {
             SettingsDestinationView(
-                playerState = playerState,
+                playerConnection = playerConnection,
                 serverConnected = serverConnected,
                 onOpenSettingsDialog = onOpenSettings,
                 contentBottomPadding = contentBottomPadding
@@ -1241,8 +1304,9 @@ private fun DestinationContent(
 
 @Composable
 private fun HomeDestinationView(
-    coordinator: PlaybackCoordinator,
-    playerState: PlayerState,
+    playerConnection: PlayerConnection,
+    currentTrackDto: TrackSummaryDto?,
+    status: PlaybackStatus,
     serverConnected: Boolean,
     searchQuery: String,
     onQueryChange: (String) -> Unit,
@@ -1257,8 +1321,7 @@ private fun HomeDestinationView(
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
     HomeExpressiveContent(
-        coordinator = coordinator,
-        playerState = playerState,
+        playerConnection = playerConnection,
         serverConnected = serverConnected,
         searchQuery = searchQuery,
         onQueryChange = onQueryChange,
@@ -1276,15 +1339,13 @@ private fun HomeDestinationView(
 
 @Composable
 private fun SearchDestinationView(
-    coordinator: PlaybackCoordinator,
-    playerState: PlayerState,
+    playerConnection: PlayerConnection,
     onOpenSettings: () -> Unit,
     contentBottomPadding: androidx.compose.ui.unit.Dp,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
     SearchScreen(
-        coordinator = coordinator,
-        playerState = playerState,
+        playerConnection = playerConnection,
         onOpenSettings = onOpenSettings,
         contentBottomPadding = contentBottomPadding,
         onRipClick = onRipClick
@@ -1293,11 +1354,14 @@ private fun SearchDestinationView(
 
 @Composable
 private fun LibraryDestinationView(
-    coordinator: PlaybackCoordinator,
-    playerState: PlayerState,
+    playerConnection: PlayerConnection,
+    currentTrackDto: TrackSummaryDto?,
+    status: PlaybackStatus,
     allTracks: List<TrackSummaryDto>,
     contentBottomPadding: androidx.compose.ui.unit.Dp
 ) {
+    val apiClient = (playerConnection as RealPlayerConnection).apiClient
+
     var selectedTab by remember { mutableStateOf("All Saved") }
     val tabs = listOf("All Saved", "Cached Downloads", "Playlists")
 
@@ -1347,15 +1411,15 @@ private fun LibraryDestinationView(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             items(tracksToShow, key = { it.id }) { track ->
-                val isPlaying = playerState.currentTrack?.id == track.id &&
-                        playerState.status == PlaybackStatus.PLAYING
+                val isPlaying = currentTrackDto?.id == track.id &&
+                        status == PlaybackStatus.PLAYING
 
                 TrackRow(
                     track = track,
-                    artworkUrl = coordinator.apiClient.getArtworkUrl(track, 200),
+                    artworkUrl = apiClient.getArtworkUrl(track, 200),
                     isPlaying = isPlaying,
                     onTrackClick = { clicked ->
-                        coordinator.playTrack(clicked, tracksToShow)
+                        playerConnection.play(clicked.toTrack(), tracksToShow.map { it.toTrack() })
                     }
                 )
             }
@@ -1365,11 +1429,15 @@ private fun LibraryDestinationView(
 
 @Composable
 private fun SettingsDestinationView(
-    playerState: PlayerState,
+    playerConnection: PlayerConnection,
     serverConnected: Boolean,
     onOpenSettingsDialog: () -> Unit,
     contentBottomPadding: androidx.compose.ui.unit.Dp
 ) {
+    val realConnection = playerConnection as RealPlayerConnection
+    val serverUrl = realConnection.apiClient.baseUrl
+    val isDevMode = realConnection.isDevMode
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1414,15 +1482,15 @@ private fun SettingsDestinationView(
                 }
 
                 Text(
-                    text = "Endpoint: ${playerState.serverUrl}",
+                    text = "Endpoint: $serverUrl",
                     style = ExpressiveTypography.bodyMedium,
                     color = OnSurfaceVariantDark
                 )
 
                 Text(
-                    text = if (playerState.isDevMode) "Dev Mode Direct Stream Active (Bypasses Telegram OTP)" else "Production Ticket Auth Active",
+                    text = if (isDevMode) "Dev Mode Direct Stream Active (Bypasses Telegram OTP)" else "Production Ticket Auth Active",
                     style = ExpressiveTypography.bodySmall,
-                    color = if (playerState.isDevMode) LosslessGold else PrimaryDark
+                    color = if (isDevMode) LosslessGold else PrimaryDark
                 )
             }
         }

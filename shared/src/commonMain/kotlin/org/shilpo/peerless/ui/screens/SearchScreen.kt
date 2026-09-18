@@ -24,9 +24,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.shilpo.peerless.lastfm.LastFmClient
 import org.shilpo.peerless.model.*
-import org.shilpo.peerless.player.PlaybackCoordinator
+import org.shilpo.peerless.network.PeerlessApiClient
 import org.shilpo.peerless.player.PlaybackStatus
-import org.shilpo.peerless.player.PlayerState
+import org.shilpo.peerless.player.PlayerConnection
+import org.shilpo.peerless.player.RealPlayerConnection
 import org.shilpo.peerless.theme.*
 import org.shilpo.peerless.ui.SampleLosslessLibrary
 import org.shilpo.peerless.ui.components.ExpressiveSearchBar
@@ -90,8 +91,7 @@ val CuratedTasteMixes = listOf(
 
 @Composable
 fun SearchScreen(
-    coordinator: PlaybackCoordinator,
-    playerState: PlayerState,
+    playerConnection: PlayerConnection,
     onOpenSettings: () -> Unit = {},
     contentBottomPadding: Dp = 0.dp,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null,
@@ -99,6 +99,11 @@ fun SearchScreen(
     initialQuery: String = "",
     initialFilter: SearchFilter = SearchFilter.ALL
 ) {
+    val apiClient = (playerConnection as? RealPlayerConnection)?.apiClient ?: remember { PeerlessApiClient() }
+    val currentTrack by playerConnection.currentTrack.collectAsState()
+    val status by playerConnection.status.collectAsState()
+    val currentTrackDto = currentTrack?.toSummaryDto()
+
     var searchQuery by remember { mutableStateOf(initialQuery) }
     var selectedFilter by remember { mutableStateOf(initialFilter) }
     var isSearching by remember { mutableStateOf(false) }
@@ -115,7 +120,7 @@ fun SearchScreen(
         zeroStateTags = tagsRes.getOrElse { LastFmClient.fallbackTopTags() }
     }
 
-    LaunchedEffect(searchQuery, selectedFilter, playerState.serverUrl) {
+    LaunchedEffect(searchQuery, selectedFilter, apiClient.baseUrl) {
         val trimmedQuery = searchQuery.trim()
         if (trimmedQuery.isBlank()) {
             isSearching = false
@@ -132,7 +137,7 @@ fun SearchScreen(
 
         coroutineScope {
             launch {
-                val searchRes = coordinator.apiClient.search(
+                val searchRes = apiClient.search(
                     query = trimmedQuery,
                     provider = providerParam
                 )
@@ -294,8 +299,8 @@ fun SearchScreen(
                 onFilterSelect = { selectedFilter = it },
                 onOpenSettings = onOpenSettings,
                 isSearching = isSearching,
-                isDevMode = playerState.isDevMode,
-                serverUrl = playerState.serverUrl
+                isDevMode = (playerConnection as? RealPlayerConnection)?.isDevMode ?: true,
+                serverUrl = apiClient.baseUrl
             )
 
             if (searchQuery.isBlank()) {
@@ -304,8 +309,9 @@ fun SearchScreen(
                     onSelectTag = { tag -> searchQuery = tag.name },
                     onSelectTasteMix = { mix -> searchQuery = mix.queryKeyword },
                     cachedSampleTracks = SampleLosslessLibrary.filter { it.is_cached },
-                    coordinator = coordinator,
-                    playerState = playerState,
+                    playerConnection = playerConnection,
+                    currentTrackDto = currentTrackDto,
+                    status = status,
                     contentBottomPadding = contentBottomPadding
                 )
             } else {
@@ -315,8 +321,9 @@ fun SearchScreen(
                     artistSpotlight = artistSpotlight,
                     cachedTracks = cachedTracks,
                     liveTracks = liveTracks,
-                    coordinator = coordinator,
-                    playerState = playerState,
+                    playerConnection = playerConnection,
+                    currentTrackDto = currentTrackDto,
+                    status = status,
                     onSelectTag = { tag -> searchQuery = tag },
                     onSelectArtist = { artist -> searchQuery = artist },
                     onRipClick = onRipClick,
@@ -333,10 +340,12 @@ private fun ZeroStateDiscovery(
     onSelectTag: (LastFmTag) -> Unit,
     onSelectTasteMix: (TasteMixCardData) -> Unit,
     cachedSampleTracks: List<TrackSummaryDto>,
-    coordinator: PlaybackCoordinator,
-    playerState: PlayerState,
+    playerConnection: PlayerConnection,
+    currentTrackDto: TrackSummaryDto?,
+    status: PlaybackStatus,
     contentBottomPadding: Dp
 ) {
+    val apiClient = (playerConnection as? RealPlayerConnection)?.apiClient ?: remember { PeerlessApiClient() }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -506,14 +515,14 @@ private fun ZeroStateDiscovery(
         }
 
         items(cachedSampleTracks.take(4), key = { it.id }) { track ->
-            val isPlaying = playerState.currentTrack?.id == track.id &&
-                    playerState.status == PlaybackStatus.PLAYING
+            val isPlaying = currentTrackDto?.id == track.id &&
+                    status == PlaybackStatus.PLAYING
 
             TrackRow(
                 track = track,
-                artworkUrl = coordinator.apiClient.getArtworkUrl(track, 200),
+                artworkUrl = apiClient.getArtworkUrl(track, 200),
                 isPlaying = isPlaying,
-                onTrackClick = { coordinator.playTrack(it, cachedSampleTracks) }
+                onTrackClick = { playerConnection.play(it.toTrack(), cachedSampleTracks.map { t -> t.toTrack() }) }
             )
         }
     }
@@ -601,13 +610,15 @@ private fun SearchResultsContent(
     artistSpotlight: LastFmArtist?,
     cachedTracks: List<TrackSummaryDto>,
     liveTracks: List<UncachedTrackDto>,
-    coordinator: PlaybackCoordinator,
-    playerState: PlayerState,
+    playerConnection: PlayerConnection,
+    currentTrackDto: TrackSummaryDto?,
+    status: PlaybackStatus,
     onSelectTag: (String) -> Unit,
     onSelectArtist: (String) -> Unit,
     onRipClick: ((TrackSummaryDto) -> Unit)?,
     contentBottomPadding: Dp
 ) {
+    val apiClient = (playerConnection as? RealPlayerConnection)?.apiClient ?: remember { PeerlessApiClient() }
     val isEmptyResult = !isSearching && cachedTracks.isEmpty() && liveTracks.isEmpty() && artistSpotlight == null
 
     LazyColumn(
@@ -642,14 +653,14 @@ private fun SearchResultsContent(
             }
 
             items(cachedTracks, key = { "cached_${it.id}" }) { track ->
-                val isPlaying = playerState.currentTrack?.id == track.id &&
-                        playerState.status == PlaybackStatus.PLAYING
+                val isPlaying = currentTrackDto?.id == track.id &&
+                        status == PlaybackStatus.PLAYING
 
                 TrackRow(
                     track = track,
-                    artworkUrl = coordinator.apiClient.getArtworkUrl(track, 200),
+                    artworkUrl = apiClient.getArtworkUrl(track, 200),
                     isPlaying = isPlaying,
-                    onTrackClick = { coordinator.playTrack(it, cachedTracks) }
+                    onTrackClick = { playerConnection.play(it.toTrack(), cachedTracks.map { t -> t.toTrack() }) }
                 )
             }
         }
@@ -667,14 +678,14 @@ private fun SearchResultsContent(
 
             items(liveTracks, key = { "live_${it.provider}_${it.track_id}" }) { uncached ->
                 val trackSummary = uncached.toTrackSummary()
-                val isPlaying = playerState.currentTrack?.id == trackSummary.id &&
-                        playerState.status == PlaybackStatus.PLAYING
+                val isPlaying = currentTrackDto?.id == trackSummary.id &&
+                        status == PlaybackStatus.PLAYING
 
                 TrackRow(
                     track = trackSummary,
-                    artworkUrl = coordinator.apiClient.getArtworkUrl(trackSummary, 200),
+                    artworkUrl = apiClient.getArtworkUrl(trackSummary, 200),
                     isPlaying = isPlaying,
-                    onTrackClick = { coordinator.playTrack(it, emptyList()) },
+                    onTrackClick = { playerConnection.play(it.toTrack(), emptyList()) },
                     onRipClick = onRipClick
                 )
             }

@@ -27,124 +27,126 @@ import coil3.compose.AsyncImage
 import kotlinx.coroutines.delay
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.model.UncachedTrackDto
-import org.shilpo.peerless.player.PlaybackCoordinator
+import org.shilpo.peerless.model.toTrack
+import org.shilpo.peerless.player.LocalPlayerConnection
 import org.shilpo.peerless.player.PlaybackStatus
-import org.shilpo.peerless.player.PlayerState
+import org.shilpo.peerless.player.PlayerConnection
+import org.shilpo.peerless.player.RealPlayerConnection
 import org.shilpo.peerless.theme.*
 import org.shilpo.peerless.ui.components.*
 
 val SampleLosslessLibrary = listOf(
     TrackSummaryDto(
-        id = -101,
-        provider = "qobuz",
-        track_id = "sample_101",
-        title = "Time",
-        artist = "Pink Floyd",
-        album = "The Dark Side of the Moon (50th Anniv.)",
-        duration = 425,
-        codec = "FLAC",
-        bit_depth = 24,
-        sample_rate = 96000,
-        is_cached = true,
-        artwork_url = "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/3e/76/b0/3e76b0e3-762b-2286-a019-8afb19cee541/886445635829.jpg/600x600bb.jpg"
-    ),
-    TrackSummaryDto(
-        id = -102,
-        provider = "apple_music",
-        track_id = "sample_102",
-        title = "Get Lucky (feat. Pharrell Williams)",
-        artist = "Daft Punk",
-        album = "Random Access Memories",
-        duration = 369,
-        codec = "ALAC",
-        bit_depth = 24,
-        sample_rate = 88200,
-        is_cached = true,
-        artwork_url = "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/e8/43/5f/e8435ffa-b6b9-b171-40ab-4ff3959ab661/886443919266.jpg/600x600bb.jpg"
-    ),
-    TrackSummaryDto(
-        id = -103,
-        provider = "qobuz",
-        track_id = "sample_103",
-        title = "So What",
-        artist = "Miles Davis",
-        album = "Kind of Blue",
-        duration = 562,
-        codec = "FLAC",
-        bit_depth = 24,
-        sample_rate = 192000,
-        is_cached = true,
-        artwork_url = "https://is1-ssl.mzstatic.com/image/thumb/Music/7f/9f/d6/mzi.vtnaewef.jpg/600x600bb.jpg"
-    ),
-    TrackSummaryDto(
-        id = -104,
-        provider = "apple_music",
-        track_id = "sample_104",
-        title = "Dreams",
-        artist = "Fleetwood Mac",
-        album = "Rumours (Super Deluxe)",
-        duration = 257,
-        codec = "ALAC",
-        bit_depth = 24,
-        sample_rate = 96000,
-        is_cached = true,
-        artwork_url = "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/d2/48/f4/d248f4ae-a7e4-a48e-1588-6617de3e8d76/mzi.izeorbmm.jpg/600x600bb.jpg"
-    ),
-    TrackSummaryDto(
-        id = -105,
-        provider = "qobuz",
-        track_id = "sample_105",
-        title = "Paranoid Android",
-        artist = "Radiohead",
-        album = "OK Computer",
-        duration = 383,
-        codec = "FLAC",
-        bit_depth = 24,
-        sample_rate = 96000,
-        is_cached = false,
-        artwork_url = "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/07/60/ba/0760ba0f-148c-b18f-d0ff-169ee96f3af5/634904078164.png/600x600bb.jpg"
-    ),
-    TrackSummaryDto(
-        id = -106,
-        provider = "apple_music",
-        track_id = "sample_106",
-        title = "Blinding Lights",
-        artist = "The Weeknd",
-        album = "After Hours",
-        duration = 200,
-        codec = "ALAC",
-        bit_depth = 24,
+        id = 29516,
+        provider = "apple",
+        track_id = "1651284061",
+        title = "Tamaki (Dolby Atmos)",
+        artist = "RADWIMPS",
+        album = "Suzume (Motion Picture Soundtrack)",
+        duration = 296,
+        codec = "ec-3",
+        bit_depth = 16,
         sample_rate = 48000,
         is_cached = true,
-        artwork_url = "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/61/e7/3f/61e73f94-018d-5f50-50ec-8521952bc72e/20UM1IM11629.rgb.jpg/600x600bb.jpg"
+        artwork_url = ""
     ),
     TrackSummaryDto(
-        id = -107,
-        provider = "qobuz",
-        track_id = "sample_107",
-        title = "Hotel California",
-        artist = "Eagles",
-        album = "Hotel California (2013 Remaster)",
-        duration = 391,
-        codec = "FLAC",
-        bit_depth = 24,
-        sample_rate = 192000,
-        is_cached = false,
-        artwork_url = "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/88/16/2c/88162c3d-46db-8321-61f3-3a47404cfe76/075596050920.jpg/600x600bb.jpg"
-    ),
-    TrackSummaryDto(
-        id = -108,
-        provider = "apple_music",
-        track_id = "sample_108",
-        title = "Come Together",
-        artist = "The Beatles",
-        album = "Abbey Road (2019 Mix)",
-        duration = 259,
-        codec = "ALAC",
-        bit_depth = 24,
-        sample_rate = 96000,
+        id = 29515,
+        provider = "apple",
+        track_id = "1651284061",
+        title = "Tamaki",
+        artist = "RADWIMPS",
+        album = "Suzume (Motion Picture Soundtrack)",
+        duration = 296,
+        codec = "alac",
+        bit_depth = 16,
+        sample_rate = 44100,
         is_cached = true,
-        artwork_url = "https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/df/db/61/dfdb615d-47f8-06e9-9533-b96daccc029f/18UMGIM31076.rgb.jpg/600x600bb.jpg"
+        artwork_url = ""
+    ),
+    TrackSummaryDto(
+        id = 29514,
+        provider = "apple",
+        track_id = "1651284059",
+        title = "Suzume (Dolby Atmos)",
+        artist = "RADWIMPS",
+        album = "Suzume (Motion Picture Soundtrack)",
+        duration = 238,
+        codec = "ec-3",
+        bit_depth = 16,
+        sample_rate = 48000,
+        is_cached = true,
+        artwork_url = ""
+    ),
+    TrackSummaryDto(
+        id = 29513,
+        provider = "apple",
+        track_id = "1651284059",
+        title = "Suzume (feat. Toaka)",
+        artist = "RADWIMPS",
+        album = "Suzume (Motion Picture Soundtrack)",
+        duration = 238,
+        codec = "alac",
+        bit_depth = 16,
+        sample_rate = 44100,
+        is_cached = true,
+        artwork_url = ""
+    ),
+    TrackSummaryDto(
+        id = 29512,
+        provider = "apple",
+        track_id = "1651284057",
+        title = "Kanata Haluka (Dolby Atmos)",
+        artist = "RADWIMPS",
+        album = "Suzume (Motion Picture Soundtrack)",
+        duration = 356,
+        codec = "ec-3",
+        bit_depth = 16,
+        sample_rate = 48000,
+        is_cached = true,
+        artwork_url = ""
+    ),
+    TrackSummaryDto(
+        id = 29511,
+        provider = "apple",
+        track_id = "1651284057",
+        title = "Kanata Haluka",
+        artist = "RADWIMPS",
+        album = "Suzume (Motion Picture Soundtrack)",
+        duration = 356,
+        codec = "alac",
+        bit_depth = 16,
+        sample_rate = 44100,
+        is_cached = true,
+        artwork_url = ""
+    ),
+    TrackSummaryDto(
+        id = 29518,
+        provider = "apple",
+        track_id = "1651284062",
+        title = "Tears of Suzume (Dolby Atmos)",
+        artist = "RADWIMPS",
+        album = "Suzume (Motion Picture Soundtrack)",
+        duration = 276,
+        codec = "ec-3",
+        bit_depth = 16,
+        sample_rate = 48000,
+        is_cached = true,
+        artwork_url = ""
+    ),
+    TrackSummaryDto(
+        id = 29517,
+        provider = "apple",
+        track_id = "1651284062",
+        title = "Tears of Suzume",
+        artist = "RADWIMPS",
+        album = "Suzume (Motion Picture Soundtrack)",
+        duration = 276,
+        codec = "alac",
+        bit_depth = 16,
+        sample_rate = 44100,
+        is_cached = true,
+        artwork_url = ""
     )
 )
 
@@ -490,8 +492,7 @@ fun LosslessLibrarySectionHeader(
 
 @Composable
 fun HomeExpressiveContent(
-    coordinator: PlaybackCoordinator,
-    playerState: PlayerState,
+    playerConnection: PlayerConnection,
     serverConnected: Boolean,
     searchQuery: String,
     onQueryChange: (String) -> Unit,
@@ -506,6 +507,11 @@ fun HomeExpressiveContent(
     onRipClick: ((TrackSummaryDto) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val currentTrack by playerConnection.currentTrack.collectAsState()
+    val currentTrackDto = currentTrack?.toSummaryDto()
+    val status by playerConnection.status.collectAsState()
+    val apiClient = (playerConnection as RealPlayerConnection).apiClient
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = contentBottomPadding),
@@ -526,13 +532,13 @@ fun HomeExpressiveContent(
                 item(key = "quick_picks") {
                     QuickPicksCarousel(
                         tracks = allTracks.take(6),
-                        currentTrackId = playerState.currentTrack?.id,
-                        isPlaying = playerState.status == PlaybackStatus.PLAYING,
+                        currentTrackId = currentTrackDto?.id,
+                        isPlaying = status == PlaybackStatus.PLAYING,
                         onTrackClick = { clicked ->
-                            coordinator.playTrack(clicked, allTracks)
+                            playerConnection.play(clicked.toTrack(), allTracks.map { it.toTrack() })
                         },
                         getArtworkUrl = { track ->
-                            coordinator.apiClient.getArtworkUrl(track, 300)
+                            apiClient.getArtworkUrl(track, 300)
                         }
                     )
                 }
@@ -545,12 +551,12 @@ fun HomeExpressiveContent(
                 onShuffle = {
                     if (displayedTracks.isNotEmpty()) {
                         val shuffled = displayedTracks.shuffled()
-                        coordinator.playTrack(shuffled.first(), shuffled)
+                        playerConnection.play(shuffled.first().toTrack(), shuffled.map { it.toTrack() })
                     }
                 },
                 onPlayAll = {
                     if (displayedTracks.isNotEmpty()) {
-                        coordinator.playTrack(displayedTracks.first(), displayedTracks)
+                        playerConnection.play(displayedTracks.first().toTrack(), displayedTracks.map { it.toTrack() })
                     }
                 }
             )
@@ -587,16 +593,16 @@ fun HomeExpressiveContent(
                 items = displayedTracks,
                 key = { it.id }
             ) { track ->
-                val isPlaying = playerState.currentTrack?.id == track.id &&
-                        playerState.status == PlaybackStatus.PLAYING
+                val isPlaying = currentTrackDto?.id == track.id &&
+                        status == PlaybackStatus.PLAYING
 
                 Box(modifier = Modifier.padding(horizontal = 12.dp)) {
                     TrackRow(
                         track = track,
-                        artworkUrl = coordinator.apiClient.getArtworkUrl(track, 200),
+                        artworkUrl = apiClient.getArtworkUrl(track, 200),
                         isPlaying = isPlaying,
                         onTrackClick = { clicked ->
-                            coordinator.playTrack(clicked, displayedTracks)
+                            playerConnection.play(clicked.toTrack(), displayedTracks.map { it.toTrack() })
                         },
                         onRipClick = onRipClick
                     )
@@ -608,10 +614,19 @@ fun HomeExpressiveContent(
 
 @Composable
 fun HomeScreen(
-    coordinator: PlaybackCoordinator = remember { PlaybackCoordinator() },
+    playerConnection: PlayerConnection = LocalPlayerConnection.current,
     modifier: Modifier = Modifier
 ) {
-    val playerState by coordinator.state.collectAsState()
+    val realConnection = playerConnection as RealPlayerConnection
+    val apiClient = realConnection.apiClient
+    val currentTrack by playerConnection.currentTrack.collectAsState()
+    val currentTrackDto = currentTrack?.toSummaryDto()
+    val status by playerConnection.status.collectAsState()
+    val playbackInfo by playerConnection.playbackInfo.collectAsState()
+    val canSkipNext by playerConnection.canSkipNext.collectAsState()
+    val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
+    val shuffleMode by playerConnection.shuffleMode.collectAsState()
+    val repeatMode by playerConnection.repeatMode.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("All") }
@@ -622,7 +637,7 @@ fun HomeScreen(
     var serverConnected by remember { mutableStateOf(false) }
     var serverTracks by remember { mutableStateOf<List<TrackSummaryDto>>(emptyList()) }
 
-    LaunchedEffect(searchQuery, selectedFilter, playerState.serverUrl) {
+    LaunchedEffect(searchQuery, selectedFilter, apiClient.baseUrl) {
         isSearching = true
         delay(300)
 
@@ -632,7 +647,7 @@ fun HomeScreen(
             else -> null
         }
 
-        val result = coordinator.apiClient.search(
+        val result = apiClient.search(
             query = searchQuery.trim(),
             provider = providerParam
         )
@@ -683,8 +698,7 @@ fun HomeScreen(
                 .statusBarsPadding()
         ) {
             HomeExpressiveContent(
-                coordinator = coordinator,
-                playerState = playerState,
+                playerConnection = playerConnection,
                 serverConnected = serverConnected,
                 searchQuery = searchQuery,
                 onQueryChange = { searchQuery = it },
@@ -695,69 +709,80 @@ fun HomeScreen(
                 onOpenSettings = { isSettingsOpen = true },
                 onNavigateToSearch = { searchQuery = " " },
                 onToggleStats = { isNowPlayingOpen = true },
-                contentBottomPadding = if (playerState.currentTrack != null) 96.dp else 24.dp
+                contentBottomPadding = if (currentTrackDto != null) 96.dp else 24.dp
             )
         }
 
         AnimatedVisibility(
-            visible = playerState.currentTrack != null,
+            visible = currentTrackDto != null,
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
             exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
         ) {
-            playerState.currentTrack?.let { track ->
+            currentTrackDto?.let { trackDto ->
                 MiniPlayerBar(
-                    track = track,
-                    playbackInfo = playerState.playbackInfo,
-                    status = playerState.status,
-                    positionMs = playerState.positionMs,
-                    durationMs = playerState.durationMs,
-                    artworkUrl = coordinator.apiClient.getArtworkUrl(track, 200),
-                    onTogglePlayPause = { coordinator.togglePlayPause() },
-                    onPlayNext = { coordinator.playNext() },
-                    onPlayPrevious = { coordinator.playPrevious() },
+                    track = trackDto,
+                    playbackInfo = playbackInfo,
+                    status = status,
+                    positionMs = playerConnection.currentPositionMs,
+                    durationMs = playerConnection.durationMs,
+                    artworkUrl = apiClient.getArtworkUrl(trackDto, 200),
+                    onTogglePlayPause = { playerConnection.togglePlayPause() },
+                    onPlayNext = { playerConnection.playNext() },
+                    onPlayPrevious = { playerConnection.playPrevious() },
                     onOpenNowPlaying = { isNowPlayingOpen = true },
-                    onDismiss = { coordinator.stopAndDismiss() },
-                    canSkipNext = coordinator.canSkipNext,
-                    canSkipPrevious = coordinator.canSkipPrevious
+                    onDismiss = { playerConnection.stopAndDismiss() },
+                    canSkipNext = canSkipNext,
+                    canSkipPrevious = canSkipPrevious
                 )
             }
         }
 
         AnimatedVisibility(
-            visible = isNowPlayingOpen && playerState.currentTrack != null,
+            visible = isNowPlayingOpen && currentTrackDto != null,
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
             exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
         ) {
-            playerState.currentTrack?.let { track ->
+            currentTrackDto?.let { trackDto ->
                 NowPlayingSheet(
-                    track = track,
-                    playbackInfo = playerState.playbackInfo,
-                    status = playerState.status,
-                    positionMs = playerState.positionMs,
-                    durationMs = playerState.durationMs,
-                    artworkUrl = coordinator.apiClient.getArtworkUrl(track, 600),
-                    serverUrl = playerState.serverUrl,
-                    isDevMode = playerState.isDevMode,
-                    onTogglePlayPause = { coordinator.togglePlayPause() },
-                    onSeekTo = { pos -> coordinator.seekTo(pos) },
-                    onPlayNext = { coordinator.playNext() },
-                    onPlayPrevious = { coordinator.playPrevious() },
+                    track = trackDto,
+                    playbackInfo = playbackInfo,
+                    status = status,
+                    positionMs = playerConnection.currentPositionMs,
+                    durationMs = playerConnection.durationMs,
+                    artworkUrl = apiClient.getArtworkUrl(trackDto, 600),
+                    serverUrl = apiClient.baseUrl,
+                    isDevMode = realConnection.isDevMode,
+                    onTogglePlayPause = { playerConnection.togglePlayPause() },
+                    onSeekTo = { pos -> playerConnection.seekTo(pos) },
+                    onPlayNext = { playerConnection.playNext() },
+                    onPlayPrevious = { playerConnection.playPrevious() },
                     onClose = { isNowPlayingOpen = false },
-                    onOpenSettings = { isSettingsOpen = true }
+                    onOpenSettings = { isSettingsOpen = true },
+                    isShuffle = shuffleMode,
+                    onToggleShuffle = { playerConnection.setShuffleMode(!shuffleMode) },
+                    repeatMode = repeatMode,
+                    onToggleRepeat = {
+                        val next = when (repeatMode) {
+                            org.shilpo.peerless.model.RepeatMode.OFF -> org.shilpo.peerless.model.RepeatMode.ALL
+                            org.shilpo.peerless.model.RepeatMode.ALL -> org.shilpo.peerless.model.RepeatMode.ONE
+                            org.shilpo.peerless.model.RepeatMode.ONE -> org.shilpo.peerless.model.RepeatMode.OFF
+                        }
+                        playerConnection.setRepeatMode(next)
+                    }
                 )
             }
         }
 
         if (isSettingsOpen) {
             ServerSettingsDialog(
-                currentServerUrl = playerState.serverUrl,
-                currentDevMode = playerState.isDevMode,
+                currentServerUrl = apiClient.baseUrl,
+                currentDevMode = realConnection.isDevMode,
                 onSave = { newUrl, newDevMode ->
-                    coordinator.setServerUrl(newUrl)
-                    coordinator.setDevMode(newDevMode)
+                    apiClient.baseUrl = newUrl
+                    realConnection.isDevMode = newDevMode
                 },
                 onDismiss = { isSettingsOpen = false }
             )
