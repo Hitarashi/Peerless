@@ -2,8 +2,10 @@ package org.shilpo.peerless
 
 import androidx.compose.runtime.*
 import androidx.compose.ui.tooling.preview.Preview
-import org.shilpo.peerless.config.AppConfig
-import org.shilpo.peerless.network.LocalDevMode
+import org.shilpo.peerless.auth.DeepLinkHandler
+import org.shilpo.peerless.auth.LocalSessionManager
+import org.shilpo.peerless.auth.RealSessionManager
+import org.shilpo.peerless.auth.createPlatformTokenStorage
 import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.network.PeerlessApiClient
 import org.shilpo.peerless.player.LocalPlayerConnection
@@ -16,17 +18,38 @@ import org.shilpo.peerless.ui.shell.AdaptiveShell
 @Composable
 @Preview
 fun App() {
-    val apiClient = remember { PeerlessApiClient() }
-    val devModeState = remember { mutableStateOf(AppConfig.IS_DEV_MODE) }
+    val tokenStorage = remember { createPlatformTokenStorage() }
+    val apiClient = remember(tokenStorage) { PeerlessApiClient(tokenStorage = tokenStorage) }
+    val sessionManager = remember(apiClient, tokenStorage) {
+        RealSessionManager(apiClient = apiClient, tokenStorage = tokenStorage)
+    }
     val playerConnection = remember(apiClient) {
-        RealPlayerConnection(
-            apiClient = apiClient,
-            isDevMode = devModeState.value
-        )
+        RealPlayerConnection(apiClient = apiClient)
+    }
+    val favoritesManager = remember(apiClient) {
+        org.shilpo.peerless.library.RealFavoritesManager(apiClient = apiClient)
     }
 
     LaunchedEffect(playerConnection) {
         platformSetup(playerConnection)
+    }
+
+    LaunchedEffect(sessionManager) {
+        sessionManager.checkExistingSession()
+    }
+
+    LaunchedEffect(sessionManager) {
+        sessionManager.sessionState.collect { state ->
+            if (state is org.shilpo.peerless.auth.SessionState.Authenticated) {
+                favoritesManager.refreshFavorites()
+            }
+        }
+    }
+
+    LaunchedEffect(sessionManager) {
+        DeepLinkHandler.deepLinkEvents.collect { creds ->
+            sessionManager.connectManual(creds.serverUrl, creds.code)
+        }
     }
 
     val currentTrack by playerConnection.currentTrack.collectAsState()
@@ -41,7 +64,8 @@ fun App() {
         CompositionLocalProvider(
             LocalPlayerConnection provides playerConnection,
             LocalPeerlessApiClient provides apiClient,
-            LocalDevMode provides devModeState
+            LocalSessionManager provides sessionManager,
+            org.shilpo.peerless.library.LocalFavoritesManager provides favoritesManager
         ) {
             AdaptiveShell()
         }

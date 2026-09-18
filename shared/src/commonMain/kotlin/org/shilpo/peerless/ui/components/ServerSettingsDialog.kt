@@ -17,12 +17,10 @@ import org.shilpo.peerless.theme.*
 @Composable
 fun ServerSettingsDialog(
     currentServerUrl: String,
-    currentDevMode: Boolean,
-    onSave: (serverUrl: String, devMode: Boolean) -> Unit,
+    onSave: (serverUrl: String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var urlInput by remember(currentServerUrl) { mutableStateOf(currentServerUrl) }
-    var devModeChecked by remember(currentDevMode) { mutableStateOf(currentDevMode) }
 
     Dialog(onDismissRequest = onDismiss) {
         Box(
@@ -96,42 +94,6 @@ fun ServerSettingsDialog(
                 }
 
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(SurfaceContainerDark)
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Direct Stream (Dev Mode)",
-                            style = ExpressiveTypography.titleSmall,
-                            color = OnSurfaceDark
-                        )
-                        Text(
-                            text = "Bypasses ticket authentication for instant local streaming",
-                            style = ExpressiveTypography.bodySmall,
-                            color = OnSurfaceVariantDark
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Switch(
-                        checked = devModeChecked,
-                        onCheckedChange = { devModeChecked = it },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = PrimaryDark,
-                            checkedTrackColor = PrimaryContainerDark,
-                            uncheckedThumbColor = OnSurfaceVariantDark,
-                            uncheckedTrackColor = SurfaceContainerHighestDark
-                        )
-                    )
-                }
-
-                Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
@@ -147,8 +109,8 @@ fun ServerSettingsDialog(
 
                     Button(
                         onClick = {
-                            val sanitized = urlInput.trim().ifBlank { "http://localhost:4444" }
-                            onSave(sanitized, devModeChecked)
+                            val sanitized = urlInput.trim()
+                            onSave(sanitized)
                             onDismiss()
                         },
                         colors = ButtonDefaults.buttonColors(

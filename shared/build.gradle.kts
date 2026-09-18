@@ -88,3 +88,9 @@ kotlin {
 dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
 }
+
+tasks.register("testDebugUnitTest") {
+    description = "Alias task to run Android host unit tests."
+    group = "verification"
+    dependsOn("testAndroidHostTest")
+}

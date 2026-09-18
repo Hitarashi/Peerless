@@ -49,6 +49,15 @@ interface PlayerConnection {
     fun stopAndDismiss()
 }
 
+fun PlayerConnection.playTrack(
+    track: org.shilpo.peerless.model.TrackSummaryDto,
+    queue: List<org.shilpo.peerless.model.TrackSummaryDto> = emptyList()
+) {
+    play(
+        Track.fromSummaryDto(track),
+        queue.map { Track.fromSummaryDto(it) })
+}
+
 val LocalPlayerConnection = staticCompositionLocalOf<PlayerConnection> {
     error("No PlayerConnection provided")
 }

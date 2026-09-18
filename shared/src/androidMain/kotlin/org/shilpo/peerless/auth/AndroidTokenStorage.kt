@@ -20,8 +20,12 @@ class AndroidTokenStorage(
     private val _tokenFlow = MutableStateFlow<String?>(null)
     override val tokenFlow: StateFlow<String?> = _tokenFlow.asStateFlow()
 
+    private val _serverUrlFlow = MutableStateFlow<String?>(null)
+    override val serverUrlFlow: StateFlow<String?> = _serverUrlFlow.asStateFlow()
+
     init {
         _tokenFlow.value = prefs?.getString("session_token", null)
+        _serverUrlFlow.value = prefs?.getString("server_url", null)
     }
 
     override suspend fun getToken(): String? {
@@ -40,6 +44,30 @@ class AndroidTokenStorage(
     override suspend fun clearToken() {
         prefs?.edit()?.remove("session_token")?.apply()
         _tokenFlow.value = null
+    }
+
+    override suspend fun getServerUrl(): String? {
+        val stored = prefs?.getString("server_url", null)
+        if (stored != null) {
+            _serverUrlFlow.value = stored
+        }
+        return _serverUrlFlow.value
+    }
+
+    override suspend fun saveServerUrl(url: String) {
+        prefs?.edit()?.putString("server_url", url.trim())?.apply()
+        _serverUrlFlow.value = url.trim()
+    }
+
+    override suspend fun clearServerUrl() {
+        prefs?.edit()?.remove("server_url")?.apply()
+        _serverUrlFlow.value = null
+    }
+
+    override suspend fun clearAll() {
+        prefs?.edit()?.remove("session_token")?.remove("server_url")?.apply()
+        _tokenFlow.value = null
+        _serverUrlFlow.value = null
     }
 }
 

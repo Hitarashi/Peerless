@@ -43,7 +43,6 @@ fun ExpressiveSearchBar(
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
     isSearching: Boolean = false,
-    isDevMode: Boolean = true,
     serverUrl: String = "",
     filters: List<SearchFilter> = DefaultSearchFilters
 ) {
@@ -190,7 +189,7 @@ fun ExpressiveSearchBar(
                     Icon(
                         imageVector = PeerlessIcons.Settings,
                         contentDescription = "Server Settings",
-                        tint = if (isDevMode) LosslessGold else OnSurfaceVariantDark,
+                        tint = if (serverUrl.isNotBlank()) PrimaryDark else OnSurfaceVariantDark,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -199,7 +198,7 @@ fun ExpressiveSearchBar(
                     modifier = Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(if (isDevMode) LosslessGold else SecondaryDark)
+                        .background(if (serverUrl.isNotBlank()) SecondaryDark else OnSurfaceVariantDark.copy(alpha = 0.5f))
                 )
             }
         }

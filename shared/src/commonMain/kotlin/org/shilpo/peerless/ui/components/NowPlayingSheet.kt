@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -43,7 +44,6 @@ fun NowPlayingSheet(
     durationMs: Long,
     artworkUrl: String,
     serverUrl: String,
-    isDevMode: Boolean,
     onTogglePlayPause: () -> Unit,
     onSeekTo: (Long) -> Unit,
     onPlayNext: () -> Unit,
@@ -54,8 +54,15 @@ fun NowPlayingSheet(
     onToggleShuffle: () -> Unit = {},
     repeatMode: RepeatMode = RepeatMode.OFF,
     onToggleRepeat: () -> Unit = {},
+    isFavorite: Boolean? = null,
+    onToggleFavorite: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val favoritesManager = org.shilpo.peerless.library.LocalFavoritesManager.current
+    val favoriteIds by (favoritesManager?.favoriteIds
+        ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet()) }).collectAsState()
+    val isFav = isFavorite ?: favoriteIds.contains(track.id)
+
     val isPlaying = status == PlaybackStatus.PLAYING
 
     var isDraggingSlider by remember { mutableStateOf(false) }
@@ -193,7 +200,7 @@ fun NowPlayingSheet(
                     Icon(
                         imageVector = PeerlessIcons.Settings,
                         contentDescription = "Playback settings",
-                        tint = if (isDevMode) LosslessGold else OnSurfaceDark,
+                        tint = OnSurfaceDark,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -269,13 +276,39 @@ fun NowPlayingSheet(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            LosslessBadge(
-                bitDepth = playbackInfo?.bit_depth ?: track.bit_depth,
-                sampleRate = playbackInfo?.sample_rate ?: track.sample_rate,
-                codec = playbackInfo?.codec ?: track.codec,
-                compact = false,
-                showTierTag = true
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                LosslessBadge(
+                    bitDepth = playbackInfo?.bit_depth ?: track.bit_depth,
+                    sampleRate = playbackInfo?.sample_rate ?: track.sample_rate,
+                    codec = playbackInfo?.codec ?: track.codec,
+                    compact = false,
+                    showTierTag = true
+                )
+
+                IconButton(
+                    onClick = {
+                        if (onToggleFavorite != null) {
+                            onToggleFavorite()
+                        } else {
+                            favoritesManager?.toggleFavorite(track)
+                        }
+                    },
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(SurfaceContainerDark)
+                ) {
+                    Icon(
+                        imageVector = if (isFav) PeerlessIcons.Heart else PeerlessIcons.HeartBorder,
+                        contentDescription = if (isFav) "Remove favorite" else "Add favorite",
+                        tint = if (isFav) Color(0xFFFF5252) else OnSurfaceVariantDark.copy(alpha = 0.75f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -418,11 +451,11 @@ fun NowPlayingSheet(
                     modifier = Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(if (isDevMode) LosslessGold else SecondaryDark)
+                        .background(SecondaryDark)
                 )
 
                 Text(
-                    text = if (isDevMode) "Dev Mode Direct Stream" else "Authenticated Stream",
+                    text = "Authenticated Lossless Stream",
                     style = ExpressiveTypography.labelSmall,
                     color = OnSurfaceDark
                 )

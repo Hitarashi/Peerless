@@ -13,8 +13,7 @@ class RealPlayerConnection(
     val apiClient: PeerlessApiClient = PeerlessApiClient(),
     val audioEngine: AudioEngine = createAudioEngine(),
     val storage: QueueStorage = createPlatformQueueStorage(),
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
-    var isDevMode: Boolean = true
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 ) : PlayerConnection {
 
     private val _currentTrack = MutableStateFlow<Track?>(null)
@@ -284,17 +283,12 @@ class RealPlayerConnection(
     }
 
     private suspend fun resolveStreamUrl(track: Track): String {
-        return if (isDevMode) {
-            apiClient.getStreamUrl(track.id)
+        val ticketResult = apiClient.getPlaybackInfo(track.id)
+        val playbackInfo = ticketResult.getOrNull() ?: return ""
+        return if (playbackInfo.stream_url.startsWith("http://") || playbackInfo.stream_url.startsWith("https://")) {
+            playbackInfo.stream_url
         } else {
-            val ticketResult = apiClient.getPlaybackInfo(track.id)
-            ticketResult.getOrNull()?.let { playbackInfo ->
-                if (playbackInfo.stream_url.startsWith("http://") || playbackInfo.stream_url.startsWith("https://")) {
-                    playbackInfo.stream_url
-                } else {
-                    "${apiClient.baseUrl}${playbackInfo.stream_url}"
-                }
-            } ?: apiClient.getStreamUrl(track.id)
+            "${apiClient.baseUrl}${playbackInfo.stream_url}"
         }
     }
 

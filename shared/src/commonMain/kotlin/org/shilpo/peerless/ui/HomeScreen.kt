@@ -28,7 +28,6 @@ import kotlinx.coroutines.delay
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.model.UncachedTrackDto
 import org.shilpo.peerless.model.toTrack
-import org.shilpo.peerless.network.LocalDevMode
 import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.LocalPlayerConnection
 import org.shilpo.peerless.player.PlaybackStatus
@@ -619,7 +618,6 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     val apiClient = LocalPeerlessApiClient.current
-    val devModeState = LocalDevMode.current
     val currentTrack by playerConnection.currentTrack.collectAsState()
     val currentTrackDto = currentTrack?.toSummaryDto()
     val status by playerConnection.status.collectAsState()
@@ -755,7 +753,6 @@ fun HomeScreen(
                     durationMs = playerConnection.currentDurationMs,
                     artworkUrl = apiClient.getArtworkUrl(trackDto, 600),
                     serverUrl = apiClient.baseUrl,
-                    isDevMode = devModeState.value,
                     onTogglePlayPause = { playerConnection.togglePlayPause() },
                     onSeekTo = { pos -> playerConnection.seekTo(pos) },
                     onPlayNext = { playerConnection.playNext() },
@@ -773,10 +770,8 @@ fun HomeScreen(
         if (isSettingsOpen) {
             ServerSettingsDialog(
                 currentServerUrl = apiClient.baseUrl,
-                currentDevMode = devModeState.value,
-                onSave = { newUrl, newDevMode ->
+                onSave = { newUrl ->
                     apiClient.baseUrl = newUrl
-                    devModeState.value = newDevMode
                 },
                 onDismiss = { isSettingsOpen = false }
             )

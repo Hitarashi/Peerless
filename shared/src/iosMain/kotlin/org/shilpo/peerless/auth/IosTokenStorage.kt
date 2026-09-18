@@ -7,25 +7,52 @@ import platform.Foundation.NSUserDefaults
 
 class IosTokenStorage : TokenStorage {
     private val defaults = NSUserDefaults.standardUserDefaults
-    private val key = "peerless_session_token"
+    private val tokenKey = "peerless_session_token"
+    private val serverUrlKey = "peerless_server_url"
 
-    private val _tokenFlow = MutableStateFlow<String?>(defaults.stringForKey(key))
+    private val _tokenFlow = MutableStateFlow<String?>(defaults.stringForKey(tokenKey))
     override val tokenFlow: StateFlow<String?> = _tokenFlow.asStateFlow()
 
+    private val _serverUrlFlow = MutableStateFlow<String?>(defaults.stringForKey(serverUrlKey))
+    override val serverUrlFlow: StateFlow<String?> = _serverUrlFlow.asStateFlow()
+
     override suspend fun getToken(): String? {
-        val stored = defaults.stringForKey(key)
+        val stored = defaults.stringForKey(tokenKey)
         _tokenFlow.value = stored
         return stored
     }
 
     override suspend fun saveToken(token: String) {
-        defaults.setObject(token.trim(), forKey = key)
+        defaults.setObject(token.trim(), forKey = tokenKey)
         _tokenFlow.value = token.trim()
     }
 
     override suspend fun clearToken() {
-        defaults.removeObjectForKey(key)
+        defaults.removeObjectForKey(tokenKey)
         _tokenFlow.value = null
+    }
+
+    override suspend fun getServerUrl(): String? {
+        val stored = defaults.stringForKey(serverUrlKey)
+        _serverUrlFlow.value = stored
+        return stored
+    }
+
+    override suspend fun saveServerUrl(url: String) {
+        defaults.setObject(url.trim(), forKey = serverUrlKey)
+        _serverUrlFlow.value = url.trim()
+    }
+
+    override suspend fun clearServerUrl() {
+        defaults.removeObjectForKey(serverUrlKey)
+        _serverUrlFlow.value = null
+    }
+
+    override suspend fun clearAll() {
+        defaults.removeObjectForKey(tokenKey)
+        defaults.removeObjectForKey(serverUrlKey)
+        _tokenFlow.value = null
+        _serverUrlFlow.value = null
     }
 }
 

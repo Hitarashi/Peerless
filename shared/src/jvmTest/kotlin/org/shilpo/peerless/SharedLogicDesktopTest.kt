@@ -25,8 +25,7 @@ class SharedLogicDesktopTest {
             apiClient = client,
             audioEngine = fakeEngine,
             storage = storage,
-            scope = backgroundScope,
-            isDevMode = true
+            scope = backgroundScope
         )
         val mpris = MprisServer(player)
         mpris.start()

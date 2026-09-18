@@ -108,8 +108,7 @@ class SharedCommonTest {
             apiClient = client,
             audioEngine = fakeEngine,
             storage = storage,
-            scope = backgroundScope,
-            isDevMode = true
+            scope = backgroundScope
         )
 
         val t1 = Track(

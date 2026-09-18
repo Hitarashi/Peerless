@@ -1,8 +1,5 @@
 package org.shilpo.peerless.network
 
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -128,19 +125,10 @@ open class PeerlessApiClient(
     }
 
     fun resolveStreamUrl(trackId: Int, ticket: String? = null): String {
-        return when {
-            AppConfig.IS_DEV_MODE && ticket.isNullOrBlank() -> {
-                "$baseUrl/api/v1/stream?track_id=$trackId"
-            }
-
-            !ticket.isNullOrBlank() -> {
-                "$baseUrl/api/v1/stream?ticket=$ticket"
-            }
-
-            else -> {
-                "$baseUrl/api/v1/stream?track_id=$trackId"
-            }
+        require(!ticket.isNullOrBlank()) {
+            "Playback ticket is required for streaming. Direct unauthenticated streams are not supported."
         }
+        return "$baseUrl/api/v1/stream?ticket=$ticket"
     }
 
     fun getStreamUrl(trackId: Int, ticket: String? = null): String = resolveStreamUrl(trackId, ticket)
@@ -268,7 +256,7 @@ open class PeerlessApiClient(
         }
     }
 
-    suspend fun exchangeOtp(
+    open suspend fun exchangeOtp(
         code: String,
         deviceName: String? = null,
         platform: String? = null
@@ -285,7 +273,7 @@ open class PeerlessApiClient(
         exchangeResp
     }
 
-    suspend fun refreshToken(refreshToken: String? = null): Result<RefreshResponse> = runCatching {
+    open suspend fun refreshToken(refreshToken: String? = null): Result<RefreshResponse> = runCatching {
         val currentToken = resolveToken(refreshToken)
             ?: error("No refresh token available")
         val response = httpClient.post("$baseUrl/api/v1/auth/refresh") {
@@ -300,7 +288,7 @@ open class PeerlessApiClient(
         refreshResp
     }
 
-    suspend fun logout(refreshToken: String? = null): Result<Unit> = runCatching {
+    open suspend fun logout(refreshToken: String? = null): Result<Unit> = runCatching {
         val currentToken = resolveToken(refreshToken)
         if (!currentToken.isNullOrBlank()) {
             httpClient.post("$baseUrl/api/v1/auth/logout") {
@@ -311,7 +299,7 @@ open class PeerlessApiClient(
         tokenStorage?.clearToken()
     }
 
-    suspend fun getMe(token: String? = null): Result<MeResponse> = runCatching {
+    open suspend fun getMe(token: String? = null): Result<MeResponse> = runCatching {
         val authToken = resolveToken(token) ?: error("Not authenticated")
         val response = httpClient.get("$baseUrl/api/v1/auth/me") {
             header(HttpHeaders.Authorization, "Bearer $authToken")
@@ -322,7 +310,15 @@ open class PeerlessApiClient(
         response.body<MeResponse>()
     }
 
-    suspend fun getFavorites(token: String? = null): Result<List<FavoriteItemDto>> = runCatching {
+    open suspend fun getServerHealth(): Result<ServerHealthDto> = runCatching {
+        val response = httpClient.get("$baseUrl/api/v1/health")
+        if (!response.status.isSuccess()) {
+            error("Get server health failed with status: ${response.status}")
+        }
+        response.body<ServerHealthDto>()
+    }
+
+    open suspend fun getFavorites(token: String? = null): Result<List<TrackSummaryDto>> = runCatching {
         val authToken = resolveToken(token) ?: error("Not authenticated")
         val response = httpClient.get("$baseUrl/api/v1/me/favorites") {
             header(HttpHeaders.Authorization, "Bearer $authToken")
@@ -330,7 +326,7 @@ open class PeerlessApiClient(
         if (!response.status.isSuccess()) {
             error("Get favorites failed with status: ${response.status}")
         }
-        response.body<List<FavoriteItemDto>>()
+        response.body<List<TrackSummaryDto>>()
     }
 
     suspend fun addFavorite(trackId: Int, token: String? = null): Result<Unit> = runCatching {
@@ -380,9 +376,5 @@ open class PeerlessApiClient(
 
 val LocalPeerlessApiClient = staticCompositionLocalOf<PeerlessApiClient> {
     error("No PeerlessApiClient provided")
-}
-
-val LocalDevMode = compositionLocalOf<MutableState<Boolean>> {
-    mutableStateOf(AppConfig.IS_DEV_MODE)
 }
 

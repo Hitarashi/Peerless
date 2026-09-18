@@ -24,18 +24,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.shilpo.peerless.auth.LocalSessionManager
+import org.shilpo.peerless.auth.SessionState
+import org.shilpo.peerless.library.LocalFavoritesManager
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.model.toTrack
-import org.shilpo.peerless.network.LocalDevMode
 import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.LocalPlayerConnection
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
+import org.shilpo.peerless.player.playTrack
 import org.shilpo.peerless.theme.*
 import org.shilpo.peerless.ui.HomeExpressiveContent
 import org.shilpo.peerless.ui.SampleLosslessLibrary
 import org.shilpo.peerless.ui.components.*
 import org.shilpo.peerless.ui.navigation.NavigationDestination
+import org.shilpo.peerless.ui.screens.AuthOnboardingScreen
+import org.shilpo.peerless.ui.screens.ProfileScreen
 import org.shilpo.peerless.ui.screens.SearchScreen
 import org.shilpo.peerless.ui.toTrackSummary
 
@@ -45,7 +50,16 @@ fun AdaptiveShell(
 ) {
     val playerConnection = LocalPlayerConnection.current
     val apiClient = LocalPeerlessApiClient.current
-    val devModeState = LocalDevMode.current
+    val sessionManager = LocalSessionManager.current
+    val sessionState by sessionManager.sessionState.collectAsState()
+    val hasCredentials = sessionManager.hasSavedCredentials()
+
+    var isProfileOpen by remember { mutableStateOf(false) }
+
+    if (sessionState is SessionState.Unauthenticated || (sessionState is SessionState.Loading && !hasCredentials)) {
+        AuthOnboardingScreen(modifier = modifier.fillMaxSize())
+        return
+    }
 
     val currentTrack by playerConnection.currentTrack.collectAsState()
     val currentTrackDto = currentTrack?.toSummaryDto()
@@ -168,6 +182,7 @@ fun AdaptiveShell(
                             allTracks = activeLibrary,
                             onOpenNowPlaying = { isNowPlayingOpen = true },
                             onOpenSettings = { isSettingsOpen = true },
+                            onOpenProfile = { isProfileOpen = true },
                             onRipClick = onRipClick
                         )
                     }
@@ -188,6 +203,7 @@ fun AdaptiveShell(
                             allTracks = activeLibrary,
                             onOpenNowPlaying = { isNowPlayingOpen = true },
                             onOpenSettings = { isSettingsOpen = true },
+                            onOpenProfile = { isProfileOpen = true },
                             onRipClick = onRipClick
                         )
                     }
@@ -225,6 +241,7 @@ fun AdaptiveShell(
                             },
                             onOpenNowPlaying = { isNowPlayingOpen = true },
                             onOpenSettings = { isSettingsOpen = true },
+                            onOpenProfile = { isProfileOpen = true },
                             onRipClick = onRipClick
                         )
                     }
@@ -250,7 +267,6 @@ fun AdaptiveShell(
                             durationMs = playerConnection.currentDurationMs,
                             artworkUrl = apiClient.getArtworkUrl(trackDto, 600),
                             serverUrl = apiClient.baseUrl,
-                            isDevMode = devModeState.value,
                             onTogglePlayPause = { playerConnection.togglePlayPause() },
                             onSeekTo = { pos -> playerConnection.seekTo(pos) },
                             onPlayNext = { playerConnection.playNext() },
@@ -265,13 +281,27 @@ fun AdaptiveShell(
                     }
                 }
 
+                AnimatedVisibility(
+                    visible = isProfileOpen,
+                    enter = slideInVertically(
+                        initialOffsetY = { it },
+                        animationSpec = tween(350, easing = ExpressiveMotion.EmphasizedEasing)
+                    ) + fadeIn(),
+                    exit = slideOutVertically(
+                        targetOffsetY = { it },
+                        animationSpec = tween(300, easing = ExpressiveMotion.EmphasizedAccelerateEasing)
+                    ) + fadeOut()
+                ) {
+                    ProfileScreen(
+                        onClose = { isProfileOpen = false }
+                    )
+                }
+
                 if (isSettingsOpen) {
                     ServerSettingsDialog(
                         currentServerUrl = apiClient.baseUrl,
-                        currentDevMode = devModeState.value,
-                        onSave = { newUrl, newDevMode ->
+                        onSave = { newUrl ->
                             apiClient.baseUrl = newUrl
-                            devModeState.value = newDevMode
                         },
                         onDismiss = { isSettingsOpen = false }
                     )
@@ -297,6 +327,7 @@ private fun CompactLayout(
     allTracks: List<TrackSummaryDto>,
     onOpenNowPlaying: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenProfile: () -> Unit,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
     val apiClient = LocalPeerlessApiClient.current
@@ -323,6 +354,7 @@ private fun CompactLayout(
                 displayedTracks = displayedTracks,
                 allTracks = allTracks,
                 onOpenSettings = onOpenSettings,
+                onOpenProfile = onOpenProfile,
                 onOpenNowPlaying = onOpenNowPlaying,
                 contentBottomPadding = if (currentTrackDto != null) 175.dp else 98.dp,
                 onRipClick = onRipClick
@@ -467,6 +499,7 @@ private fun MediumLayout(
     allTracks: List<TrackSummaryDto>,
     onOpenNowPlaying: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenProfile: () -> Unit,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
     val apiClient = LocalPeerlessApiClient.current
@@ -532,6 +565,30 @@ private fun MediumLayout(
                         )
                     )
                 }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                NavigationRailItem(
+                    selected = false,
+                    onClick = onOpenProfile,
+                    icon = {
+                        Icon(
+                            imageVector = PeerlessIcons.Person,
+                            contentDescription = "Profile & Telemetry"
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = "Profile",
+                            style = ExpressiveTypography.labelSmall
+                        )
+                    },
+                    colors = NavigationRailItemDefaults.colors(
+                        unselectedIconColor = OnSurfaceVariantDark.copy(alpha = 0.75f),
+                        unselectedTextColor = OnSurfaceVariantDark.copy(alpha = 0.75f)
+                    ),
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
             }
 
             Box(
@@ -554,11 +611,11 @@ private fun MediumLayout(
                     displayedTracks = displayedTracks,
                     allTracks = allTracks,
                     onOpenSettings = onOpenSettings,
+                    onOpenProfile = onOpenProfile,
                     onOpenNowPlaying = onOpenNowPlaying,
                     contentBottomPadding = if (currentTrackDto != null) 90.dp else 16.dp,
                     onRipClick = onRipClick
                 )
-
             }
         }
 
@@ -614,6 +671,7 @@ private fun ExpandedLayout(
     onToggleRepeat: () -> Unit,
     onOpenNowPlaying: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenProfile: () -> Unit,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
     val apiClient = LocalPeerlessApiClient.current
@@ -630,6 +688,7 @@ private fun ExpandedLayout(
                 onSelectDestination = onSelectDestination,
                 serverConnected = serverConnected,
                 onOpenSettings = onOpenSettings,
+                onOpenProfile = onOpenProfile,
                 modifier = Modifier
                     .width(240.dp)
                     .fillMaxHeight()
@@ -654,6 +713,7 @@ private fun ExpandedLayout(
                     displayedTracks = displayedTracks,
                     allTracks = allTracks,
                     onOpenSettings = onOpenSettings,
+                    onOpenProfile = onOpenProfile,
                     onOpenNowPlaying = onOpenNowPlaying,
                     onToggleStats = { onToggleSupportingPane(SupportingPaneType.SIGNAL_PATH) },
                     contentBottomPadding = 16.dp,
@@ -717,6 +777,7 @@ private fun PersistentNavigationDrawer(
     onSelectDestination: (NavigationDestination) -> Unit,
     serverConnected: Boolean,
     onOpenSettings: () -> Unit,
+    onOpenProfile: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -849,25 +910,77 @@ private fun PersistentNavigationDrawer(
                 }
             }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(SurfaceContainerDark.copy(alpha = 0.6f))
-                    .border(1.dp, OutlineVariantDark.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                    .padding(10.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = "AUDIO ENGINE",
-                        style = SpecBadgeTypography.copy(fontSize = 8.sp),
-                        color = SecondaryDark
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(SquircleShapeSmall)
+                        .background(SurfaceContainerDark.copy(alpha = 0.8f))
+                        .border(1.dp, PrimaryDark.copy(alpha = 0.35f), SquircleShapeSmall)
+                        .clickable { onOpenProfile() }
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Brush.linearGradient(listOf(PrimaryDark, TertiaryDark))),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = PeerlessIcons.Person,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Account & Telemetry",
+                            style = ExpressiveTypography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = OnSurfaceDark,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "Sessions & Daemon",
+                            style = SpecBadgeTypography.copy(fontSize = 7.5.sp),
+                            color = SecondaryDark
+                        )
+                    }
+
+                    Icon(
+                        imageVector = PeerlessIcons.OpenInNew,
+                        contentDescription = null,
+                        tint = OnSurfaceVariantDark,
+                        modifier = Modifier.size(14.dp)
                     )
-                    Text(
-                        text = "24-BIT / 192KHZ DIRECT",
-                        style = SpecBadgeLargeTypography.copy(fontSize = 10.sp),
-                        color = OnSurfaceDark
-                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(SurfaceContainerDark.copy(alpha = 0.6f))
+                        .border(1.dp, OutlineVariantDark.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                        .padding(10.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "AUDIO ENGINE",
+                            style = SpecBadgeTypography.copy(fontSize = 8.sp),
+                            color = SecondaryDark
+                        )
+                        Text(
+                            text = "24-BIT / 192KHZ DIRECT",
+                            style = SpecBadgeLargeTypography.copy(fontSize = 10.sp),
+                            color = OnSurfaceDark
+                        )
+                    }
                 }
             }
         }
@@ -884,7 +997,6 @@ private fun SupportingPaneContainer(
     modifier: Modifier = Modifier
 ) {
     val apiClient = LocalPeerlessApiClient.current
-    val devModeState = LocalDevMode.current
     val playbackInfo by playerConnection.playbackInfo.collectAsState()
     val queue by playerConnection.queue.collectAsState()
     val queueDtos = remember(queue) { queue.map { it.toSummaryDto() } }
@@ -974,8 +1086,7 @@ private fun SupportingPaneContainer(
                         SignalPathPaneContent(
                             track = currentTrackDto,
                             playbackInfo = playbackInfo,
-                            serverUrl = apiClient.baseUrl,
-                            isDevMode = devModeState.value
+                            serverUrl = apiClient.baseUrl
                         )
                     }
                 }
@@ -1098,8 +1209,7 @@ private fun LyricsPaneContent(currentTrack: TrackSummaryDto?) {
 private fun SignalPathPaneContent(
     track: TrackSummaryDto?,
     playbackInfo: org.shilpo.peerless.model.PlaybackInfo?,
-    serverUrl: String,
-    isDevMode: Boolean
+    serverUrl: String
 ) {
     if (track == null) {
         Box(
@@ -1124,7 +1234,7 @@ private fun SignalPathPaneContent(
                 stageNumber = "1",
                 stageName = "SOURCE ORIGIN",
                 primaryInfo = if (track.is_cached) "Telegram Dump Channel (Instant)" else "${track.provider.uppercase()} Mirror",
-                secondaryInfo = "Endpoint: $serverUrl • ${if (isDevMode) "Dev Mode Direct" else "Signed Ticket"}",
+                secondaryInfo = "Endpoint: $serverUrl • HMAC Signed Ticket",
                 accentColor = SecondaryDark
             )
 
@@ -1240,6 +1350,7 @@ private fun DestinationContent(
     displayedTracks: List<TrackSummaryDto>,
     allTracks: List<TrackSummaryDto>,
     onOpenSettings: () -> Unit,
+    onOpenProfile: () -> Unit,
     onOpenNowPlaying: () -> Unit,
     onToggleStats: (() -> Unit)? = null,
     contentBottomPadding: androidx.compose.ui.unit.Dp,
@@ -1290,6 +1401,7 @@ private fun DestinationContent(
                 playerConnection = playerConnection,
                 serverConnected = serverConnected,
                 onOpenSettingsDialog = onOpenSettings,
+                onOpenProfile = onOpenProfile,
                 contentBottomPadding = contentBottomPadding
             )
         }
@@ -1355,12 +1467,26 @@ private fun LibraryDestinationView(
     contentBottomPadding: androidx.compose.ui.unit.Dp
 ) {
     val apiClient = LocalPeerlessApiClient.current
+    val favoritesManager = LocalFavoritesManager.current
 
-    var selectedTab by remember { mutableStateOf("All Saved") }
-    val tabs = listOf("All Saved", "Cached Downloads", "Playlists")
+    val favorites by (favoritesManager?.favorites
+        ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptyList()) }).collectAsState()
+    val isFavoritesLoading by (favoritesManager?.isLoading
+        ?: remember { kotlinx.coroutines.flow.MutableStateFlow(false) }).collectAsState()
+
+    var selectedTab by remember { mutableStateOf("Favorites") }
+    val tabs = listOf("Favorites", "Cached Downloads", "All Catalog")
+
+    LaunchedEffect(Unit) {
+        favoritesManager?.refreshFavorites()
+    }
 
     val cachedOnly = remember(allTracks) { allTracks.filter { it.is_cached } }
-    val tracksToShow = if (selectedTab == "Cached Downloads") cachedOnly else allTracks
+    val tracksToShow = when (selectedTab) {
+        "Favorites" -> favorites
+        "Cached Downloads" -> cachedOnly
+        else -> allTracks
+    }
 
     Column(
         modifier = Modifier
@@ -1383,7 +1509,7 @@ private fun LibraryDestinationView(
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = tab,
+                        text = if (tab == "Favorites" && favorites.isNotEmpty()) "Favorites (${favorites.size})" else tab,
                         style = ExpressiveTypography.labelMedium,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                         color = if (isSelected) OnPrimaryDark else OnSurfaceVariantDark
@@ -1392,30 +1518,86 @@ private fun LibraryDestinationView(
             }
         }
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            contentPadding = PaddingValues(
-                start = 12.dp,
-                end = 12.dp,
-                top = 4.dp,
-                bottom = contentBottomPadding
-            ),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            items(tracksToShow, key = { it.id }) { track ->
-                val isPlaying = currentTrackDto?.id == track.id &&
-                        status == PlaybackStatus.PLAYING
+        if (selectedTab == "Favorites" && favorites.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(bottom = contentBottomPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isFavoritesLoading) {
+                    CircularProgressIndicator(
+                        color = PrimaryDark,
+                        modifier = Modifier.size(32.dp)
+                    )
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(SurfaceContainerDark),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = PeerlessIcons.Heart,
+                                contentDescription = null,
+                                tint = OnSurfaceVariantDark.copy(alpha = 0.5f),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
 
-                TrackRow(
-                    track = track,
-                    artworkUrl = apiClient.getArtworkUrl(track, 200),
-                    isPlaying = isPlaying,
-                    onTrackClick = { clicked ->
-                        playerConnection.play(clicked.toTrack(), tracksToShow.map { it.toTrack() })
+                        Text(
+                            text = "No Favorite Tracks Yet",
+                            style = ExpressiveTypography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = OnSurfaceDark
+                        )
+
+                        Text(
+                            text = "Tap the heart icon on any track in Search or Home to bookmark it in your personal high-fidelity library.",
+                            style = ExpressiveTypography.bodyMedium,
+                            color = OnSurfaceVariantDark,
+                            textAlign = TextAlign.Center
+                        )
                     }
-                )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentPadding = PaddingValues(
+                    start = 12.dp,
+                    end = 12.dp,
+                    top = 4.dp,
+                    bottom = contentBottomPadding
+                ),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(tracksToShow, key = { it.id }) { track ->
+                    val isPlaying = currentTrackDto?.id == track.id &&
+                            status == PlaybackStatus.PLAYING
+
+                    TrackRow(
+                        track = track,
+                        artworkUrl = apiClient.getArtworkUrl(track, 200),
+                        isPlaying = isPlaying,
+                        onTrackClick = { clicked ->
+                            playerConnection.playTrack(clicked, tracksToShow)
+                        },
+                        isFavorite = favoritesManager?.isFavorite(track.id),
+                        onToggleFavorite = { clicked ->
+                            favoritesManager?.toggleFavorite(clicked)
+                        }
+                    )
+                }
             }
         }
     }
@@ -1426,12 +1608,11 @@ private fun SettingsDestinationView(
     playerConnection: PlayerConnection,
     serverConnected: Boolean,
     onOpenSettingsDialog: () -> Unit,
+    onOpenProfile: () -> Unit,
     contentBottomPadding: androidx.compose.ui.unit.Dp
 ) {
     val apiClient = LocalPeerlessApiClient.current
-    val devModeState = LocalDevMode.current
     val serverUrl = apiClient.baseUrl
-    val isDevMode = devModeState.value
 
     Column(
         modifier = Modifier
@@ -1447,6 +1628,64 @@ private fun SettingsDestinationView(
             fontWeight = FontWeight.Bold,
             color = OnSurfaceDark
         )
+
+        // Telegram Account & Telemetry Card
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(SquircleShapeMedium)
+                .background(SurfaceContainerDark)
+                .border(1.dp, PrimaryDark.copy(alpha = 0.4f), SquircleShapeMedium)
+                .clickable { onOpenProfile() }
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(Brush.linearGradient(listOf(PrimaryDark, TertiaryDark))),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = PeerlessIcons.Person,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "Telegram Account & Telemetry",
+                            style = ExpressiveTypography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = OnSurfaceDark
+                        )
+                        Text(
+                            text = "View active device sessions, daemon metrics, and logout",
+                            style = ExpressiveTypography.bodySmall,
+                            color = OnSurfaceVariantDark
+                        )
+                    }
+                }
+
+                Icon(
+                    imageVector = PeerlessIcons.OpenInNew,
+                    contentDescription = "Open profile",
+                    tint = PrimaryDark,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
 
         Box(
             modifier = Modifier
@@ -1477,15 +1716,15 @@ private fun SettingsDestinationView(
                 }
 
                 Text(
-                    text = "Endpoint: $serverUrl",
+                    text = if (serverUrl.isNotBlank()) "Endpoint: $serverUrl" else "Endpoint: Unconfigured",
                     style = ExpressiveTypography.bodyMedium,
                     color = OnSurfaceVariantDark
                 )
 
                 Text(
-                    text = if (isDevMode) "Dev Mode Direct Stream Active (Bypasses Telegram OTP)" else "Production Ticket Auth Active",
+                    text = "Verified Session & HMAC Ticket Auth Active",
                     style = ExpressiveTypography.bodySmall,
-                    color = if (isDevMode) LosslessGold else PrimaryDark
+                    color = PrimaryDark
                 )
             }
         }

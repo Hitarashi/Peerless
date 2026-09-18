@@ -1,9 +1,7 @@
 package org.shilpo.peerless.config
 
 object AppConfig {
-    const val IS_DEV_MODE: Boolean = true
-
-    const val DEFAULT_SERVER_URL: String = "http://192.168.0.6:4444"
+    const val DEFAULT_SERVER_URL: String = ""
 
     const val APP_NAME: String = "Peerless"
     const val APP_VERSION: String = "1.0.0"

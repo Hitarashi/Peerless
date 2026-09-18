@@ -24,7 +24,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.shilpo.peerless.lastfm.LastFmClient
 import org.shilpo.peerless.model.*
-import org.shilpo.peerless.network.LocalDevMode
 import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
@@ -299,7 +298,6 @@ fun SearchScreen(
                 onFilterSelect = { selectedFilter = it },
                 onOpenSettings = onOpenSettings,
                 isSearching = isSearching,
-                isDevMode = LocalDevMode.current.value,
                 serverUrl = apiClient.baseUrl
             )
 

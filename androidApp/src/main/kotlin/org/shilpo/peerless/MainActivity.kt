@@ -1,13 +1,14 @@
 package org.shilpo.peerless
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-
 import org.shilpo.peerless.auth.AndroidContextProvider
+import org.shilpo.peerless.auth.DeepLinkHandler
 import org.shilpo.peerless.player.AndroidAudioContextHolder
 
 class MainActivity : ComponentActivity() {
@@ -17,8 +18,20 @@ class MainActivity : ComponentActivity() {
         AndroidAudioContextHolder.context = applicationContext
         AndroidContextProvider.context = applicationContext
 
+        intent?.dataString?.let { uri ->
+            DeepLinkHandler.handleUri(uri)
+        }
+
         setContent {
             App()
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent.dataString?.let { uri ->
+            DeepLinkHandler.handleUri(uri)
         }
     }
 }

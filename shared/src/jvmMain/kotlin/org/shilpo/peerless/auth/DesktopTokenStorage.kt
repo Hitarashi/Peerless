@@ -6,22 +6,28 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 
 class DesktopTokenStorage : TokenStorage {
-    private val tokenFile: File by lazy {
+    private val configDir: File by lazy {
         val userHome = System.getProperty("user.home") ?: "."
-        val configDir = File(userHome, ".config/peerless")
-        if (!configDir.exists()) {
-            configDir.mkdirs()
+        val dir = File(userHome, ".config/peerless")
+        if (!dir.exists()) {
+            dir.mkdirs()
         }
-        File(configDir, "session.token")
+        dir
     }
 
-    private val _tokenFlow = MutableStateFlow(loadTokenSync())
+    private val tokenFile: File by lazy { File(configDir, "session.token") }
+    private val serverUrlFile: File by lazy { File(configDir, "server.url") }
+
+    private val _tokenFlow = MutableStateFlow(loadFile(tokenFile))
     override val tokenFlow: StateFlow<String?> = _tokenFlow.asStateFlow()
 
-    private fun loadTokenSync(): String? {
+    private val _serverUrlFlow = MutableStateFlow(loadFile(serverUrlFile))
+    override val serverUrlFlow: StateFlow<String?> = _serverUrlFlow.asStateFlow()
+
+    private fun loadFile(file: File): String? {
         return try {
-            if (tokenFile.exists()) {
-                val content = tokenFile.readText().trim()
+            if (file.exists()) {
+                val content = file.readText().trim()
                 content.ifBlank { null }
             } else null
         } catch (_: Exception) {
@@ -53,6 +59,31 @@ class DesktopTokenStorage : TokenStorage {
         } catch (_: Exception) {
         }
         _tokenFlow.value = null
+    }
+
+    override suspend fun getServerUrl(): String? = _serverUrlFlow.value
+
+    override suspend fun saveServerUrl(url: String) {
+        try {
+            serverUrlFile.writeText(url.trim())
+            _serverUrlFlow.value = url.trim()
+        } catch (_: Exception) {
+        }
+    }
+
+    override suspend fun clearServerUrl() {
+        try {
+            if (serverUrlFile.exists()) {
+                serverUrlFile.delete()
+            }
+        } catch (_: Exception) {
+        }
+        _serverUrlFlow.value = null
+    }
+
+    override suspend fun clearAll() {
+        clearToken()
+        clearServerUrl()
     }
 }
 

@@ -179,8 +179,15 @@ fun TrackRow(
     isPlaying: Boolean,
     onTrackClick: (TrackSummaryDto) -> Unit,
     modifier: Modifier = Modifier,
-    onRipClick: ((TrackSummaryDto) -> Unit)? = null
+    onRipClick: ((TrackSummaryDto) -> Unit)? = null,
+    isFavorite: Boolean? = null,
+    onToggleFavorite: ((TrackSummaryDto) -> Unit)? = null
 ) {
+    val favoritesManager = org.shilpo.peerless.library.LocalFavoritesManager.current
+    val favoriteIds by (favoritesManager?.favoriteIds
+        ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet()) }).collectAsState()
+    val isFav = isFavorite ?: favoriteIds.contains(track.id)
+
     var showAudioDetails by remember { mutableStateOf(false) }
 
     if (showAudioDetails) {
@@ -396,6 +403,24 @@ fun TrackRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
+            IconButton(
+                onClick = {
+                    if (onToggleFavorite != null) {
+                        onToggleFavorite(track)
+                    } else {
+                        favoritesManager?.toggleFavorite(track)
+                    }
+                },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = if (isFav) PeerlessIcons.Heart else PeerlessIcons.HeartBorder,
+                    contentDescription = if (isFav) "Remove from favorites" else "Add to favorites",
+                    tint = if (isFav) Color(0xFFFF5252) else OnSurfaceVariantDark.copy(alpha = 0.65f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
             Column(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(3.dp)

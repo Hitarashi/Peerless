@@ -97,8 +97,7 @@ class PlayerConnectionTest {
             apiClient = client,
             audioEngine = fakeEngine,
             storage = storage,
-            scope = backgroundScope,
-            isDevMode = true
+            scope = backgroundScope
         )
 
         val t1 = createTrack(1, "Track 1")
@@ -140,8 +139,7 @@ class PlayerConnectionTest {
             apiClient = client,
             audioEngine = fakeEngine,
             storage = storage,
-            scope = backgroundScope,
-            isDevMode = true
+            scope = backgroundScope
         )
 
         val tracks = (1..10).map { createTrack(it, "Track $it") }
@@ -172,8 +170,7 @@ class PlayerConnectionTest {
             apiClient = client,
             audioEngine = fakeEngine,
             storage = storage,
-            scope = backgroundScope,
-            isDevMode = true
+            scope = backgroundScope
         )
 
         val t1 = createTrack(1, "Track 1")
@@ -203,8 +200,7 @@ class PlayerConnectionTest {
             apiClient = client,
             audioEngine = fakeEngine,
             storage = storage,
-            scope = backgroundScope,
-            isDevMode = true
+            scope = backgroundScope
         )
 
         player.setVolume(0.75f)
@@ -226,8 +222,7 @@ class PlayerConnectionTest {
                 apiClient = client,
                 audioEngine = fakeEngine,
                 storage = storage,
-                scope = testScope,
-                isDevMode = true
+                scope = testScope
             )
 
             val t1 = createTrack(1, "Track 1")
@@ -261,8 +256,7 @@ class PlayerConnectionTest {
             apiClient = client,
             audioEngine = fakeEngine,
             storage = storage,
-            scope = backgroundScope,
-            isDevMode = true
+            scope = backgroundScope
         )
 
         assertNull(player.signalPath.value)
@@ -298,8 +292,7 @@ class PlayerConnectionTest {
                 apiClient = client,
                 audioEngine = fakeEngine,
                 storage = storage,
-                scope = testScope,
-                isDevMode = true
+                scope = testScope
             )
 
             val t1 = createTrack(1, "Track 1")
@@ -359,8 +352,7 @@ class PlayerConnectionTest {
             apiClient = client,
             audioEngine = fakeEngine,
             storage = storage,
-            scope = backgroundScope,
-            isDevMode = true
+            scope = backgroundScope
         )
 
         fakeEngine._state.value = AudioEngineState(status = PlaybackStatus.PAUSED, durationMs = 180_000L)

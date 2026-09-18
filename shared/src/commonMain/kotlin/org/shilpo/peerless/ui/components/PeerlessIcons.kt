@@ -1,9 +1,7 @@
 package org.shilpo.peerless.ui.components
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.QueueMusic
-import androidx.compose.material.icons.automirrored.rounded.VolumeMute
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -142,8 +140,20 @@ object PeerlessIcons {
     val VolumeMute: ImageVector get() = Icons.AutoMirrored.Rounded.VolumeMute
     val MoreVert: ImageVector get() = Icons.Rounded.MoreVert
     val Heart: ImageVector get() = Icons.Rounded.Favorite
+    val HeartBorder: ImageVector get() = Icons.Rounded.FavoriteBorder
     val Sparkle: ImageVector get() = Icons.Rounded.AutoAwesome
     val Compass: ImageVector get() = Icons.Rounded.Explore
     val BarChart: ImageVector get() = Icons.Rounded.BarChart
     val Database: ImageVector get() = Icons.Rounded.Storage
+    val Person: ImageVector get() = Icons.Rounded.Person
+    val Speed: ImageVector get() = Icons.Rounded.Speed
+    val Dns: ImageVector get() = Icons.Rounded.Dns
+    val Memory: ImageVector get() = Icons.Rounded.Memory
+    val Devices: ImageVector get() = Icons.Rounded.Devices
+    val CheckCircle: ImageVector get() = Icons.Rounded.CheckCircle
+    val Warning: ImageVector get() = Icons.Rounded.Warning
+    val ContentPaste: ImageVector get() = Icons.Rounded.ContentPaste
+    val Key: ImageVector get() = Icons.Rounded.VpnKey
+    val Logout: ImageVector get() = Icons.AutoMirrored.Rounded.Logout
+    val OpenInNew: ImageVector get() = Icons.AutoMirrored.Rounded.OpenInNew
 }
