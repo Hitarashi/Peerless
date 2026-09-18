@@ -7,9 +7,6 @@ import java.io.File
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * JNA binding to the native libmpv C API (libmpv.so.2 / libmpv.dylib / mpv-2.dll).
- */
 @Suppress("FunctionName")
 interface LibMpv : Library {
     fun mpv_create(): Pointer?
@@ -49,7 +46,6 @@ internal object LocaleFixer {
                 else -> "c"
             }
             val crt = Native.load(libName, CStandardLibrary::class.java)
-            // Force C locale across all categories (Linux LC_NUMERIC=1, Windows/Mac LC_NUMERIC=4, LC_ALL=0/6)
             for (category in 0..6) {
                 crt.setlocale(category, "C")
             }
@@ -100,17 +96,14 @@ object MpvConstants {
 
 internal object MpvLoader {
     private val candidatePaths = listOf(
-        // Linux standard locations
         "/usr/lib/libmpv.so.2",
         "/usr/lib64/libmpv.so.2",
         "/usr/local/lib/libmpv.so.2",
         "/usr/lib/libmpv.so",
         "/usr/lib/x86_64-linux-gnu/libmpv.so.2",
         "/usr/lib/aarch64-linux-gnu/libmpv.so.2",
-        // macOS Homebrew & system
         "/opt/homebrew/lib/libmpv.dylib",
         "/usr/local/lib/libmpv.dylib",
-        // Windows
         "mpv-2.dll",
         "libmpv-2.dll"
     )
@@ -142,10 +135,6 @@ internal object MpvLoader {
     }
 }
 
-/**
- * High-performance, bit-perfect desktop audio engine powered by in-process libmpv.
- * Conforms to the deep AudioEngine interface seam.
- */
 class DesktopAudioEngine : AudioEngine {
     private val _state = MutableStateFlow(AudioEngineState())
     override val state: StateFlow<AudioEngineState> = _state.asStateFlow()
@@ -190,7 +179,6 @@ class DesktopAudioEngine : AudioEngine {
             libMpvInstance = lib
             val ctx = lib.mpv_create() ?: error("mpv_create returned null")
 
-            // Audio-only configuration: zero video/graphical window overhead
             lib.mpv_set_option_string(ctx, "vo", "null")
             lib.mpv_set_option_string(ctx, "audio-display", "no")
             lib.mpv_set_option_string(ctx, "idle", "yes")
@@ -209,7 +197,6 @@ class DesktopAudioEngine : AudioEngine {
 
             mpvContext = ctx
 
-            // Observe core playback properties
             lib.mpv_observe_property(ctx, 1L, "time-pos", MpvConstants.FORMAT_NONE)
             lib.mpv_observe_property(ctx, 2L, "duration", MpvConstants.FORMAT_NONE)
             lib.mpv_observe_property(ctx, 3L, "pause", MpvConstants.FORMAT_NONE)
@@ -434,7 +421,6 @@ class DesktopAudioEngine : AudioEngine {
                 setProperty("http-header-fields", headerStr)
             }
 
-            // Apply play state before loadfile (mediamp spec §5)
             setProperty("pause", if (isPlaying) "no" else "yes")
             executeCommand("loadfile", url, "replace")
             setVolume(currentVolume)
@@ -444,7 +430,6 @@ class DesktopAudioEngine : AudioEngine {
     override fun prepareNext(url: String?, headers: Map<String, String>) {
         nextPreloadedUrl = url
         if (url == null) {
-            // Remove appended items from queue if any
             val count = getProperty("playlist-count")?.toIntOrNull() ?: 1
             if (count > 1) {
                 executeCommand("playlist-remove", "1")
@@ -458,7 +443,6 @@ class DesktopAudioEngine : AudioEngine {
                 val headerStr = headers.entries.joinToString("\r\n") { "${it.key}: ${it.value}" }
                 setProperty("http-header-fields", headerStr)
             }
-            // Append next file for gapless audio handoff
             executeCommand("loadfile", url, "append")
         }
     }

@@ -238,13 +238,11 @@ class PlayerConnectionTest {
             assertEquals(0, player.currentIndex.value)
             assertEquals(t1, player.currentTrack.value)
 
-            // Native audio engine reports seamless gapless handoff to next track
             fakeEngine._events.emit(AudioEngineEvent.TransitionedToNext("http://127.0.0.1:4444/api/v1/stream/2"))
 
             assertEquals(1, player.currentIndex.value)
             assertEquals(t2, player.currentTrack.value)
 
-            // Native audio engine reports another seamless transition to track 3
             fakeEngine._events.emit(AudioEngineEvent.TransitionedToNext("http://127.0.0.1:4444/api/v1/stream/3"))
 
             assertEquals(2, player.currentIndex.value)
@@ -311,7 +309,6 @@ class PlayerConnectionTest {
             assertEquals(180_000L, player.durationMs.value)
             assertEquals(180_000L, player.currentDurationMs)
 
-            // Test intention methods play() and pause()
             player.pause()
             assertFalse(player.isPlaying.value)
             assertEquals(PlaybackStatus.PAUSED, player.status.value)
@@ -320,19 +317,16 @@ class PlayerConnectionTest {
             assertTrue(player.isPlaying.value)
             assertEquals(PlaybackStatus.PLAYING, player.status.value)
 
-            // Test seekTo and reactive positionMs StateFlow
             player.seekTo(45_000L)
             assertEquals(45_000L, player.positionMs.value)
             assertEquals(45_000L, player.currentPositionMs)
 
-            // Test toggleShuffle
             assertFalse(player.shuffleMode.value)
             player.toggleShuffle()
             assertTrue(player.shuffleMode.value)
             player.toggleShuffle()
             assertFalse(player.shuffleMode.value)
 
-            // Test cycleRepeatMode: OFF -> ALL -> ONE -> OFF
             assertEquals(RepeatMode.OFF, player.repeatMode.value)
             player.cycleRepeatMode()
             assertEquals(RepeatMode.ALL, player.repeatMode.value)
@@ -369,7 +363,6 @@ class PlayerConnectionTest {
             isDevMode = true
         )
 
-        // Initially buffers on load
         fakeEngine._state.value = AudioEngineState(status = PlaybackStatus.PAUSED, durationMs = 180_000L)
 
         kotlinx.coroutines.delay(100)

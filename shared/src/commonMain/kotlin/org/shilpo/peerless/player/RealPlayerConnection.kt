@@ -7,6 +7,7 @@ import org.shilpo.peerless.model.PlaybackStateSnapshot
 import org.shilpo.peerless.model.RepeatMode
 import org.shilpo.peerless.model.Track
 import org.shilpo.peerless.network.PeerlessApiClient
+import kotlin.time.Duration.Companion.milliseconds
 
 class RealPlayerConnection(
     val apiClient: PeerlessApiClient = PeerlessApiClient(),
@@ -127,7 +128,7 @@ class RealPlayerConnection(
                 if (dur > 0L) {
                     _durationMs.value = dur
                 }
-                delay(16) // ~60fps smooth adaptive tick loop
+                delay(16.milliseconds)
             }
         }
     }
@@ -192,7 +193,6 @@ class RealPlayerConnection(
                     artist = track.artist,
                     artworkUrl = track.artworkUrl
                 )
-                // Defer seek until engine is ready/buffered to prevent cold-start seek race condition
                 scope.launch {
                     audioEngine.state.first {
                         it.status == PlaybackStatus.PAUSED ||
