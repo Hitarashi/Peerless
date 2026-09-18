@@ -1,5 +1,9 @@
 package org.shilpo.peerless.network
 
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.staticCompositionLocalOf
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -373,3 +377,12 @@ open class PeerlessApiClient(
         response.body<PlaylistDto>()
     }
 }
+
+val LocalPeerlessApiClient = staticCompositionLocalOf<PeerlessApiClient> {
+    error("No PeerlessApiClient provided")
+}
+
+val LocalDevMode = compositionLocalOf<MutableState<Boolean>> {
+    mutableStateOf(AppConfig.IS_DEV_MODE)
+}
+

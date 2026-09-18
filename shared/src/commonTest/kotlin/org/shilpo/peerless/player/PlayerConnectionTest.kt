@@ -288,4 +288,92 @@ class PlayerConnectionTest {
         assertEquals(48000, player.signalPath.value?.sampleRateHz)
         assertEquals(24, player.signalPath.value?.bitDepth)
     }
+
+    @Test
+    fun testReactivePositionDurationAndIntentionMethods() = runTest {
+        val testScope = CoroutineScope(Dispatchers.Unconfined)
+        try {
+            val fakeEngine = TestFakeAudioEngine()
+            val storage = InMemoryQueueStorage()
+            val client = PeerlessApiClient("http://127.0.0.1:4444")
+            val player = RealPlayerConnection(
+                apiClient = client,
+                audioEngine = fakeEngine,
+                storage = storage,
+                scope = testScope,
+                isDevMode = true
+            )
+
+            val t1 = createTrack(1, "Track 1")
+            val t2 = createTrack(2, "Track 2")
+            player.play(t1, listOf(t1, t2))
+
+            assertEquals(180_000L, player.durationMs.value)
+            assertEquals(180_000L, player.currentDurationMs)
+
+            // Test intention methods play() and pause()
+            player.pause()
+            assertFalse(player.isPlaying.value)
+            assertEquals(PlaybackStatus.PAUSED, player.status.value)
+
+            player.play()
+            assertTrue(player.isPlaying.value)
+            assertEquals(PlaybackStatus.PLAYING, player.status.value)
+
+            // Test seekTo and reactive positionMs StateFlow
+            player.seekTo(45_000L)
+            assertEquals(45_000L, player.positionMs.value)
+            assertEquals(45_000L, player.currentPositionMs)
+
+            // Test toggleShuffle
+            assertFalse(player.shuffleMode.value)
+            player.toggleShuffle()
+            assertTrue(player.shuffleMode.value)
+            player.toggleShuffle()
+            assertFalse(player.shuffleMode.value)
+
+            // Test cycleRepeatMode: OFF -> ALL -> ONE -> OFF
+            assertEquals(RepeatMode.OFF, player.repeatMode.value)
+            player.cycleRepeatMode()
+            assertEquals(RepeatMode.ALL, player.repeatMode.value)
+            player.cycleRepeatMode()
+            assertEquals(RepeatMode.ONE, player.repeatMode.value)
+            player.cycleRepeatMode()
+            assertEquals(RepeatMode.OFF, player.repeatMode.value)
+        } finally {
+            testScope.cancel()
+        }
+    }
+
+    @Test
+    fun testHydrationWithDeferredSeek() = runTest {
+        val storage = InMemoryQueueStorage()
+        val t1 = createTrack(1, "Track 1")
+        storage.saveState(
+            org.shilpo.peerless.model.PlaybackStateSnapshot(
+                queue = listOf(t1),
+                currentIndex = 0,
+                positionMs = 32_000L,
+                shuffleMode = false,
+                repeatMode = RepeatMode.OFF
+            )
+        )
+
+        val fakeEngine = TestFakeAudioEngine()
+        val client = PeerlessApiClient("http://127.0.0.1:4444")
+        val player = RealPlayerConnection(
+            apiClient = client,
+            audioEngine = fakeEngine,
+            storage = storage,
+            scope = backgroundScope,
+            isDevMode = true
+        )
+
+        // Initially buffers on load
+        fakeEngine._state.value = AudioEngineState(status = PlaybackStatus.PAUSED, durationMs = 180_000L)
+
+        kotlinx.coroutines.delay(100)
+        assertEquals(t1, player.currentTrack.value)
+        assertEquals(32_000L, player.positionMs.value)
+    }
 }

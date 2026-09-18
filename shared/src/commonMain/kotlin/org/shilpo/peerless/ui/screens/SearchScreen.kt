@@ -24,10 +24,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.shilpo.peerless.lastfm.LastFmClient
 import org.shilpo.peerless.model.*
-import org.shilpo.peerless.network.PeerlessApiClient
+import org.shilpo.peerless.network.LocalDevMode
+import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
-import org.shilpo.peerless.player.RealPlayerConnection
 import org.shilpo.peerless.theme.*
 import org.shilpo.peerless.ui.SampleLosslessLibrary
 import org.shilpo.peerless.ui.components.ExpressiveSearchBar
@@ -99,7 +99,7 @@ fun SearchScreen(
     initialQuery: String = "",
     initialFilter: SearchFilter = SearchFilter.ALL
 ) {
-    val apiClient = (playerConnection as? RealPlayerConnection)?.apiClient ?: remember { PeerlessApiClient() }
+    val apiClient = LocalPeerlessApiClient.current
     val currentTrack by playerConnection.currentTrack.collectAsState()
     val status by playerConnection.status.collectAsState()
     val currentTrackDto = currentTrack?.toSummaryDto()
@@ -299,7 +299,7 @@ fun SearchScreen(
                 onFilterSelect = { selectedFilter = it },
                 onOpenSettings = onOpenSettings,
                 isSearching = isSearching,
-                isDevMode = (playerConnection as? RealPlayerConnection)?.isDevMode ?: true,
+                isDevMode = LocalDevMode.current.value,
                 serverUrl = apiClient.baseUrl
             )
 
@@ -345,7 +345,7 @@ private fun ZeroStateDiscovery(
     status: PlaybackStatus,
     contentBottomPadding: Dp
 ) {
-    val apiClient = (playerConnection as? RealPlayerConnection)?.apiClient ?: remember { PeerlessApiClient() }
+    val apiClient = LocalPeerlessApiClient.current
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -618,7 +618,7 @@ private fun SearchResultsContent(
     onRipClick: ((TrackSummaryDto) -> Unit)?,
     contentBottomPadding: Dp
 ) {
-    val apiClient = (playerConnection as? RealPlayerConnection)?.apiClient ?: remember { PeerlessApiClient() }
+    val apiClient = LocalPeerlessApiClient.current
     val isEmptyResult = !isSearching && cachedTracks.isEmpty() && liveTracks.isEmpty() && artistSpotlight == null
 
     LazyColumn(

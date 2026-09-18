@@ -132,8 +132,9 @@ class AndroidAudioEngine(
         val bitRate = format?.bitrate?.takeIf { it > 0 }?.let { it / 1000 }
 
         val isAtmos = mimeType == MimeTypes.AUDIO_E_AC3_JOC ||
+                mimeType == MimeTypes.AUDIO_E_AC3 ||
                 mimeType.contains("dolby") ||
-                (currentTitle?.contains("atmos", ignoreCase = true) == true) ||
+                mimeType.contains("eac3") ||
                 channelCount > 2
 
         val codecName = when {

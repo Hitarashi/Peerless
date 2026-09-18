@@ -20,7 +20,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 class MprisServer(
     private val playerConnection: PlayerConnection,
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
+    private val serverBaseUrl: String? = null
 ) {
     @Volatile
     private var isRunning = false
@@ -204,8 +205,8 @@ class MprisServer(
 
         var url = track.artworkUrl
         if (url.isNullOrBlank() && track.id > 0) {
-            val serverUrl = System.getenv("PEERLESS_SERVER_URL")
-                ?: (playerConnection as? RealPlayerConnection)?.apiClient?.baseUrl
+            val serverUrl = serverBaseUrl
+                ?: System.getenv("PEERLESS_SERVER_URL")
                 ?: "http://127.0.0.1:4444"
             url = "$serverUrl/api/v1/assets/tracks/${track.id}/artwork?size=600"
         }
@@ -415,12 +416,12 @@ class MprisServer(
 
         when (member) {
             "Play" -> {
-                scope.launch { playerConnection.togglePlayPause() }
+                scope.launch { playerConnection.play() }
                 sendEmptyReturn(os, sender, serial)
             }
 
             "Pause" -> {
-                scope.launch { playerConnection.togglePlayPause() }
+                scope.launch { playerConnection.pause() }
                 sendEmptyReturn(os, sender, serial)
             }
 

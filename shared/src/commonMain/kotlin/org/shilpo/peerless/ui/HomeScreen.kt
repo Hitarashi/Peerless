@@ -28,10 +28,11 @@ import kotlinx.coroutines.delay
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.model.UncachedTrackDto
 import org.shilpo.peerless.model.toTrack
+import org.shilpo.peerless.network.LocalDevMode
+import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.LocalPlayerConnection
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
-import org.shilpo.peerless.player.RealPlayerConnection
 import org.shilpo.peerless.theme.*
 import org.shilpo.peerless.ui.components.*
 
@@ -510,7 +511,7 @@ fun HomeExpressiveContent(
     val currentTrack by playerConnection.currentTrack.collectAsState()
     val currentTrackDto = currentTrack?.toSummaryDto()
     val status by playerConnection.status.collectAsState()
-    val apiClient = (playerConnection as RealPlayerConnection).apiClient
+    val apiClient = LocalPeerlessApiClient.current
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -617,8 +618,8 @@ fun HomeScreen(
     playerConnection: PlayerConnection = LocalPlayerConnection.current,
     modifier: Modifier = Modifier
 ) {
-    val realConnection = playerConnection as RealPlayerConnection
-    val apiClient = realConnection.apiClient
+    val apiClient = LocalPeerlessApiClient.current
+    val devModeState = LocalDevMode.current
     val currentTrack by playerConnection.currentTrack.collectAsState()
     val currentTrackDto = currentTrack?.toSummaryDto()
     val status by playerConnection.status.collectAsState()
@@ -727,7 +728,7 @@ fun HomeScreen(
                     playbackInfo = playbackInfo,
                     status = status,
                     positionMs = playerConnection.currentPositionMs,
-                    durationMs = playerConnection.durationMs,
+                    durationMs = playerConnection.currentDurationMs,
                     artworkUrl = apiClient.getArtworkUrl(trackDto, 200),
                     onTogglePlayPause = { playerConnection.togglePlayPause() },
                     onPlayNext = { playerConnection.playNext() },
@@ -751,10 +752,10 @@ fun HomeScreen(
                     playbackInfo = playbackInfo,
                     status = status,
                     positionMs = playerConnection.currentPositionMs,
-                    durationMs = playerConnection.durationMs,
+                    durationMs = playerConnection.currentDurationMs,
                     artworkUrl = apiClient.getArtworkUrl(trackDto, 600),
                     serverUrl = apiClient.baseUrl,
-                    isDevMode = realConnection.isDevMode,
+                    isDevMode = devModeState.value,
                     onTogglePlayPause = { playerConnection.togglePlayPause() },
                     onSeekTo = { pos -> playerConnection.seekTo(pos) },
                     onPlayNext = { playerConnection.playNext() },
@@ -762,16 +763,9 @@ fun HomeScreen(
                     onClose = { isNowPlayingOpen = false },
                     onOpenSettings = { isSettingsOpen = true },
                     isShuffle = shuffleMode,
-                    onToggleShuffle = { playerConnection.setShuffleMode(!shuffleMode) },
+                    onToggleShuffle = { playerConnection.toggleShuffle() },
                     repeatMode = repeatMode,
-                    onToggleRepeat = {
-                        val next = when (repeatMode) {
-                            org.shilpo.peerless.model.RepeatMode.OFF -> org.shilpo.peerless.model.RepeatMode.ALL
-                            org.shilpo.peerless.model.RepeatMode.ALL -> org.shilpo.peerless.model.RepeatMode.ONE
-                            org.shilpo.peerless.model.RepeatMode.ONE -> org.shilpo.peerless.model.RepeatMode.OFF
-                        }
-                        playerConnection.setRepeatMode(next)
-                    }
+                    onToggleRepeat = { playerConnection.cycleRepeatMode() }
                 )
             }
         }
@@ -779,10 +773,10 @@ fun HomeScreen(
         if (isSettingsOpen) {
             ServerSettingsDialog(
                 currentServerUrl = apiClient.baseUrl,
-                currentDevMode = realConnection.isDevMode,
+                currentDevMode = devModeState.value,
                 onSave = { newUrl, newDevMode ->
                     apiClient.baseUrl = newUrl
-                    realConnection.isDevMode = newDevMode
+                    devModeState.value = newDevMode
                 },
                 onDismiss = { isSettingsOpen = false }
             )

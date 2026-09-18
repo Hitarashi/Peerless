@@ -3,9 +3,7 @@ package org.shilpo.peerless.player
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import platform.AVFAudio.AVAudioSession
-import platform.AVFAudio.AVAudioSessionCategoryPlayback
-import platform.AVFAudio.setActive
+import platform.AVFAudio.*
 import platform.AVFoundation.*
 import platform.CoreMedia.CMTimeGetSeconds
 import platform.CoreMedia.CMTimeMakeWithSeconds
@@ -26,7 +24,7 @@ class IosAudioEngine : AudioEngine {
     override val signalPath: StateFlow<SignalPathSnapshot?> = _signalPath.asStateFlow()
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    private var player: AVPlayer? = null
+    private var player: AVQueuePlayer? = null
     private var progressJob: Job? = null
     private var observerToken: Any? = null
 
@@ -96,8 +94,8 @@ class IosAudioEngine : AudioEngine {
         }
 
         val playerItem = AVPlayerItem.playerItemWithAsset(asset)
-        val newPlayer = AVPlayer.playerWithPlayerItem(playerItem)
-        player = newPlayer
+        val queuePlayer = AVQueuePlayer(playerItem = playerItem)
+        player = queuePlayer
 
         _state.value = AudioEngineState(status = PlaybackStatus.BUFFERING)
 
@@ -117,10 +115,15 @@ class IosAudioEngine : AudioEngine {
     private fun handleTrackEnd() {
         val nextItem = nextPlayerItem
         val nextTrackUrl = nextUrl
-        if (nextItem != null) {
+        if (nextItem != null && player?.currentItem == nextItem) {
             nextPlayerItem = null
             nextUrl = null
-            player?.replaceCurrentItemWithPlayerItem(nextItem)
+            _events.tryEmit(AudioEngineEvent.TransitionedToNext(nextTrackUrl))
+            updateSignalPathSnapshot()
+        } else if (nextItem != null) {
+            nextPlayerItem = null
+            nextUrl = null
+            player?.advanceToNextItem()
             player?.play()
             _events.tryEmit(AudioEngineEvent.TransitionedToNext(nextTrackUrl))
             updateSignalPathSnapshot()
@@ -146,22 +149,24 @@ class IosAudioEngine : AudioEngine {
         } else {
             AVURLAsset.URLAssetWithURL(nsUrl, null)
         }
-        nextPlayerItem = AVPlayerItem.playerItemWithAsset(asset)
+        val item = AVPlayerItem.playerItemWithAsset(asset)
+        nextPlayerItem = item
+        player?.insertItem(item, afterItem = null)
     }
 
     @OptIn(ExperimentalForeignApi::class)
     private fun updateSignalPathSnapshot() {
         val audioSession = AVAudioSession.sharedInstance()
         val sampleRate = audioSession.sampleRate.toInt().takeIf { it > 0 } ?: 48000
-        val channels = audioSession.outputNumberOfChannels.takeIf { it > 0 } ?: 2
+        val channels = audioSession.outputNumberOfChannels.toInt().takeIf { it > 0 } ?: 2
         val sinkName =
-            (audioSession.currentRoute.outputs.firstOrNull() as? platform.AVFAudio.AVAudioSessionPortDescription)?.portName
+            (audioSession.currentRoute.outputs.firstOrNull() as? AVAudioSessionPortDescription)?.portName
                 ?: "CoreAudio Output"
 
-        val isAtmos = (currentTitle?.contains("atmos", ignoreCase = true) == true) || channels > 2
+        val isAtmos = channels > 2
         val codec = if (isAtmos) "Dolby Atmos (Spatial Audio)" else "Apple Lossless (ALAC)"
         val channelLayout = when {
-            isAtmos -> "Dolby Atmos Spatial"
+            isAtmos -> "$channels Channels (Dolby Atmos Spatial)"
             channels == 2 -> "Stereo"
             else -> "$channels Channels"
         }

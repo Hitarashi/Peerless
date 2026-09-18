@@ -376,7 +376,7 @@ class DesktopAudioEngine : AudioEngine {
                 lowerCodec.contains("truehd") ||
                 hrChannels.contains("atmos", ignoreCase = true) ||
                 hrChannels.contains("7.1.4") ||
-                (currentTrackTitle?.contains("atmos", ignoreCase = true) == true)
+                hrChannels.contains("5.1.2")
 
         val channelLayoutDesc = when {
             isAtmos && hrChannels.isNotBlank() -> "$hrChannels (Dolby Atmos)"

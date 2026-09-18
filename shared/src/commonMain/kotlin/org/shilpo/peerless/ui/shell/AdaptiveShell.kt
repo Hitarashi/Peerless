@@ -26,10 +26,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.model.toTrack
+import org.shilpo.peerless.network.LocalDevMode
+import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.LocalPlayerConnection
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
-import org.shilpo.peerless.player.RealPlayerConnection
 import org.shilpo.peerless.theme.*
 import org.shilpo.peerless.ui.HomeExpressiveContent
 import org.shilpo.peerless.ui.SampleLosslessLibrary
@@ -43,8 +44,8 @@ fun AdaptiveShell(
     modifier: Modifier = Modifier
 ) {
     val playerConnection = LocalPlayerConnection.current
-    val realConnection = playerConnection as RealPlayerConnection
-    val apiClient = realConnection.apiClient
+    val apiClient = LocalPeerlessApiClient.current
+    val devModeState = LocalDevMode.current
 
     val currentTrack by playerConnection.currentTrack.collectAsState()
     val currentTrackDto = currentTrack?.toSummaryDto()
@@ -246,10 +247,10 @@ fun AdaptiveShell(
                             playbackInfo = playerConnection.playbackInfo.collectAsState().value,
                             status = status,
                             positionMs = playerConnection.currentPositionMs,
-                            durationMs = playerConnection.durationMs,
+                            durationMs = playerConnection.currentDurationMs,
                             artworkUrl = apiClient.getArtworkUrl(trackDto, 600),
                             serverUrl = apiClient.baseUrl,
-                            isDevMode = realConnection.isDevMode,
+                            isDevMode = devModeState.value,
                             onTogglePlayPause = { playerConnection.togglePlayPause() },
                             onSeekTo = { pos -> playerConnection.seekTo(pos) },
                             onPlayNext = { playerConnection.playNext() },
@@ -257,16 +258,9 @@ fun AdaptiveShell(
                             onClose = { isNowPlayingOpen = false },
                             onOpenSettings = { isSettingsOpen = true },
                             isShuffle = shuffleMode,
-                            onToggleShuffle = { playerConnection.setShuffleMode(!shuffleMode) },
+                            onToggleShuffle = { playerConnection.toggleShuffle() },
                             repeatMode = repeatMode,
-                            onToggleRepeat = {
-                                val next = when (repeatMode) {
-                                    org.shilpo.peerless.model.RepeatMode.OFF -> org.shilpo.peerless.model.RepeatMode.ALL
-                                    org.shilpo.peerless.model.RepeatMode.ALL -> org.shilpo.peerless.model.RepeatMode.ONE
-                                    org.shilpo.peerless.model.RepeatMode.ONE -> org.shilpo.peerless.model.RepeatMode.OFF
-                                }
-                                playerConnection.setRepeatMode(next)
-                            }
+                            onToggleRepeat = { playerConnection.cycleRepeatMode() }
                         )
                     }
                 }
@@ -274,10 +268,10 @@ fun AdaptiveShell(
                 if (isSettingsOpen) {
                     ServerSettingsDialog(
                         currentServerUrl = apiClient.baseUrl,
-                        currentDevMode = realConnection.isDevMode,
+                        currentDevMode = devModeState.value,
                         onSave = { newUrl, newDevMode ->
                             apiClient.baseUrl = newUrl
-                            realConnection.isDevMode = newDevMode
+                            devModeState.value = newDevMode
                         },
                         onDismiss = { isSettingsOpen = false }
                     )
@@ -305,7 +299,7 @@ private fun CompactLayout(
     onOpenSettings: () -> Unit,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
-    val apiClient = (playerConnection as RealPlayerConnection).apiClient
+    val apiClient = LocalPeerlessApiClient.current
     val canSkipNext by playerConnection.canSkipNext.collectAsState()
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
 
@@ -355,7 +349,7 @@ private fun CompactLayout(
                         playbackInfo = playerConnection.playbackInfo.collectAsState().value,
                         status = status,
                         positionMs = playerConnection.currentPositionMs,
-                        durationMs = playerConnection.durationMs,
+                        durationMs = playerConnection.currentDurationMs,
                         artworkUrl = apiClient.getArtworkUrl(trackDto, 200),
                         onTogglePlayPause = { playerConnection.togglePlayPause() },
                         onPlayNext = { playerConnection.playNext() },
@@ -475,7 +469,7 @@ private fun MediumLayout(
     onOpenSettings: () -> Unit,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
-    val apiClient = (playerConnection as RealPlayerConnection).apiClient
+    val apiClient = LocalPeerlessApiClient.current
     val canSkipNext by playerConnection.canSkipNext.collectAsState()
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
 
@@ -579,7 +573,7 @@ private fun MediumLayout(
                     playbackInfo = playerConnection.playbackInfo.collectAsState().value,
                     status = status,
                     positionMs = playerConnection.currentPositionMs,
-                    durationMs = playerConnection.durationMs,
+                    durationMs = playerConnection.currentDurationMs,
                     artworkUrl = apiClient.getArtworkUrl(trackDto, 200),
                     onTogglePlayPause = { playerConnection.togglePlayPause() },
                     onPlayNext = { playerConnection.playNext() },
@@ -622,7 +616,7 @@ private fun ExpandedLayout(
     onOpenSettings: () -> Unit,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
-    val apiClient = (playerConnection as RealPlayerConnection).apiClient
+    val apiClient = LocalPeerlessApiClient.current
     val isRepeat = repeatMode != org.shilpo.peerless.model.RepeatMode.OFF
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -698,7 +692,7 @@ private fun ExpandedLayout(
             playbackInfo = playerConnection.playbackInfo.collectAsState().value,
             status = status,
             positionMs = playerConnection.currentPositionMs,
-            durationMs = playerConnection.durationMs,
+            durationMs = playerConnection.currentDurationMs,
             artworkUrl = currentTrackDto?.let { apiClient.getArtworkUrl(it, 200) } ?: "",
             onTogglePlayPause = { playerConnection.togglePlayPause() },
             onSeekTo = { pos -> playerConnection.seekTo(pos) },
@@ -889,8 +883,8 @@ private fun SupportingPaneContainer(
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val realConnection = playerConnection as RealPlayerConnection
-    val apiClient = realConnection.apiClient
+    val apiClient = LocalPeerlessApiClient.current
+    val devModeState = LocalDevMode.current
     val playbackInfo by playerConnection.playbackInfo.collectAsState()
     val queue by playerConnection.queue.collectAsState()
     val queueDtos = remember(queue) { queue.map { it.toSummaryDto() } }
@@ -981,7 +975,7 @@ private fun SupportingPaneContainer(
                             track = currentTrackDto,
                             playbackInfo = playbackInfo,
                             serverUrl = apiClient.baseUrl,
-                            isDevMode = realConnection.isDevMode
+                            isDevMode = devModeState.value
                         )
                     }
                 }
@@ -997,7 +991,7 @@ private fun QueuePaneContent(
     currentTrackDto: TrackSummaryDto?,
     status: PlaybackStatus
 ) {
-    val apiClient = (playerConnection as RealPlayerConnection).apiClient
+    val apiClient = LocalPeerlessApiClient.current
 
     if (queueDtos.isEmpty()) {
         Box(
@@ -1360,7 +1354,7 @@ private fun LibraryDestinationView(
     allTracks: List<TrackSummaryDto>,
     contentBottomPadding: androidx.compose.ui.unit.Dp
 ) {
-    val apiClient = (playerConnection as RealPlayerConnection).apiClient
+    val apiClient = LocalPeerlessApiClient.current
 
     var selectedTab by remember { mutableStateOf("All Saved") }
     val tabs = listOf("All Saved", "Cached Downloads", "Playlists")
@@ -1434,9 +1428,10 @@ private fun SettingsDestinationView(
     onOpenSettingsDialog: () -> Unit,
     contentBottomPadding: androidx.compose.ui.unit.Dp
 ) {
-    val realConnection = playerConnection as RealPlayerConnection
-    val serverUrl = realConnection.apiClient.baseUrl
-    val isDevMode = realConnection.isDevMode
+    val apiClient = LocalPeerlessApiClient.current
+    val devModeState = LocalDevMode.current
+    val serverUrl = apiClient.baseUrl
+    val isDevMode = devModeState.value
 
     Column(
         modifier = Modifier

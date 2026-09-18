@@ -1,10 +1,7 @@
 package org.shilpo.peerless.player
 
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import org.shilpo.peerless.model.PlaybackInfo
 import org.shilpo.peerless.model.PlaybackStateSnapshot
 import org.shilpo.peerless.model.RepeatMode
@@ -56,22 +53,42 @@ class RealPlayerConnection(
     private val _volume = MutableStateFlow(1.0f)
     override val volume: StateFlow<Float> = _volume.asStateFlow()
 
-    override val currentPositionMs: Long
-        get() = audioEngine.state.value.positionMs
+    private val _positionMs = MutableStateFlow(0L)
+    override val positionMs: StateFlow<Long> = _positionMs.asStateFlow()
 
-    override val durationMs: Long
-        get() = audioEngine.state.value.durationMs.takeIf { it > 0L }
-            ?: (_currentTrack.value?.durationMs ?: 0L)
+    private val _durationMs = MutableStateFlow(0L)
+    override val durationMs: StateFlow<Long> = _durationMs.asStateFlow()
+
+    override val currentPositionMs: Long
+        get() = _positionMs.value
+
+    override val currentDurationMs: Long
+        get() = _durationMs.value
 
     private var loadJob: Job? = null
     private var preloadJob: Job? = null
     private var saveDebounceJob: Job? = null
+    private var tickerJob: Job? = null
 
     init {
         scope.launch {
             audioEngine.state.collect { engState ->
                 _status.value = engState.status
-                _isPlaying.value = (engState.status == PlaybackStatus.PLAYING)
+                val playing = (engState.status == PlaybackStatus.PLAYING)
+                if (_isPlaying.value != playing) {
+                    _isPlaying.value = playing
+                    if (playing) {
+                        startTicker()
+                    } else {
+                        stopTicker()
+                    }
+                } else if (!playing) {
+                    _positionMs.value = engState.positionMs
+                }
+
+                val dur = engState.durationMs.takeIf { it > 0L }
+                    ?: (_currentTrack.value?.durationMs ?: 0L)
+                _durationMs.value = dur
 
                 if (engState.status == PlaybackStatus.COMPLETED) {
                     handlePlaybackCompleted()
@@ -97,6 +114,33 @@ class RealPlayerConnection(
         }
     }
 
+    private fun startTicker() {
+        tickerJob?.cancel()
+        tickerJob = scope.launch {
+            while (isActive && _isPlaying.value) {
+                val pos = audioEngine.state.value.positionMs
+                if (pos >= 0L) {
+                    _positionMs.value = pos
+                }
+                val dur = audioEngine.state.value.durationMs.takeIf { it > 0L }
+                    ?: (_currentTrack.value?.durationMs ?: 0L)
+                if (dur > 0L) {
+                    _durationMs.value = dur
+                }
+                delay(16) // ~60fps smooth adaptive tick loop
+            }
+        }
+    }
+
+    private fun stopTicker() {
+        tickerJob?.cancel()
+        tickerJob = null
+        val pos = audioEngine.state.value.positionMs
+        if (pos >= 0L) {
+            _positionMs.value = pos
+        }
+    }
+
     private fun handleEngineTransitionedToNext() {
         val q = _queue.value
         if (q.isEmpty()) return
@@ -106,6 +150,8 @@ class RealPlayerConnection(
             _currentIndex.value = nextIdx
             val track = q[nextIdx]
             _currentTrack.value = track
+            _positionMs.value = 0L
+            _durationMs.value = track.durationMs
             updateSkipFlags()
             preloadNextTrack()
             scheduleSave()
@@ -135,10 +181,29 @@ class RealPlayerConnection(
         _currentTrack.value = track
         updateSkipFlags()
 
-        if (track != null && snapshot.positionMs > 0L) {
-            val streamUrl = resolveStreamUrl(track)
-            audioEngine.prepare(streamUrl)
-            audioEngine.seekTo(snapshot.positionMs)
+        if (track != null) {
+            _durationMs.value = track.durationMs
+            if (snapshot.positionMs > 0L) {
+                _positionMs.value = snapshot.positionMs
+                val streamUrl = resolveStreamUrl(track)
+                audioEngine.prepare(
+                    streamUrl,
+                    title = track.title,
+                    artist = track.artist,
+                    artworkUrl = track.artworkUrl
+                )
+                // Defer seek until engine is ready/buffered to prevent cold-start seek race condition
+                scope.launch {
+                    audioEngine.state.first {
+                        it.status == PlaybackStatus.PAUSED ||
+                                it.status == PlaybackStatus.PLAYING ||
+                                it.status == PlaybackStatus.BUFFERING ||
+                                it.durationMs > 0L
+                    }
+                    audioEngine.seekTo(snapshot.positionMs)
+                    _positionMs.value = snapshot.positionMs
+                }
+            }
         }
     }
 
@@ -183,6 +248,8 @@ class RealPlayerConnection(
 
     private fun startLoadingTrack(track: Track) {
         _status.value = PlaybackStatus.BUFFERING
+        _positionMs.value = 0L
+        _durationMs.value = track.durationMs
         loadJob?.cancel()
         preloadJob?.cancel()
 
@@ -196,7 +263,7 @@ class RealPlayerConnection(
                 }
             }
 
-            audioEngine.prepare(streamUrl)
+            audioEngine.prepare(streamUrl, title = track.title, artist = track.artist, artworkUrl = track.artworkUrl)
             audioEngine.play()
 
             preloadNextTrack()
@@ -231,17 +298,29 @@ class RealPlayerConnection(
         }
     }
 
-    override fun togglePlayPause() {
+    override fun play() {
         val currentStatus = _status.value
-        if (currentStatus == PlaybackStatus.PLAYING) {
-            audioEngine.pause()
-        } else if (currentStatus == PlaybackStatus.PAUSED || currentStatus == PlaybackStatus.IDLE) {
+        if (currentStatus == PlaybackStatus.PAUSED || currentStatus == PlaybackStatus.IDLE) {
             if (_currentTrack.value != null) {
                 audioEngine.play()
             } else if (_queue.value.isNotEmpty()) {
                 val first = _queue.value.first()
                 play(first, _queue.value)
             }
+        }
+    }
+
+    override fun pause() {
+        if (_status.value == PlaybackStatus.PLAYING || _status.value == PlaybackStatus.BUFFERING) {
+            audioEngine.pause()
+        }
+    }
+
+    override fun togglePlayPause() {
+        if (_status.value == PlaybackStatus.PLAYING) {
+            pause()
+        } else {
+            play()
         }
     }
 
@@ -309,6 +388,7 @@ class RealPlayerConnection(
     }
 
     override fun seekTo(positionMs: Long) {
+        _positionMs.value = positionMs
         audioEngine.seekTo(positionMs)
         scheduleSave()
     }
@@ -347,11 +427,24 @@ class RealPlayerConnection(
         scheduleSave()
     }
 
+    override fun toggleShuffle() {
+        setShuffleMode(!_shuffleMode.value)
+    }
+
     override fun setRepeatMode(mode: RepeatMode) {
         _repeatMode.value = mode
         updateSkipFlags()
         preloadNextTrack()
         scheduleSave()
+    }
+
+    override fun cycleRepeatMode() {
+        val nextMode = when (_repeatMode.value) {
+            RepeatMode.OFF -> RepeatMode.ALL
+            RepeatMode.ALL -> RepeatMode.ONE
+            RepeatMode.ONE -> RepeatMode.OFF
+        }
+        setRepeatMode(nextMode)
     }
 
     override fun addToQueue(track: Track) {
@@ -431,6 +524,7 @@ class RealPlayerConnection(
     }
 
     override fun stopAndDismiss() {
+        stopTicker()
         loadJob?.cancel()
         preloadJob?.cancel()
         audioEngine.stop()
@@ -438,6 +532,8 @@ class RealPlayerConnection(
         _playbackInfo.value = null
         _status.value = PlaybackStatus.IDLE
         _isPlaying.value = false
+        _positionMs.value = 0L
+        _durationMs.value = 0L
         updateSkipFlags()
         scope.launch {
             storage.clearState()

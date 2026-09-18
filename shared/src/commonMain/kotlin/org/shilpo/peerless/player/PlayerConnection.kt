@@ -20,17 +20,26 @@ interface PlayerConnection {
     val canSkipPrevious: StateFlow<Boolean>
     val volume: StateFlow<Float>
 
-    val currentPositionMs: Long
-    val durationMs: Long
+    val positionMs: StateFlow<Long>
+    val durationMs: StateFlow<Long>
+
+    val currentPositionMs: Long get() = positionMs.value
+    val currentDurationMs: Long get() = durationMs.value
 
     fun play(track: Track, queue: List<Track> = emptyList())
+    fun play()
+    fun pause()
     fun togglePlayPause()
     fun playNext()
+    fun skipNext() = playNext()
     fun playPrevious()
+    fun skipPrevious() = playPrevious()
     fun seekTo(positionMs: Long)
     fun setVolume(volume: Float)
     fun setShuffleMode(enabled: Boolean)
+    fun toggleShuffle()
     fun setRepeatMode(mode: RepeatMode)
+    fun cycleRepeatMode()
 
     fun addToQueue(track: Track)
     fun playNextInQueue(track: Track)
