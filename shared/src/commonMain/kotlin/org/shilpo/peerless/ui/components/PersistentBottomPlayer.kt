@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -17,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
@@ -61,6 +63,21 @@ fun PersistentBottomPlayer(
     val colorScheme = MaterialTheme.colorScheme
     val isPlaying = status == PlaybackStatus.PLAYING
 
+    var showAudioDetails by remember { mutableStateOf(false) }
+
+    if (showAudioDetails && track != null) {
+        val detailTrack = track.copy(
+            codec = playbackInfo?.codec ?: track.codec,
+            bit_depth = playbackInfo?.bit_depth ?: track.bit_depth,
+            sample_rate = playbackInfo?.sample_rate ?: track.sample_rate
+        )
+        AudioDetailsModal(
+            track = detailTrack,
+            artworkUrl = artworkUrl,
+            onDismiss = { showAudioDetails = false }
+        )
+    }
+
     val topEndCorner by animateDpAsState(
         targetValue = if (activeSupportingPane != null) 8.dp else 24.dp,
         animationSpec = spring(
@@ -102,6 +119,7 @@ fun PersistentBottomPlayer(
             Row(
                 modifier = Modifier
                     .weight(1f)
+                    .pointerHoverIcon(PointerIcon.Hand)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -150,23 +168,104 @@ fun PersistentBottomPlayer(
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
                             text = track?.artist ?: "Select a lossless track to begin",
                             style = ExpressiveTypography.bodySmall,
                             color = colorScheme.onSurfaceVariant,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
 
                         if (track != null) {
-                            LosslessBadge(
-                                bitDepth = playbackInfo?.bit_depth ?: track.bit_depth,
-                                sampleRate = playbackInfo?.sample_rate ?: track.sample_rate,
-                                codec = playbackInfo?.codec ?: track.codec,
-                                compact = true
-                            )
+                            val effectiveCodec = playbackInfo?.codec ?: track.codec
+                            val effectiveProvider = track.provider
+                            val hasApple = effectiveProvider.contains("apple", ignoreCase = true)
+                            val hasQobuz = effectiveProvider.contains("qobuz", ignoreCase = true)
+                            val hasDolby = effectiveCodec.contains("ec-3", ignoreCase = true) ||
+                                    effectiveCodec.contains("ec3", ignoreCase = true) ||
+                                    effectiveCodec.contains("atmos", ignoreCase = true)
+                            val effectiveBitDepth = playbackInfo?.bit_depth ?: track.bit_depth ?: 16
+                            val effectiveSampleRate = playbackInfo?.sample_rate ?: track.sample_rate ?: 44100
+                            val hasHiRes = effectiveBitDepth >= 24 || effectiveSampleRate >= 88200
+                            val hasAnyIcon =
+                                hasApple || hasQobuz || effectiveProvider.isNotBlank() || hasDolby || hasHiRes
+
+                            if (hasAnyIcon) {
+                                Text(
+                                    text = "•",
+                                    style = ExpressiveTypography.bodySmall,
+                                    color = colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                                )
+
+                                val iconInteractionSource = remember { MutableInteractionSource() }
+                                val isIconHovered by iconInteractionSource.collectIsHoveredAsState()
+
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(if (isIconHovered) colorScheme.onSurfaceVariant.copy(alpha = 0.12f) else Color.Transparent)
+                                        .pointerHoverIcon(PointerIcon.Hand)
+                                        .clickable(
+                                            interactionSource = iconInteractionSource,
+                                            indication = ripple(bounded = true),
+                                            onClick = { showAudioDetails = true }
+                                        )
+                                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (hasApple) {
+                                        Icon(
+                                            imageVector = PeerlessIcons.AppleLogo,
+                                            contentDescription = "Apple Music",
+                                            tint = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                    }
+                                    if (hasQobuz) {
+                                        Icon(
+                                            imageVector = PeerlessIcons.QobuzLogo,
+                                            contentDescription = "Qobuz",
+                                            tint = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                                            modifier = Modifier.height(11.dp).width(28.dp)
+                                        )
+                                    }
+                                    if (!hasApple && !hasQobuz && effectiveProvider.isNotBlank()) {
+                                        Text(
+                                            text = formatProviderLabel(effectiveProvider),
+                                            style = SpecBadgeTypography.copy(
+                                                fontSize = 8.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                letterSpacing = 0.3.sp
+                                            ),
+                                            color = colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    if (hasDolby) {
+                                        Icon(
+                                            imageVector = PeerlessIcons.DolbyAtmos,
+                                            contentDescription = "Dolby Atmos",
+                                            tint = colorScheme.tertiary,
+                                            modifier = Modifier.height(10.dp).width(15.dp)
+                                        )
+                                    }
+                                    if (hasHiRes) {
+                                        Icon(
+                                            imageVector = PeerlessIcons.HiRes,
+                                            contentDescription = "Hi-Res Audio",
+                                            tint = colorScheme.tertiary,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }

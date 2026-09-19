@@ -398,14 +398,61 @@ fun QuickPickCard(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                PowerampLosslessBadge(
-                    bitDepth = track.bit_depth,
-                    sampleRate = track.sample_rate,
-                    codec = track.codec,
-                    compact = true
-                )
+                val hasApple = track.provider.contains("apple", ignoreCase = true)
+                val hasQobuz = track.provider.contains("qobuz", ignoreCase = true)
+                val hasDolby = track.codec.contains("ec-3", ignoreCase = true) ||
+                        track.codec.contains("ec3", ignoreCase = true) ||
+                        track.codec.contains("atmos", ignoreCase = true)
+                val hasHiRes = (track.bit_depth ?: 16) >= 24 || (track.sample_rate ?: 44100) >= 88200
+
+                if (hasApple) {
+                    Icon(
+                        imageVector = PeerlessIcons.AppleLogo,
+                        contentDescription = "Apple Music",
+                        tint = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier.size(11.dp)
+                    )
+                }
+                if (hasQobuz) {
+                    Icon(
+                        imageVector = PeerlessIcons.QobuzLogo,
+                        contentDescription = "Qobuz",
+                        tint = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier.height(10.dp).width(25.dp)
+                    )
+                }
+                if (!hasApple && !hasQobuz && track.provider.isNotBlank()) {
+                    Text(
+                        text = formatProviderLabel(track.provider),
+                        style = SpecBadgeTypography.copy(
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.3.sp
+                        ),
+                        color = Color.White.copy(alpha = 0.8f),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (hasDolby) {
+                    Icon(
+                        imageVector = PeerlessIcons.DolbyAtmos,
+                        contentDescription = "Dolby Atmos",
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.height(9.dp).width(14.dp)
+                    )
+                }
+                if (hasHiRes) {
+                    Icon(
+                        imageVector = PeerlessIcons.HiRes,
+                        contentDescription = "Hi-Res Audio",
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
             }
         }
     }

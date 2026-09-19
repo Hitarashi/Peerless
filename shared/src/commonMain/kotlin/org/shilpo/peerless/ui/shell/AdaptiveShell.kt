@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 import org.shilpo.peerless.auth.LocalSessionManager
 import org.shilpo.peerless.auth.SessionState
 import org.shilpo.peerless.library.LocalFavoritesManager
+import org.shilpo.peerless.model.CanonicalDeduplicator
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.model.toTrack
 import org.shilpo.peerless.network.LocalPeerlessApiClient
@@ -55,7 +56,6 @@ import org.shilpo.peerless.ui.navigation.NavigationDestination
 import org.shilpo.peerless.ui.screens.AuthOnboardingScreen
 import org.shilpo.peerless.ui.screens.ProfileScreen
 import org.shilpo.peerless.ui.screens.SearchScreen
-import org.shilpo.peerless.ui.toTrackSummary
 import kotlin.ranges.coerceIn
 
 @Composable
@@ -119,8 +119,12 @@ fun AdaptiveShell(
 
         result.onSuccess { response ->
             serverConnected = true
-            val combined = response.cached + response.live.map { it.toTrackSummary() }
-            serverTracks = combined
+            val canonicalList = CanonicalDeduplicator.deduplicate(
+                cachedTracks = response.cached,
+                liveTracks = response.live,
+                baseUrl = apiClient.baseUrl
+            )
+            serverTracks = canonicalList.map { it.toSummaryDto() }
             isSearching = false
         }.onFailure {
             serverConnected = false
@@ -128,7 +132,13 @@ fun AdaptiveShell(
         }
     }
 
-    val activeLibrary = if (serverTracks.isNotEmpty()) serverTracks else SampleLosslessLibrary
+    val activeLibrary = remember(serverTracks, apiClient.baseUrl) {
+        if (serverTracks.isNotEmpty()) {
+            serverTracks
+        } else {
+            CanonicalDeduplicator.deduplicateTracks(SampleLosslessLibrary, apiClient.baseUrl).map { it.toSummaryDto() }
+        }
+    }
     val displayedTracks = remember(activeLibrary, selectedFilter, searchQuery) {
         activeLibrary.filter { track ->
             val matchesFilter = when (selectedFilter) {
@@ -1484,10 +1494,13 @@ private fun LibraryDestinationView(
     }
 
     val cachedOnly = remember(allTracks) { allTracks.filter { it.is_cached } }
-    val tracksToShow = when (selectedTab) {
+    val rawTracks = when (selectedTab) {
         "Favorites" -> favorites
         "Cached Downloads" -> cachedOnly
         else -> allTracks
+    }
+    val tracksToShow = remember(rawTracks, apiClient.baseUrl) {
+        CanonicalDeduplicator.deduplicateTracks(rawTracks, apiClient.baseUrl).map { it.toSummaryDto() }
     }
 
     Column(

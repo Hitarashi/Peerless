@@ -89,6 +89,20 @@ fun NowPlayingSheet(
     val dismissThresholdPx = with(density) { 60.dp.toPx() }
     var cumulativeDragY by remember { mutableFloatStateOf(0f) }
     var hasTriggeredClose by remember { mutableStateOf(false) }
+    var showAudioDetails by remember { mutableStateOf(false) }
+
+    if (showAudioDetails) {
+        val detailTrack = track.copy(
+            codec = playbackInfo?.codec ?: track.codec,
+            bit_depth = playbackInfo?.bit_depth ?: track.bit_depth,
+            sample_rate = playbackInfo?.sample_rate ?: track.sample_rate
+        )
+        AudioDetailsModal(
+            track = detailTrack,
+            artworkUrl = artworkUrl,
+            onDismiss = { showAudioDetails = false }
+        )
+    }
 
     val colorScheme = MaterialTheme.colorScheme
 
@@ -267,8 +281,10 @@ fun NowPlayingSheet(
                     bitDepth = playbackInfo?.bit_depth ?: track.bit_depth,
                     sampleRate = playbackInfo?.sample_rate ?: track.sample_rate,
                     codec = playbackInfo?.codec ?: track.codec,
+                    provider = track.provider,
                     compact = false,
-                    showTierTag = true
+                    showTierTag = true,
+                    onClick = { showAudioDetails = true }
                 )
 
                 IconButton(

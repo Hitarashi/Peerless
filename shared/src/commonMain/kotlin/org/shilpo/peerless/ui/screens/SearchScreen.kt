@@ -33,7 +33,6 @@ import org.shilpo.peerless.ui.SampleLosslessLibrary
 import org.shilpo.peerless.ui.components.ExpressiveSearchBar
 import org.shilpo.peerless.ui.components.PeerlessIcons
 import org.shilpo.peerless.ui.components.TrackRow
-import org.shilpo.peerless.ui.toTrackSummary
 
 data class TasteMixCardData(
     val id: String,
@@ -109,8 +108,7 @@ fun SearchScreen(
     var selectedFilter by remember { mutableStateOf(initialFilter) }
     var isSearching by remember { mutableStateOf(false) }
 
-    var cachedTracks by remember { mutableStateOf<List<TrackSummaryDto>>(emptyList()) }
-    var liveTracks by remember { mutableStateOf<List<UncachedTrackDto>>(emptyList()) }
+    var canonicalTracks by remember { mutableStateOf<List<CanonicalTrack>>(emptyList()) }
     var artistSpotlight by remember { mutableStateOf<LastFmArtist?>(null) }
     var zeroStateTags by remember { mutableStateOf<List<LastFmTag>>(emptyList()) }
 
@@ -125,8 +123,7 @@ fun SearchScreen(
         val trimmedQuery = searchQuery.trim()
         if (trimmedQuery.isBlank()) {
             isSearching = false
-            cachedTracks = emptyList()
-            liveTracks = emptyList()
+            canonicalTracks = emptyList()
             artistSpotlight = null
             return@LaunchedEffect
         }
@@ -218,15 +215,12 @@ fun SearchScreen(
                         else -> response.live
                     }
 
-                    val cachedKeys =
-                        filteredCached.map { it.title.trim().lowercase() to it.artist.trim().lowercase() }.toSet()
-                    val filteredLive = rawLive.filter {
-                        val key = it.title.trim().lowercase() to it.artist.trim().lowercase()
-                        !cachedKeys.contains(key)
-                    }
-
-                    cachedTracks = filteredCached
-                    liveTracks = filteredLive
+                    val deduplicated = CanonicalDeduplicator.deduplicate(
+                        cachedTracks = filteredCached,
+                        liveTracks = rawLive,
+                        baseUrl = apiClient.baseUrl
+                    )
+                    canonicalTracks = deduplicated
                 }.onFailure {
                     val localMatches = SampleLosslessLibrary.filter {
                         val matchesQuery = it.title.contains(trimmedQuery, ignoreCase = true) ||
@@ -245,18 +239,11 @@ fun SearchScreen(
                     }
 
                     val cachedLocal = localMatches.filter { it.is_cached }
-                    cachedTracks = cachedLocal
-                    liveTracks = if (selectedFilter == SearchFilter.CACHED) {
+                    val liveLocal = if (selectedFilter == SearchFilter.CACHED) {
                         emptyList()
                     } else {
-                        val cachedKeys =
-                            cachedLocal.map { it.title.trim().lowercase() to it.artist.trim().lowercase() }.toSet()
                         localMatches
-                            .filter {
-                                !it.is_cached && !cachedKeys.contains(
-                                    it.title.trim().lowercase() to it.artist.trim().lowercase()
-                                )
-                            }
+                            .filter { !it.is_cached }
                             .map {
                                 UncachedTrackDto(
                                     provider = it.provider,
@@ -270,6 +257,11 @@ fun SearchScreen(
                                 )
                             }
                     }
+                    canonicalTracks = CanonicalDeduplicator.deduplicate(
+                        cachedTracks = cachedLocal,
+                        liveTracks = liveLocal,
+                        baseUrl = apiClient.baseUrl
+                    )
                 }
             }
 
@@ -319,8 +311,7 @@ fun SearchScreen(
                     query = searchQuery,
                     isSearching = isSearching,
                     artistSpotlight = artistSpotlight,
-                    cachedTracks = cachedTracks,
-                    liveTracks = liveTracks,
+                    canonicalTracks = canonicalTracks,
                     playerConnection = playerConnection,
                     currentTrackDto = currentTrackDto,
                     status = status,
@@ -614,8 +605,7 @@ private fun SearchResultsContent(
     query: String,
     isSearching: Boolean,
     artistSpotlight: LastFmArtist?,
-    cachedTracks: List<TrackSummaryDto>,
-    liveTracks: List<UncachedTrackDto>,
+    canonicalTracks: List<CanonicalTrack>,
     playerConnection: PlayerConnection,
     currentTrackDto: TrackSummaryDto?,
     status: PlaybackStatus,
@@ -625,7 +615,10 @@ private fun SearchResultsContent(
     contentBottomPadding: Dp
 ) {
     val apiClient = LocalPeerlessApiClient.current
-    val isEmptyResult = !isSearching && cachedTracks.isEmpty() && liveTracks.isEmpty() && artistSpotlight == null
+    val coroutineScope = rememberCoroutineScope()
+    val cachedTracks = remember(canonicalTracks) { canonicalTracks.filter { it.isCached } }
+    val liveTracks = remember(canonicalTracks) { canonicalTracks.filter { !it.isCached } }
+    val isEmptyResult = !isSearching && canonicalTracks.isEmpty() && artistSpotlight == null
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -658,21 +651,40 @@ private fun SearchResultsContent(
                 )
             }
 
-            items(cachedTracks, key = { "cached_${it.id}" }) { track ->
-                val isPlaying = currentTrackDto?.id == track.id &&
+            items(cachedTracks, key = { "canonical_cached_${it.id}" }) { canonical ->
+                val activeSource = canonical.immediatePlaySource() ?: canonical.bestSource
+                val trackDto = canonical.toSummaryDto(activeSource)
+                val isPlaying = currentTrackDto?.id == trackDto.id &&
                         status == PlaybackStatus.PLAYING
 
                 TrackRow(
-                    track = track,
-                    artworkUrl = apiClient.getArtworkUrl(track, 200),
+                    canonicalTrack = canonical,
+                    artworkUrl = canonical.artworkUrl ?: apiClient.getArtworkUrl(trackDto, 200),
                     isPlaying = isPlaying,
-                    onTrackClick = {
-                        if (currentTrackDto?.id == it.id) {
+                    onTrackClick = { clickedCanonical ->
+                        val playSource = clickedCanonical.immediatePlaySource() ?: clickedCanonical.bestSource
+                        val playTrack = clickedCanonical.toTrack(playSource)
+                        if (currentTrackDto?.id == playTrack.id) {
                             playerConnection.togglePlayPause()
                         } else {
-                            playerConnection.play(it.toTrack(), cachedTracks.map { t -> t.toTrack() })
+                            playerConnection.play(playTrack, cachedTracks.map { it.toTrack() })
                         }
-                    }
+                        val bgRip = clickedCanonical.backgroundRipSource()
+                        if (bgRip != null) {
+                            coroutineScope.launch {
+                                apiClient.createRipTask(
+                                    provider = bgRip.provider.raw,
+                                    trackId = bgRip.providerTrackId,
+                                    codec = bgRip.codec.raw
+                                )
+                            }
+                        }
+                    },
+                    onSelectSource = { source ->
+                        val playTrack = canonical.toTrack(source)
+                        playerConnection.play(playTrack, cachedTracks.map { it.toTrack() })
+                    },
+                    onRipClick = onRipClick
                 )
             }
         }
@@ -688,21 +700,38 @@ private fun SearchResultsContent(
                 )
             }
 
-            items(liveTracks, key = { "live_${it.provider}_${it.track_id}" }) { uncached ->
-                val trackSummary = uncached.toTrackSummary()
-                val isPlaying = currentTrackDto?.id == trackSummary.id &&
+            items(liveTracks, key = { "canonical_live_${it.id}" }) { canonical ->
+                val activeSource = canonical.immediatePlaySource() ?: canonical.bestSource
+                val trackDto = canonical.toSummaryDto(activeSource)
+                val isPlaying = currentTrackDto?.id == trackDto.id &&
                         status == PlaybackStatus.PLAYING
 
                 TrackRow(
-                    track = trackSummary,
-                    artworkUrl = apiClient.getArtworkUrl(trackSummary, 200),
+                    canonicalTrack = canonical,
+                    artworkUrl = canonical.artworkUrl ?: apiClient.getArtworkUrl(trackDto, 200),
                     isPlaying = isPlaying,
-                    onTrackClick = {
-                        if (currentTrackDto?.id == it.id) {
+                    onTrackClick = { clickedCanonical ->
+                        val playSource = clickedCanonical.immediatePlaySource() ?: clickedCanonical.bestSource
+                        val playTrack = clickedCanonical.toTrack(playSource)
+                        if (currentTrackDto?.id == playTrack.id) {
                             playerConnection.togglePlayPause()
                         } else {
-                            playerConnection.play(it.toTrack(), emptyList())
+                            playerConnection.play(playTrack, emptyList())
                         }
+                        val bgRip = clickedCanonical.backgroundRipSource()
+                        if (bgRip != null) {
+                            coroutineScope.launch {
+                                apiClient.createRipTask(
+                                    provider = bgRip.provider.raw,
+                                    trackId = bgRip.providerTrackId,
+                                    codec = bgRip.codec.raw
+                                )
+                            }
+                        }
+                    },
+                    onSelectSource = { source ->
+                        val playTrack = canonical.toTrack(source)
+                        playerConnection.play(playTrack, emptyList())
                     },
                     onRipClick = onRipClick
                 )

@@ -1,20 +1,27 @@
 package org.shilpo.peerless.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import org.shilpo.peerless.theme.PillShape
+import androidx.compose.ui.unit.sp
 import org.shilpo.peerless.theme.SpecBadgeLargeTypography
 import org.shilpo.peerless.theme.SpecBadgeTypography
 
@@ -62,7 +69,9 @@ fun LosslessBadge(
     codec: String?,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
-    showTierTag: Boolean = true
+    showTierTag: Boolean = true,
+    provider: String? = null,
+    onClick: (() -> Unit)? = null
 ) {
     val tier = determineLosslessTier(bitDepth, sampleRate, codec)
     val colorScheme = MaterialTheme.colorScheme
@@ -71,8 +80,6 @@ fun LosslessBadge(
         LosslessTier.LOSSLESS -> colorScheme.secondary
         LosslessTier.HIGH_QUALITY -> colorScheme.primary
     }
-    val badgeBgColor = badgeAccentColor.copy(alpha = 0.12f)
-    val badgeBorderColor = badgeAccentColor.copy(alpha = 0.35f)
 
     val depthStr = formatBitDepth(bitDepth)
     val rateStr = formatSampleRate(sampleRate)
@@ -103,25 +110,91 @@ fun LosslessBadge(
         }
     }
 
-    val shape = if (compact) RoundedCornerShape(6.dp) else PillShape
+    val hasApple = provider?.contains("apple", ignoreCase = true) == true
+    val hasQobuz = provider?.contains("qobuz", ignoreCase = true) == true
+    val hasDolby = codec?.contains("ec-3", ignoreCase = true) == true ||
+            codec?.contains("ec3", ignoreCase = true) == true ||
+            codec?.contains("atmos", ignoreCase = true) == true
+
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
 
     Row(
         modifier = modifier
-            .background(badgeBgColor, shape)
-            .border(width = 1.dp, color = badgeBorderColor, shape = shape)
-            .padding(
-                horizontal = if (compact) 6.dp else 10.dp,
-                vertical = if (compact) 2.dp else 4.dp
+            .clip(RoundedCornerShape(8.dp))
+            .then(
+                if (onClick != null) {
+                    Modifier
+                        .background(if (isHovered) colorScheme.onSurfaceVariant.copy(alpha = 0.08f) else Color.Transparent)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = ripple(color = badgeAccentColor),
+                            onClick = onClick
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                } else {
+                    Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                }
             ),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Icon(
-            imageVector = PeerlessIcons.LosslessWave,
-            contentDescription = "Lossless Audio",
-            tint = badgeAccentColor,
-            modifier = Modifier.size(if (compact) 10.dp else 13.dp)
-        )
+        if (hasApple) {
+            Icon(
+                imageVector = PeerlessIcons.AppleLogo,
+                contentDescription = "Apple Music",
+                tint = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                modifier = Modifier.size(if (compact) 11.dp else 13.dp)
+            )
+        }
+        if (hasQobuz) {
+            Icon(
+                imageVector = PeerlessIcons.QobuzLogo,
+                contentDescription = "Qobuz",
+                tint = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                modifier = Modifier
+                    .height(if (compact) 10.dp else 12.dp)
+                    .width(if (compact) 25.dp else 30.dp)
+            )
+        }
+        if (provider != null && !hasApple && !hasQobuz && provider.isNotBlank()) {
+            Text(
+                text = formatProviderLabel(provider),
+                style = SpecBadgeTypography.copy(
+                    fontSize = if (compact) 8.5.sp else 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.3.sp
+                ),
+                color = colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+            )
+        }
+        if (hasDolby) {
+            Icon(
+                imageVector = PeerlessIcons.DolbyAtmos,
+                contentDescription = "Dolby Atmos",
+                tint = colorScheme.tertiary,
+                modifier = Modifier
+                    .height(if (compact) 9.dp else 11.dp)
+                    .width(if (compact) 14.dp else 17.dp)
+            )
+        }
+
+        if (tier == LosslessTier.HI_RES_LOSSLESS) {
+            Icon(
+                imageVector = PeerlessIcons.HiRes,
+                contentDescription = "Hi-Res Audio",
+                tint = badgeAccentColor,
+                modifier = Modifier.size(if (compact) 13.dp else 16.dp)
+            )
+        } else {
+            Icon(
+                imageVector = PeerlessIcons.LosslessWave,
+                contentDescription = "Lossless Audio",
+                tint = badgeAccentColor,
+                modifier = Modifier.size(if (compact) 11.dp else 13.dp)
+            )
+        }
 
         Text(
             text = labelText,

@@ -32,14 +32,16 @@ enum class Codec(val raw: String, val displayName: String) {
     Flac("flac", "FLAC"),
     Aac("aac", "AAC"),
     Opus("opus", "Opus"),
+    Ec3("ec3", "Dolby Atmos"),
     Unknown("unknown", "Unknown");
 
     companion object {
-        fun fromString(value: String): Codec = when (value.lowercase()) {
+        fun fromString(value: String): Codec = when (value.lowercase().trim()) {
             "alac" -> Alac
             "flac" -> Flac
             "aac" -> Aac
             "opus" -> Opus
+            "ec3", "ec-3", "eac3", "atmos", "dolby", "dolby atmos" -> Ec3
             else -> Unknown
         }
     }
@@ -56,6 +58,44 @@ enum class SearchFilter(val label: String, val providerQuery: String? = null) {
     CACHED("Cached")
 }
 
+fun sourceComparator(spatialSupported: Boolean = false): Comparator<TrackSource> = Comparator { a, b ->
+    if (spatialSupported) {
+        val aIsEc3 = a.codec == Codec.Ec3
+        val bIsEc3 = b.codec == Codec.Ec3
+        if (aIsEc3 != bIsEc3) {
+            return@Comparator if (aIsEc3) 1 else -1
+        }
+    }
+    val aSr = a.sampleRate ?: 44100
+    val bSr = b.sampleRate ?: 44100
+    if (aSr != bSr) {
+        return@Comparator aSr.compareTo(bSr)
+    }
+    val aBd = a.bitDepth ?: 16
+    val bBd = b.bitDepth ?: 16
+    if (aBd != bBd) {
+        return@Comparator aBd.compareTo(bBd)
+    }
+    val aCodecScore = when (a.codec) {
+        Codec.Alac -> 2
+        Codec.Flac -> 1
+        else -> 0
+    }
+    val bCodecScore = when (b.codec) {
+        Codec.Alac -> 2
+        Codec.Flac -> 1
+        else -> 0
+    }
+    if (aCodecScore != bCodecScore) {
+        return@Comparator aCodecScore.compareTo(bCodecScore)
+    }
+    0
+}
+
+fun isSourceSuperior(a: TrackSource, b: TrackSource, spatialSupported: Boolean = false): Boolean {
+    return sourceComparator(spatialSupported).compare(a, b) > 0
+}
+
 @Serializable
 data class AudioSpecs(
     val codec: Codec,
@@ -64,7 +104,7 @@ data class AudioSpecs(
     val bitrateKbps: Int? = null
 ) {
     val isHiRes: Boolean
-        get() = (bitDepth ?: 16) > 16 || (sampleRate ?: 44100) > 48000
+        get() = (bitDepth ?: 16) > 16 || (sampleRate ?: 44100) > 48000 || codec == Codec.Ec3
 
     val effectiveBitrateKbps: Int?
         get() {
@@ -76,13 +116,16 @@ data class AudioSpecs(
                 Codec.Flac -> (pcmBitrate * 0.65).toInt()
                 Codec.Aac -> 256
                 Codec.Opus -> 128
+                Codec.Ec3 -> 768
                 Codec.Unknown -> (pcmBitrate * 0.70).toInt()
             }
         }
 
     val badgeText: String
-        get() = buildString {
-            if (bitDepth != null) append("${bitDepth} BIT  ")
+        get() = if (codec == Codec.Ec3) {
+            "DOLBY ATMOS"
+        } else buildString {
+            if (bitDepth != null && bitDepth >= 24) append("${bitDepth} BIT  ")
             if (sampleRate != null) {
                 val khz = if (sampleRate % 1000 == 0) {
                     "${sampleRate / 1000}"
@@ -98,8 +141,10 @@ data class AudioSpecs(
         }.trim()
 
     val fullBadgeText: String
-        get() = buildString {
-            if (bitDepth != null) append("${bitDepth} BIT  ")
+        get() = if (codec == Codec.Ec3) {
+            "DOLBY ATMOS"
+        } else buildString {
+            if (bitDepth != null && bitDepth >= 24) append("${bitDepth} BIT  ")
             if (sampleRate != null) {
                 val khz = if (sampleRate % 1000 == 0) {
                     "${sampleRate / 1000}"
@@ -152,11 +197,69 @@ data class CanonicalTrack(
         get() = sources.any { it.isCached }
 
     val bestSource: TrackSource?
-        get() = sources.maxWithOrNull(
-            compareBy<TrackSource> { it.isCached }
-                .thenBy { it.bitDepth ?: 16 }
-                .thenBy { it.sampleRate ?: 44100 }
-        ) ?: sources.firstOrNull()
+        get() = resolveBestSource(sources, spatialSupported = false)
+
+    fun resolveBestSource(
+        candidateSources: List<TrackSource> = sources,
+        spatialSupported: Boolean = false
+    ): TrackSource? {
+        if (candidateSources.isEmpty()) return null
+        return candidateSources.maxWithOrNull(sourceComparator(spatialSupported)) ?: candidateSources.firstOrNull()
+    }
+
+    fun immediatePlaySource(spatialSupported: Boolean = false): TrackSource? {
+        val cached = sources.filter { it.isCached }
+        return if (cached.isNotEmpty()) {
+            resolveBestSource(cached, spatialSupported)
+        } else {
+            sources.firstOrNull()
+        }
+    }
+
+    fun backgroundRipSource(spatialSupported: Boolean = false): TrackSource? {
+        val overallBest = resolveBestSource(sources, spatialSupported) ?: return null
+        if (overallBest.isCached) return null
+        val immediate = immediatePlaySource(spatialSupported) ?: return overallBest
+        val cmp = sourceComparator(spatialSupported).compare(overallBest, immediate)
+        return if (cmp > 0) overallBest else null
+    }
+
+    fun toSummaryDto(preferredSource: TrackSource? = null): TrackSummaryDto {
+        val s = preferredSource ?: immediatePlaySource() ?: bestSource ?: sources.firstOrNull()
+        return TrackSummaryDto(
+            id = s?.id ?: (id.toIntOrNull() ?: 0),
+            provider = s?.provider?.raw ?: "unknown",
+            track_id = s?.providerTrackId ?: id,
+            title = title,
+            artist = artist,
+            album = album,
+            duration = durationSeconds,
+            codec = s?.codec?.raw ?: "flac",
+            bit_depth = s?.bitDepth,
+            sample_rate = s?.sampleRate,
+            is_cached = s?.isCached ?: isCached,
+            artwork_url = artworkUrl
+        )
+    }
+
+    fun toTrack(preferredSource: TrackSource? = null): Track {
+        val s = preferredSource ?: immediatePlaySource() ?: bestSource ?: sources.firstOrNull()
+        return Track(
+            id = s?.id ?: (id.toIntOrNull() ?: 0),
+            title = title,
+            artist = artist,
+            album = album,
+            durationSeconds = durationSeconds,
+            artworkUrl = artworkUrl,
+            codec = s?.codec ?: Codec.Alac,
+            bitDepth = s?.bitDepth,
+            sampleRate = s?.sampleRate,
+            bitrateKbps = s?.bitrateKbps,
+            provider = s?.provider ?: Provider.Apple,
+            providerTrackId = s?.providerTrackId ?: id,
+            isCached = s?.isCached ?: isCached
+        )
+    }
 }
 
 @Serializable
@@ -532,29 +635,169 @@ fun TrackDetailDto.toCanonicalTrack(baseUrl: String = ""): CanonicalTrack {
 }
 
 object CanonicalDeduplicator {
-    private fun normalize(str: String): String =
+    fun normalize(str: String): String =
         str.trim().lowercase().replace(Regex("\\s+"), " ")
 
-    private data class TrackMetadata(
-        var id: String,
+    data class DeduplicationItem(
+        val id: String,
         val title: String,
         val artist: String,
-        var album: String,
-        var durationSeconds: Int,
-        var artworkUrl: String? = null,
-        var isrc: String? = null
+        val album: String,
+        val durationSeconds: Int,
+        val artworkUrl: String? = null,
+        val isrc: String? = null,
+        val sources: List<TrackSource> = emptyList()
     )
+
+    fun matches(a: DeduplicationItem, b: DeduplicationItem): Boolean {
+        // 1) Same provider & providerTrackId
+        for (sa in a.sources) {
+            for (sb in b.sources) {
+                if (sa.provider != Provider.Unknown &&
+                    sa.provider == sb.provider &&
+                    sa.providerTrackId.isNotBlank() &&
+                    sa.providerTrackId == sb.providerTrackId
+                ) {
+                    return true
+                }
+            }
+        }
+
+        // 2) Same ISRC (when available and non-blank)
+        val aIsrc = a.isrc?.trim()
+        val bIsrc = b.isrc?.trim()
+        if (!aIsrc.isNullOrBlank() && !bIsrc.isNullOrBlank() &&
+            aIsrc.equals(bIsrc, ignoreCase = true)
+        ) {
+            return true
+        }
+
+        // 3) Normalized title + normalized artist + duration within 3 seconds (|durA - durB| <= 3)
+        val normTitleA = normalize(a.title)
+        val normTitleB = normalize(b.title)
+        val normArtistA = normalize(a.artist)
+        val normArtistB = normalize(b.artist)
+        if (normTitleA.isNotEmpty() && normTitleA == normTitleB &&
+            normArtistA.isNotEmpty() && normArtistA == normArtistB
+        ) {
+            if (a.durationSeconds <= 0 || b.durationSeconds <= 0 ||
+                kotlin.math.abs(a.durationSeconds - b.durationSeconds) <= 3
+            ) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    private class DisjointSet(n: Int) {
+        val parent = IntArray(n) { it }
+        fun find(i: Int): Int {
+            var root = i
+            while (root != parent[root]) {
+                root = parent[root]
+            }
+            var curr = i
+            while (curr != root) {
+                val next = parent[curr]
+                parent[curr] = root
+                curr = next
+            }
+            return root
+        }
+
+        fun union(i: Int, j: Int) {
+            val rootI = find(i)
+            val rootJ = find(j)
+            if (rootI != rootJ) {
+                parent[rootI] = rootJ
+            }
+        }
+    }
+
+    private fun groupItems(items: List<DeduplicationItem>): List<List<DeduplicationItem>> {
+        if (items.isEmpty()) return emptyList()
+        val n = items.size
+        val dsu = DisjointSet(n)
+        for (i in 0 until n) {
+            for (j in i + 1 until n) {
+                if (matches(items[i], items[j])) {
+                    dsu.union(i, j)
+                }
+            }
+        }
+        val groups = LinkedHashMap<Int, MutableList<DeduplicationItem>>()
+        for (i in 0 until n) {
+            val root = dsu.find(i)
+            groups.getOrPut(root) { mutableListOf() }.add(items[i])
+        }
+        return groups.values.toList()
+    }
+
+    private fun mergeGroup(group: List<DeduplicationItem>): CanonicalTrack {
+        val mergedSources = mutableListOf<TrackSource>()
+        for (item in group) {
+            for (s in item.sources) {
+                val existingIndex = mergedSources.indexOfFirst {
+                    it.provider == s.provider && it.providerTrackId == s.providerTrackId
+                }
+                if (existingIndex >= 0) {
+                    val existing = mergedSources[existingIndex]
+                    if (s.isCached && !existing.isCached) {
+                        mergedSources[existingIndex] = s
+                    } else if (s.isCached == existing.isCached) {
+                        if (sourceComparator(false).compare(s, existing) > 0) {
+                            mergedSources[existingIndex] = s
+                        }
+                    }
+                } else {
+                    mergedSources.add(s)
+                }
+            }
+        }
+
+        val sortedSources = mergedSources.sortedWith { a, b ->
+            if (a.isCached != b.isCached) {
+                if (a.isCached) -1 else 1
+            } else {
+                sourceComparator(false).compare(b, a)
+            }
+        }
+
+        val cachedItem = group.firstOrNull { it.sources.any { s -> s.isCached } } ?: group.first()
+        val bestItem = group.maxByOrNull { it.durationSeconds } ?: cachedItem
+
+        val id = group.firstNotNullOfOrNull { item ->
+            item.id.takeIf { it.isNotBlank() && !it.contains("_") }
+        } ?: cachedItem.id
+
+        val artworkUrl = group.firstNotNullOfOrNull { it.artworkUrl?.takeIf { u -> u.isNotBlank() } }
+        val isrc = group.firstNotNullOfOrNull { it.isrc?.takeIf { c -> c.isNotBlank() } }
+        val title = cachedItem.title.ifBlank { bestItem.title }
+        val artist = cachedItem.artist.ifBlank { bestItem.artist }
+        val album = group.firstNotNullOfOrNull { it.album.takeIf { a -> a.isNotBlank() } } ?: cachedItem.album
+        val duration = if (cachedItem.durationSeconds > 0) cachedItem.durationSeconds else bestItem.durationSeconds
+
+        return CanonicalTrack(
+            id = id,
+            title = title,
+            artist = artist,
+            album = album,
+            durationSeconds = duration,
+            artworkUrl = artworkUrl,
+            isrc = isrc,
+            sources = sortedSources
+        )
+    }
 
     fun deduplicate(
         cachedTracks: List<TrackSummaryDto>,
         liveTracks: List<UncachedTrackDto>,
         baseUrl: String = ""
     ): List<CanonicalTrack> {
-        val sourcesMap = LinkedHashMap<Pair<String, String>, MutableList<TrackSource>>()
-        val metadataMap = LinkedHashMap<Pair<String, String>, TrackMetadata>()
+        val items = mutableListOf<DeduplicationItem>()
 
         for (cached in cachedTracks) {
-            val key = normalize(cached.title) to normalize(cached.artist)
             val providerEnum = Provider.fromString(cached.provider)
             val codecEnum = Codec.fromString(cached.codec)
             val source = TrackSource(
@@ -566,44 +809,24 @@ object CanonicalDeduplicator {
                 sampleRate = cached.sample_rate,
                 isCached = cached.is_cached
             )
+            val artworkUrl = if (cached.id > 0 && baseUrl.isNotBlank()) {
+                "${baseUrl.trimEnd('/')}/api/v1/assets/tracks/${cached.id}/artwork"
+            } else cached.artwork_url
 
-            val existingSources = sourcesMap.getOrPut(key) { mutableListOf() }
-            if (existingSources.none { it.provider == source.provider && it.providerTrackId == source.providerTrackId }) {
-                existingSources.add(source)
-            }
-
-            if (!metadataMap.containsKey(key)) {
-                val artworkUrl = if (cached.id > 0 && baseUrl.isNotBlank()) {
-                    "${baseUrl.trimEnd('/')}/api/v1/assets/tracks/${cached.id}/artwork"
-                } else null
-
-                metadataMap[key] = TrackMetadata(
+            items.add(
+                DeduplicationItem(
                     id = if (cached.id > 0) cached.id.toString() else "${cached.provider}_${cached.track_id}",
                     title = cached.title,
                     artist = cached.artist,
                     album = cached.album,
                     durationSeconds = cached.duration,
-                    artworkUrl = artworkUrl
+                    artworkUrl = artworkUrl,
+                    sources = listOf(source)
                 )
-            } else {
-                val meta = metadataMap[key]!!
-                if (cached.id > 0 && meta.id.contains("_")) {
-                    meta.id = cached.id.toString()
-                    if (baseUrl.isNotBlank()) {
-                        meta.artworkUrl = "${baseUrl.trimEnd('/')}/api/v1/assets/tracks/${cached.id}/artwork"
-                    }
-                }
-                if (meta.album.isBlank() && cached.album.isNotBlank()) {
-                    meta.album = cached.album
-                }
-                if (meta.durationSeconds <= 0 && cached.duration > 0) {
-                    meta.durationSeconds = cached.duration
-                }
-            }
+            )
         }
 
         for (live in liveTracks) {
-            val key = normalize(live.title) to normalize(live.artist)
             val providerEnum = Provider.fromString(live.provider)
             val codecEnum = if (providerEnum == Provider.Qobuz) Codec.Flac else Codec.Alac
             val source = TrackSource(
@@ -613,50 +836,59 @@ object CanonicalDeduplicator {
                 codec = codecEnum,
                 isCached = false
             )
-
-            val existingSources = sourcesMap.getOrPut(key) { mutableListOf() }
-            if (existingSources.none { it.provider == source.provider && it.providerTrackId == source.providerTrackId }) {
-                existingSources.add(source)
-            }
-
-            if (!metadataMap.containsKey(key)) {
-                metadataMap[key] = TrackMetadata(
+            items.add(
+                DeduplicationItem(
                     id = "${live.provider}_${live.track_id}",
                     title = live.title,
                     artist = live.artist,
                     album = live.album,
-                    durationSeconds = live.duration
+                    durationSeconds = live.duration,
+                    artworkUrl = live.artwork_url,
+                    sources = listOf(source)
                 )
-            } else {
-                val meta = metadataMap[key]!!
-                if (meta.album.isBlank() && live.album.isNotBlank()) {
-                    meta.album = live.album
-                }
-                if (meta.durationSeconds <= 0 && live.duration > 0) {
-                    meta.durationSeconds = live.duration
-                }
-            }
-        }
-
-        return metadataMap.map { (key, meta) ->
-            val sources = sourcesMap[key] ?: emptyList()
-            val sortedSources = sources.sortedWith(
-                compareByDescending<TrackSource> { it.isCached }
-                    .thenByDescending { it.bitDepth ?: 16 }
-                    .thenByDescending { it.sampleRate ?: 44100 }
-            )
-
-            CanonicalTrack(
-                id = meta.id,
-                title = meta.title,
-                artist = meta.artist,
-                album = meta.album,
-                durationSeconds = meta.durationSeconds,
-                artworkUrl = meta.artworkUrl,
-                isrc = meta.isrc,
-                sources = sortedSources
             )
         }
+
+        return groupItems(items).map { mergeGroup(it) }
+    }
+
+    fun deduplicateTracks(
+        tracks: List<TrackSummaryDto>,
+        baseUrl: String = ""
+    ): List<CanonicalTrack> {
+        val cached = tracks.filter { it.is_cached }
+        val live = tracks.filter { !it.is_cached }.map {
+            UncachedTrackDto(
+                provider = it.provider,
+                item_id = it.track_id,
+                track_id = it.track_id,
+                title = it.title,
+                artist = it.artist,
+                album = it.album,
+                duration = it.duration,
+                is_cached = false,
+                artwork_url = it.artwork_url
+            )
+        }
+        return deduplicate(cached, live, baseUrl)
+    }
+
+    fun deduplicateCanonical(
+        tracks: List<CanonicalTrack>
+    ): List<CanonicalTrack> {
+        val items = tracks.map {
+            DeduplicationItem(
+                id = it.id,
+                title = it.title,
+                artist = it.artist,
+                album = it.album,
+                durationSeconds = it.durationSeconds,
+                artworkUrl = it.artworkUrl,
+                isrc = it.isrc,
+                sources = it.sources
+            )
+        }
+        return groupItems(items).map { mergeGroup(it) }
     }
 }
 

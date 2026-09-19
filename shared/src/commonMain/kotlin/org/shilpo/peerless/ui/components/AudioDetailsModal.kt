@@ -90,8 +90,17 @@ fun AudioDetailsModal(
                             .background(tierColor.copy(alpha = 0.16f))
                             .border(1.dp, tierBorder, PillShape)
                             .padding(horizontal = 8.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
+                        if (isHiRes) {
+                            Icon(
+                                imageVector = PeerlessIcons.HiRes,
+                                contentDescription = "Hi-Res Audio",
+                                tint = tierColor,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
                         Text(
                             text = if (isHiRes) "HI-RES AUDIO" else "LOSSLESS AUDIO",
                             style = SpecBadgeTypography.copy(
