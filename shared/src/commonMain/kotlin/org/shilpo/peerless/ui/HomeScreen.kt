@@ -32,7 +32,10 @@ import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.LocalPlayerConnection
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
-import org.shilpo.peerless.theme.*
+import org.shilpo.peerless.theme.ExpressiveTypography
+import org.shilpo.peerless.theme.PillShape
+import org.shilpo.peerless.theme.SpecBadgeTypography
+import org.shilpo.peerless.theme.SquircleShapeSmall
 import org.shilpo.peerless.ui.components.*
 
 val SampleLosslessLibrary = listOf(
@@ -190,7 +193,7 @@ fun HomeTopHeader(
                     .clip(SquircleShapeSmall)
                     .background(
                         Brush.linearGradient(
-                            listOf(PrimaryDark, TertiaryDark)
+                            listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
                         )
                     ),
                 contentAlignment = Alignment.Center
@@ -208,7 +211,7 @@ fun HomeTopHeader(
                 style = ExpressiveTypography.titleLarge,
                 fontWeight = FontWeight.Black,
                 letterSpacing = 2.sp,
-                color = OnSurfaceDark
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
 
@@ -220,15 +223,15 @@ fun HomeTopHeader(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(SurfaceContainerDark)
-                    .border(1.dp, OutlineVariantDark.copy(alpha = 0.6f), CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), CircleShape)
                     .clickable(onClick = onToggleStats),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = PeerlessIcons.Compass,
                     contentDescription = "Explore & Stats",
-                    tint = OnSurfaceVariantDark,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -237,15 +240,15 @@ fun HomeTopHeader(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(SurfaceContainerDark)
-                    .border(1.dp, OutlineVariantDark.copy(alpha = 0.6f), CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), CircleShape)
                     .clickable(onClick = onNavigateToSearch),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = PeerlessIcons.Search,
                     contentDescription = "Search",
-                    tint = OnSurfaceVariantDark,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -254,15 +257,15 @@ fun HomeTopHeader(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(SurfaceContainerDark)
-                    .border(1.dp, OutlineVariantDark.copy(alpha = 0.6f), CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), CircleShape)
                     .clickable(onClick = onOpenSettings),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = PeerlessIcons.Settings,
                     contentDescription = "Settings",
-                    tint = OnSurfaceVariantDark,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -290,7 +293,7 @@ fun QuickPicksCarousel(
             text = "Quick picks",
             style = ExpressiveTypography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = OnSurfaceDark,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(horizontal = 20.dp)
         )
 
@@ -341,10 +344,12 @@ fun QuickPickCard(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(SurfaceContainerHighDark)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .border(
                 1.dp,
-                if (isPlaying) PrimaryDark.copy(alpha = 0.6f) else OutlineVariantDark.copy(alpha = 0.5f),
+                if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant.copy(
+                    alpha = 0.5f
+                ),
                 MaterialTheme.shapes.extraLarge
             )
             .clickable(onClick = onClick)
@@ -378,7 +383,7 @@ fun QuickPickCard(
                 text = track.title,
                 style = ExpressiveTypography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -429,20 +434,20 @@ fun LosslessLibrarySectionHeader(
                 text = "Lossless Library",
                 style = ExpressiveTypography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = OnSurfaceDark
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Box(
                 modifier = Modifier
                     .clip(PillShape)
-                    .background(SurfaceContainerDark)
-                    .border(1.dp, OutlineVariantDark.copy(alpha = 0.5f), PillShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), PillShape)
                     .padding(horizontal = 8.dp, vertical = 2.dp)
             ) {
                 Text(
                     text = "$trackCount tracks",
                     style = SpecBadgeTypography.copy(fontSize = 9.sp),
-                    color = OnSurfaceVariantDark
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -452,14 +457,14 @@ fun LosslessLibrarySectionHeader(
                 SplitButtonDefaults.TonalLeadingButton(
                     onClick = onPlayAll,
                     colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = SurfaceContainerHighestDark,
-                        contentColor = OnSurfaceDark
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     )
                 ) {
                     Icon(
                         imageVector = PeerlessIcons.Play,
                         contentDescription = "Play all",
-                        tint = PrimaryDark,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
@@ -474,14 +479,14 @@ fun LosslessLibrarySectionHeader(
                 SplitButtonDefaults.TrailingButton(
                     onClick = onShuffle,
                     colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = SurfaceContainerDark,
-                        contentColor = OnSurfaceDark
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     )
                 ) {
                     Icon(
                         imageVector = PeerlessIcons.Shuffle,
                         contentDescription = "Shuffle",
-                        tint = OnSurfaceDark,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -577,13 +582,13 @@ fun HomeExpressiveContent(
                         Icon(
                             imageVector = PeerlessIcons.Search,
                             contentDescription = null,
-                            tint = OnSurfaceVariantDark.copy(alpha = 0.4f),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                             modifier = Modifier.size(36.dp)
                         )
                         Text(
                             text = "No matching lossless tracks found",
                             style = ExpressiveTypography.bodyMedium,
-                            color = OnSurfaceVariantDark
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -684,9 +689,9 @@ fun HomeScreen(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        SurfaceContainerLowestDark,
-                        BackgroundDark,
-                        SurfaceDark
+                        MaterialTheme.colorScheme.surfaceContainerLowest,
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.surface
                     )
                 )
             )

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -18,24 +19,44 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 object LiquidGlassDefaults {
-    val ContainerColor: Color = Color(0xFF14141B).copy(alpha = 0.78f)
-    val ElevatedContainerColor: Color = Color(0xFF181824).copy(alpha = 0.88f)
-    val SubtleContainerColor: Color = Color(0xFF0F0F16).copy(alpha = 0.65f)
-
-    val BorderBrush: Brush = Brush.verticalGradient(
+    val StaticContainerColor: Color = Color(0xFF14141B).copy(alpha = 0.78f)
+    val StaticBorderBrush: Brush = Brush.verticalGradient(
         listOf(
             Color.White.copy(alpha = 0.20f),
             Color.White.copy(alpha = 0.04f)
         )
     )
 
-    val AccentBorderBrush: Brush = Brush.verticalGradient(
-        listOf(
-            PrimaryDark.copy(alpha = 0.40f),
-            SecondaryDark.copy(alpha = 0.15f),
-            Color.White.copy(alpha = 0.04f)
+    val ContainerColor: Color
+        @Composable
+        get() = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.78f)
+
+    val ElevatedContainerColor: Color
+        @Composable
+        get() = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.88f)
+
+    val SubtleContainerColor: Color
+        @Composable
+        get() = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.65f)
+
+    val BorderBrush: Brush
+        @Composable
+        get() = Brush.verticalGradient(
+            listOf(
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)
+            )
         )
-    )
+
+    val AccentBorderBrush: Brush
+        @Composable
+        get() = Brush.verticalGradient(
+            listOf(
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.40f),
+                MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.10f)
+            )
+        )
 
     val SpecularSheenBrush: Brush = Brush.verticalGradient(
         listOf(
@@ -52,8 +73,8 @@ object LiquidGlassDefaults {
 
 fun Modifier.liquidGlass(
     shape: Shape = LiquidGlassDefaults.DefaultShape,
-    containerColor: Color = LiquidGlassDefaults.ContainerColor,
-    borderBrush: Brush = LiquidGlassDefaults.BorderBrush,
+    containerColor: Color = LiquidGlassDefaults.StaticContainerColor,
+    borderBrush: Brush = LiquidGlassDefaults.StaticBorderBrush,
     borderWidth: Dp = LiquidGlassDefaults.BorderWidth,
     specularSheen: Boolean = true
 ): Modifier = this
@@ -138,16 +159,17 @@ fun Modifier.ambientGlow(
 @Composable
 fun AmbientGlowBackground(
     modifier: Modifier = Modifier,
-    primaryGlow: Color = PrimaryDark,
-    secondaryGlow: Color = SecondaryDark,
-    tertiaryGlow: Color = TertiaryDark,
+    primaryGlow: Color = MaterialTheme.colorScheme.primary,
+    secondaryGlow: Color = MaterialTheme.colorScheme.secondary,
+    tertiaryGlow: Color = MaterialTheme.colorScheme.tertiary,
+    backgroundColor: Color = MaterialTheme.colorScheme.background,
     glowAlpha: Float = 0.25f,
     content: @Composable BoxScope.() -> Unit
 ) {
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(BackgroundDark)
+            .background(backgroundColor)
             .ambientGlow(
                 primaryGlow = primaryGlow,
                 secondaryGlow = secondaryGlow,

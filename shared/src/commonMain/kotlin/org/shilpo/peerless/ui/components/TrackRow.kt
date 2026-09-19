@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,7 +25,10 @@ import coil3.compose.AsyncImage
 import org.shilpo.peerless.model.AudioSpecs
 import org.shilpo.peerless.model.Codec
 import org.shilpo.peerless.model.TrackSummaryDto
-import org.shilpo.peerless.theme.*
+import org.shilpo.peerless.theme.ArtworkShape
+import org.shilpo.peerless.theme.ExpressiveTypography
+import org.shilpo.peerless.theme.PillShape
+import org.shilpo.peerless.theme.SpecBadgeTypography
 
 fun formatDuration(durationSeconds: Int): String {
     if (durationSeconds <= 0) return "00:00"
@@ -56,10 +60,11 @@ fun PowerampLosslessBadge(
         bitDepth = bitDepth,
         sampleRate = sampleRate
     )
+    val colorScheme = MaterialTheme.colorScheme
     val isHiRes = specs.isHiRes
-    val badgeAccent = if (isHiRes) LosslessGold else SecondaryDark
-    val badgeBg = if (isHiRes) Color(0x18FFD54F) else Color(0x184DD0E1)
-    val badgeBorder = if (isHiRes) LosslessGoldBorder else LosslessCyanBorder
+    val badgeAccent = if (isHiRes) colorScheme.tertiary else colorScheme.secondary
+    val badgeBg = badgeAccent.copy(alpha = 0.12f)
+    val badgeBorder = badgeAccent.copy(alpha = 0.35f)
 
     val formattedSpecs = if (compact) {
         buildString {
@@ -112,7 +117,7 @@ fun AnimatedEqualizer(
     isPlaying: Boolean,
     modifier: Modifier = Modifier,
     barCount: Int = 3,
-    color: Color = PrimaryDark,
+    color: Color = MaterialTheme.colorScheme.primary,
     barWidth: Dp = 3.dp,
     maxHeight: Dp = 14.dp
 ) {
@@ -199,13 +204,15 @@ fun TrackRow(
         )
     }
 
+    val colorScheme = MaterialTheme.colorScheme
+
     val rowBg by animateColorAsState(
-        targetValue = if (isPlaying) PrimaryDark.copy(alpha = 0.10f) else Color.Transparent,
+        targetValue = if (isPlaying) colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent,
         animationSpec = tween(200)
     )
 
     val rowBorderColor by animateColorAsState(
-        targetValue = if (isPlaying) PrimaryDark.copy(alpha = 0.30f) else Color.Transparent,
+        targetValue = if (isPlaying) colorScheme.primary.copy(alpha = 0.35f) else Color.Transparent,
         animationSpec = tween(200)
     )
 
@@ -226,13 +233,13 @@ fun TrackRow(
             modifier = Modifier
                 .size(52.dp)
                 .clip(ArtworkShape)
-                .background(SurfaceContainerHighestDark),
+                .background(colorScheme.surfaceContainerHighest),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = PeerlessIcons.MusicNote,
                 contentDescription = null,
-                tint = OnSurfaceVariantDark.copy(alpha = 0.4f),
+                tint = colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                 modifier = Modifier.size(24.dp)
             )
 
@@ -252,7 +259,7 @@ fun TrackRow(
                 ) {
                     AnimatedEqualizer(
                         isPlaying = true,
-                        color = PrimaryDark,
+                        color = colorScheme.primary,
                         barWidth = 3.dp,
                         maxHeight = 16.dp
                     )
@@ -275,7 +282,7 @@ fun TrackRow(
                     text = track.title,
                     style = ExpressiveTypography.titleMedium,
                     fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.SemiBold,
-                    color = if (isPlaying) PrimaryDark else OnSurfaceDark,
+                    color = if (isPlaying) colorScheme.primary else colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
@@ -287,14 +294,14 @@ fun TrackRow(
                         horizontalArrangement = Arrangement.spacedBy(3.dp),
                         modifier = Modifier
                             .clip(PillShape)
-                            .background(SecondaryDark.copy(alpha = 0.14f))
-                            .border(1.dp, SecondaryDark.copy(alpha = 0.45f), PillShape)
+                            .background(colorScheme.secondary.copy(alpha = 0.14f))
+                            .border(1.dp, colorScheme.secondary.copy(alpha = 0.45f), PillShape)
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Icon(
                             imageVector = PeerlessIcons.CloudDone,
                             contentDescription = "Cached",
-                            tint = SecondaryDark,
+                            tint = colorScheme.secondary,
                             modifier = Modifier.size(10.dp)
                         )
                         Text(
@@ -304,7 +311,7 @@ fun TrackRow(
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.5.sp
                             ),
-                            color = SecondaryDark,
+                            color = colorScheme.secondary,
                             maxLines = 1,
                             softWrap = false
                         )
@@ -318,8 +325,8 @@ fun TrackRow(
                             .background(
                                 Brush.horizontalGradient(
                                     listOf(
-                                        LosslessGold.copy(alpha = 0.20f),
-                                        TertiaryDark.copy(alpha = 0.25f)
+                                        colorScheme.tertiary.copy(alpha = 0.20f),
+                                        colorScheme.primary.copy(alpha = 0.20f)
                                     )
                                 )
                             )
@@ -327,8 +334,8 @@ fun TrackRow(
                                 1.dp,
                                 Brush.horizontalGradient(
                                     listOf(
-                                        LosslessGold.copy(alpha = 0.60f),
-                                        LosslessPurple.copy(alpha = 0.60f)
+                                        colorScheme.tertiary.copy(alpha = 0.60f),
+                                        colorScheme.primary.copy(alpha = 0.60f)
                                     )
                                 ),
                                 PillShape
@@ -345,7 +352,7 @@ fun TrackRow(
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.5.sp
                             ),
-                            color = LosslessGold,
+                            color = colorScheme.tertiary,
                             maxLines = 1,
                             softWrap = false
                         )
@@ -356,7 +363,7 @@ fun TrackRow(
             Text(
                 text = "${track.artist} • ${track.album}",
                 style = ExpressiveTypography.bodySmall,
-                color = OnSurfaceVariantDark.copy(alpha = 0.75f),
+                color = colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -376,8 +383,8 @@ fun TrackRow(
                 Row(
                     modifier = Modifier
                         .clip(PillShape)
-                        .background(SurfaceContainerDark)
-                        .border(1.dp, OutlineVariantDark.copy(alpha = 0.6f), PillShape)
+                        .background(colorScheme.surfaceContainer)
+                        .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.6f), PillShape)
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -388,7 +395,7 @@ fun TrackRow(
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 0.3.sp
                         ),
-                        color = OnSurfaceVariantDark.copy(alpha = 0.85f),
+                        color = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
                         maxLines = 1,
                         softWrap = false,
                         overflow = TextOverflow.Ellipsis
@@ -416,7 +423,7 @@ fun TrackRow(
                 Icon(
                     imageVector = if (isFav) PeerlessIcons.Heart else PeerlessIcons.HeartBorder,
                     contentDescription = if (isFav) "Remove from favorites" else "Add to favorites",
-                    tint = if (isFav) Color(0xFFFF5252) else OnSurfaceVariantDark.copy(alpha = 0.65f),
+                    tint = if (isFav) Color(0xFFFF5252) else colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -428,7 +435,7 @@ fun TrackRow(
                 Text(
                     text = formatDuration(track.duration),
                     style = ExpressiveTypography.labelSmall.copy(fontSize = 11.sp),
-                    color = if (isPlaying) PrimaryDark else OnSurfaceVariantDark.copy(alpha = 0.7f),
+                    color = if (isPlaying) colorScheme.primary else colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     maxLines = 1,
                     softWrap = false
                 )
@@ -439,7 +446,7 @@ fun TrackRow(
                             .clip(PillShape)
                             .background(
                                 Brush.horizontalGradient(
-                                    listOf(LosslessGold, TertiaryDark)
+                                    listOf(colorScheme.tertiary, colorScheme.primary)
                                 )
                             )
                             .clickable { onRipClick(track) }
@@ -453,7 +460,7 @@ fun TrackRow(
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 0.6.sp
                             ),
-                            color = Color(0xFF0E0E14)
+                            color = colorScheme.onTertiary
                         )
                     }
                 }
@@ -466,7 +473,7 @@ fun TrackRow(
                 Icon(
                     imageVector = PeerlessIcons.MoreVert,
                     contentDescription = "Track options",
-                    tint = OnSurfaceVariantDark.copy(alpha = 0.65f),
+                    tint = colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
                     modifier = Modifier.size(18.dp)
                 )
             }

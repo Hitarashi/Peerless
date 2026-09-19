@@ -59,6 +59,7 @@ fun PersistentBottomPlayer(
     onToggleRepeat: () -> Unit = {},
     onOpenNowPlaying: () -> Unit = {}
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     val isPlaying = status == PlaybackStatus.PLAYING
 
     val playButtonInteractionSource = remember { MutableInteractionSource() }
@@ -117,8 +118,8 @@ fun PersistentBottomPlayer(
                     modifier = Modifier
                         .size(54.dp)
                         .clip(SquircleShapeSmall)
-                        .background(SurfaceContainerDark)
-                        .border(1.dp, OutlineVariantDark.copy(alpha = 0.6f), SquircleShapeSmall),
+                        .background(colorScheme.surfaceContainer)
+                        .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.6f), SquircleShapeSmall),
                     contentAlignment = Alignment.Center
                 ) {
                     if (track != null) {
@@ -132,7 +133,7 @@ fun PersistentBottomPlayer(
                         Icon(
                             imageVector = PeerlessIcons.MusicNote,
                             contentDescription = null,
-                            tint = OnSurfaceVariantDark.copy(alpha = 0.3f),
+                            tint = colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -146,7 +147,7 @@ fun PersistentBottomPlayer(
                         text = track?.title ?: "No track playing",
                         style = ExpressiveTypography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = OnSurfaceDark,
+                        color = colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -158,7 +159,7 @@ fun PersistentBottomPlayer(
                         Text(
                             text = track?.artist ?: "Select a lossless track to begin",
                             style = ExpressiveTypography.bodySmall,
-                            color = OnSurfaceVariantDark,
+                            color = colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -193,7 +194,7 @@ fun PersistentBottomPlayer(
                         Icon(
                             imageVector = PeerlessIcons.Shuffle,
                             contentDescription = "Shuffle",
-                            tint = if (isShuffle) SecondaryDark else OnSurfaceVariantDark.copy(alpha = 0.5f),
+                            tint = if (isShuffle) colorScheme.secondary else colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -205,7 +206,7 @@ fun PersistentBottomPlayer(
                         Icon(
                             imageVector = PeerlessIcons.SkipPrevious,
                             contentDescription = "Previous Track",
-                            tint = OnSurfaceDark,
+                            tint = colorScheme.onSurface,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -215,7 +216,7 @@ fun PersistentBottomPlayer(
                             .scale(playButtonScale)
                             .size(42.dp)
                             .clip(SquircleShapeSmall)
-                            .background(PrimaryDark)
+                            .background(colorScheme.primary)
                             .clickable(
                                 interactionSource = playButtonInteractionSource,
                                 indication = ripple(),
@@ -225,7 +226,7 @@ fun PersistentBottomPlayer(
                     ) {
                         PlayPauseMorphIcon(
                             isPlaying = isPlaying,
-                            tint = OnPrimaryDark,
+                            tint = colorScheme.onPrimary,
                             size = 22.dp
                         )
                     }
@@ -237,7 +238,7 @@ fun PersistentBottomPlayer(
                         Icon(
                             imageVector = PeerlessIcons.SkipNext,
                             contentDescription = "Next Track",
-                            tint = OnSurfaceDark,
+                            tint = colorScheme.onSurface,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -249,7 +250,7 @@ fun PersistentBottomPlayer(
                         Icon(
                             imageVector = PeerlessIcons.Repeat,
                             contentDescription = "Repeat",
-                            tint = if (isRepeat) SecondaryDark else OnSurfaceVariantDark.copy(alpha = 0.5f),
+                            tint = if (isRepeat) colorScheme.secondary else colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -290,7 +291,7 @@ fun PersistentBottomPlayer(
                     Icon(
                         imageVector = if (volume <= 0.01f || isMuted) PeerlessIcons.VolumeMute else PeerlessIcons.VolumeUp,
                         contentDescription = "Volume",
-                        tint = OnSurfaceVariantDark,
+                        tint = colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -302,9 +303,9 @@ fun PersistentBottomPlayer(
                         onVolumeChange(it)
                     },
                     colors = SliderDefaults.colors(
-                        thumbColor = PrimaryDark,
-                        activeTrackColor = PrimaryDark,
-                        inactiveTrackColor = SurfaceContainerHighestDark
+                        thumbColor = colorScheme.primary,
+                        activeTrackColor = colorScheme.primary,
+                        inactiveTrackColor = colorScheme.surfaceContainerHighest
                     ),
                     modifier = Modifier
                         .width(85.dp)
@@ -317,7 +318,7 @@ fun PersistentBottomPlayer(
                     modifier = Modifier
                         .height(24.dp)
                         .width(1.dp)
-                        .background(OutlineVariantDark.copy(alpha = 0.6f))
+                        .background(colorScheme.outlineVariant.copy(alpha = 0.6f))
                 )
 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -392,6 +393,8 @@ fun ExpressiveWavySeekBar(
     val waveAmplitudePx = with(density) { waveAmplitude.dp.toPx() }
     val strokeWidthPx = with(density) { 3.dp.toPx() }
 
+    val colorScheme = MaterialTheme.colorScheme
+
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
@@ -400,7 +403,7 @@ fun ExpressiveWavySeekBar(
         Text(
             text = elapsedText,
             style = SpecBadgeTypography.copy(fontSize = 10.sp),
-            color = OnSurfaceVariantDark
+            color = colorScheme.onSurfaceVariant
         )
 
         Box(
@@ -443,7 +446,7 @@ fun ExpressiveWavySeekBar(
 
                 if (activeWidth < totalWidth) {
                     drawLine(
-                        color = SurfaceContainerHighestDark,
+                        color = colorScheme.surfaceContainerHighest,
                         start = Offset(activeWidth, centerY),
                         end = Offset(totalWidth, centerY),
                         strokeWidth = strokeWidthPx,
@@ -467,7 +470,7 @@ fun ExpressiveWavySeekBar(
                     drawPath(
                         path = path,
                         brush = Brush.horizontalGradient(
-                            listOf(PrimaryDark, SecondaryDark)
+                            listOf(colorScheme.primary, colorScheme.secondary)
                         ),
                         style = Stroke(
                             width = strokeWidthPx,
@@ -481,7 +484,7 @@ fun ExpressiveWavySeekBar(
                     val thumbRadius = if (isDragging) 6.dp.toPx() else 4.5.dp.toPx()
 
                     drawCircle(
-                        color = Color.White,
+                        color = colorScheme.onSurface,
                         radius = thumbRadius,
                         center = Offset(activeWidth, currentY)
                     )
@@ -492,7 +495,7 @@ fun ExpressiveWavySeekBar(
         Text(
             text = totalText,
             style = SpecBadgeTypography.copy(fontSize = 10.sp),
-            color = OnSurfaceVariantDark
+            color = colorScheme.onSurfaceVariant
         )
     }
 }
@@ -505,9 +508,10 @@ private fun SupportingPaneToggleButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val backgroundColor = if (isActive) PrimaryDark.copy(alpha = 0.22f) else Color.Transparent
-    val contentColor = if (isActive) PrimaryDark else OnSurfaceVariantDark.copy(alpha = 0.75f)
-    val borderColor = if (isActive) PrimaryDark.copy(alpha = 0.40f) else Color.Transparent
+    val colorScheme = MaterialTheme.colorScheme
+    val backgroundColor = if (isActive) colorScheme.primary.copy(alpha = 0.22f) else Color.Transparent
+    val contentColor = if (isActive) colorScheme.primary else colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+    val borderColor = if (isActive) colorScheme.primary.copy(alpha = 0.40f) else Color.Transparent
 
     Box(
         modifier = modifier

@@ -91,11 +91,11 @@ fun ProfileScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(BackgroundDark.copy(alpha = 0.95f))
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.95f))
             .ambientGlow(
-                primaryGlow = PrimaryDark,
-                secondaryGlow = SecondaryDark,
-                tertiaryGlow = TertiaryDark,
+                primaryGlow = MaterialTheme.colorScheme.primary,
+                secondaryGlow = MaterialTheme.colorScheme.secondary,
+                tertiaryGlow = MaterialTheme.colorScheme.tertiary,
                 glowAlpha = 0.22f
             )
             .statusBarsPadding()
@@ -125,7 +125,12 @@ fun ProfileScreen(
                             .size(34.dp)
                             .clip(SquircleShapeSmall)
                             .background(
-                                Brush.linearGradient(listOf(PrimaryDark, TertiaryDark))
+                                Brush.linearGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.tertiary
+                                    )
+                                )
                             ),
                         contentAlignment = Alignment.Center
                     ) {
@@ -142,7 +147,7 @@ fun ProfileScreen(
                         style = ExpressiveTypography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp,
-                        color = OnSurfaceDark
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
@@ -151,12 +156,12 @@ fun ProfileScreen(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(SurfaceContainerDark)
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
                 ) {
                     Icon(
                         imageVector = PeerlessIcons.Close,
                         contentDescription = "Close Profile",
-                        tint = OnSurfaceDark,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -191,7 +196,12 @@ fun ProfileScreen(
                                 .size(64.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    Brush.linearGradient(listOf(PrimaryDark, TertiaryDark))
+                                    Brush.linearGradient(
+                                        listOf(
+                                            MaterialTheme.colorScheme.primary,
+                                            MaterialTheme.colorScheme.tertiary
+                                        )
+                                    )
                                 )
                                 .border(
                                     width = 1.5.dp,
@@ -218,7 +228,7 @@ fun ProfileScreen(
                                 text = currentUser?.displayName ?: "Telegram Listener",
                                 style = ExpressiveTypography.titleLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = OnSurfaceDark,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -230,8 +240,12 @@ fun ProfileScreen(
                                 Row(
                                     modifier = Modifier
                                         .clip(PillShape)
-                                        .background(SecondaryDark.copy(alpha = 0.18f))
-                                        .border(1.dp, SecondaryDark.copy(alpha = 0.45f), PillShape)
+                                        .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.18f))
+                                        .border(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.secondary.copy(alpha = 0.45f),
+                                            PillShape
+                                        )
                                         .padding(horizontal = 8.dp, vertical = 2.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -239,13 +253,13 @@ fun ProfileScreen(
                                     Icon(
                                         imageVector = PeerlessIcons.CheckCircle,
                                         contentDescription = null,
-                                        tint = SecondaryDark,
+                                        tint = MaterialTheme.colorScheme.secondary,
                                         modifier = Modifier.size(10.dp)
                                     )
                                     Text(
                                         text = "TG ID: ${currentUser?.telegram_id ?: "—"}",
                                         style = SpecBadgeTypography.copy(fontSize = 8.5.sp),
-                                        color = SecondaryDark
+                                        color = MaterialTheme.colorScheme.secondary
                                     )
                                 }
 
@@ -253,14 +267,18 @@ fun ProfileScreen(
                                     Row(
                                         modifier = Modifier
                                             .clip(PillShape)
-                                            .background(SurfaceContainerDark)
-                                            .border(1.dp, OutlineVariantDark.copy(alpha = 0.5f), PillShape)
+                                            .background(MaterialTheme.colorScheme.surfaceContainer)
+                                            .border(
+                                                1.dp,
+                                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                                PillShape
+                                            )
                                             .padding(horizontal = 8.dp, vertical = 2.dp)
                                     ) {
                                         Text(
                                             text = "@${currentUser.username}",
                                             style = SpecBadgeTypography.copy(fontSize = 8.5.sp),
-                                            color = OnSurfaceVariantDark
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -269,7 +287,7 @@ fun ProfileScreen(
                             Text(
                                 text = "Connected to $serverUrl",
                                 style = SpecBadgeTypography.copy(fontSize = 8.5.sp),
-                                color = PrimaryDark,
+                                color = MaterialTheme.colorScheme.primary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -302,14 +320,14 @@ fun ProfileScreen(
                                 Icon(
                                     imageVector = PeerlessIcons.Speed,
                                     contentDescription = null,
-                                    tint = SecondaryDark,
+                                    tint = MaterialTheme.colorScheme.secondary,
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Text(
                                     text = "SERVER HEALTH TELEMETRY",
                                     style = SpecBadgeLargeTypography.copy(fontSize = 11.sp),
                                     fontWeight = FontWeight.Bold,
-                                    color = OnSurfaceDark,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     letterSpacing = 1.sp
                                 )
                             }
@@ -322,13 +340,14 @@ fun ProfileScreen(
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(16.dp),
                                         strokeWidth = 2.dp,
-                                        color = SecondaryDark
+                                        color = MaterialTheme.colorScheme.secondary
                                     )
                                 } else {
                                     val isHealthy =
                                         serverHealth?.status?.equals("healthy", ignoreCase = true) == true ||
                                                 serverHealth?.status?.equals("ok", ignoreCase = true) == true
-                                    val badgeColor = if (isHealthy) Color(0xFF69F0AE) else LosslessGold
+                                    val badgeColor =
+                                        if (isHealthy) Color(0xFF69F0AE) else MaterialTheme.colorScheme.tertiary
                                     val badgeText = if (isHealthy) "HEALTHY" else "DEGRADED"
 
                                     Row(
@@ -362,7 +381,7 @@ fun ProfileScreen(
                                     Icon(
                                         imageVector = PeerlessIcons.Compass,
                                         contentDescription = "Refresh telemetry",
-                                        tint = OnSurfaceVariantDark,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(16.dp)
                                     )
                                 }
@@ -381,7 +400,7 @@ fun ProfileScreen(
                                     value = "${serverHealth?.workers_available ?: 0} / ${serverHealth?.workers_total ?: 0}",
                                     subtitle = "Least-Loaded Pool (ADR 0007)",
                                     icon = PeerlessIcons.Dns,
-                                    accentColor = SecondaryDark,
+                                    accentColor = MaterialTheme.colorScheme.secondary,
                                     modifier = Modifier.weight(1f)
                                 )
 
@@ -390,7 +409,7 @@ fun ProfileScreen(
                                     value = "${serverHealth?.cache_entries ?: 0} entries",
                                     subtitle = "${formatBytesToMb(serverHealth?.cache_bytes ?: 0L)} MB memory",
                                     icon = PeerlessIcons.Memory,
-                                    accentColor = LosslessGold,
+                                    accentColor = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -401,7 +420,7 @@ fun ProfileScreen(
                                 value = formatUptime(serverHealth?.uptime_seconds ?: 0L),
                                 subtitle = "Continuous lossless daemon streaming uptime",
                                 icon = PeerlessIcons.LosslessWave,
-                                accentColor = PrimaryDark,
+                                accentColor = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
@@ -433,14 +452,14 @@ fun ProfileScreen(
                                 Icon(
                                     imageVector = PeerlessIcons.Devices,
                                     contentDescription = null,
-                                    tint = PrimaryDark,
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Text(
                                     text = "ACTIVE DEVICE SESSIONS",
                                     style = SpecBadgeLargeTypography.copy(fontSize = 11.sp),
                                     fontWeight = FontWeight.Bold,
-                                    color = OnSurfaceDark,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     letterSpacing = 1.sp
                                 )
                             }
@@ -449,14 +468,14 @@ fun ProfileScreen(
                             Row(
                                 modifier = Modifier
                                     .clip(PillShape)
-                                    .background(PrimaryDark.copy(alpha = 0.16f))
-                                    .border(1.dp, PrimaryDark.copy(alpha = 0.4f), PillShape)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f))
+                                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), PillShape)
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
                                 Text(
                                     text = "$sessionCount ACTIVE",
                                     style = SpecBadgeTypography.copy(fontSize = 8.5.sp),
-                                    color = PrimaryDark,
+                                    color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -522,7 +541,7 @@ fun ProfileScreen(
                         Text(
                             text = "Zero-Knowledge Session Termination. Purges all stored tokens, credentials, and configured daemon endpoints from this device. Reverts client to fresh onboarding gateway.",
                             style = ExpressiveTypography.bodySmall,
-                            color = OnSurfaceVariantDark
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
                         OutlinedButton(
@@ -584,7 +603,7 @@ fun ProfileScreen(
                     Text(
                         text = "This will immediately invalidate your session on the daemon, clear the secure hardware keystore, and erase the server URL. You will return to the onboarding gateway.",
                         style = ExpressiveTypography.bodyMedium,
-                        color = OnSurfaceVariantDark
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 },
                 confirmButton = {
@@ -616,7 +635,7 @@ fun ProfileScreen(
                         Text("Cancel")
                     }
                 },
-                containerColor = SurfaceContainerDark,
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
                 shape = RoundedCornerShape(20.dp)
             )
         }
@@ -635,8 +654,8 @@ private fun TelemetryMetricCard(
     Box(
         modifier = modifier
             .clip(SquircleShapeSmall)
-            .background(SurfaceContainerDark.copy(alpha = 0.6f))
-            .border(1.dp, OutlineVariantDark.copy(alpha = 0.4f), SquircleShapeSmall)
+            .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), SquircleShapeSmall)
             .padding(12.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -662,13 +681,13 @@ private fun TelemetryMetricCard(
                 text = value,
                 style = ExpressiveTypography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = OnSurfaceDark
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Text(
                 text = subtitle,
                 style = ExpressiveTypography.bodySmall.copy(fontSize = 10.sp),
-                color = OnSurfaceVariantDark,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -686,8 +705,8 @@ private fun SessionRowItem(
         modifier = modifier
             .fillMaxWidth()
             .clip(SquircleShapeSmall)
-            .background(SurfaceContainerDark.copy(alpha = 0.5f))
-            .border(1.dp, OutlineVariantDark.copy(alpha = 0.35f), SquircleShapeSmall)
+            .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), SquircleShapeSmall)
             .padding(12.dp)
     ) {
         Row(
@@ -699,13 +718,13 @@ private fun SessionRowItem(
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(PrimaryDark.copy(alpha = 0.15f)),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = PeerlessIcons.Devices,
                     contentDescription = null,
-                    tint = PrimaryDark,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -722,20 +741,20 @@ private fun SessionRowItem(
                         text = session.effectiveDevice,
                         style = ExpressiveTypography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = OnSurfaceDark
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
                     if (isCurrent) {
                         Row(
                             modifier = Modifier
                                 .clip(PillShape)
-                                .background(PrimaryDark.copy(alpha = 0.2f))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                                 .padding(horizontal = 6.dp, vertical = 1.dp)
                         ) {
                             Text(
                                 text = "THIS DEVICE",
                                 style = SpecBadgeTypography.copy(fontSize = 7.5.sp),
-                                color = PrimaryDark,
+                                color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -752,7 +771,7 @@ private fun SessionRowItem(
                 Text(
                     text = details,
                     style = ExpressiveTypography.bodySmall.copy(fontSize = 10.sp),
-                    color = OnSurfaceVariantDark,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

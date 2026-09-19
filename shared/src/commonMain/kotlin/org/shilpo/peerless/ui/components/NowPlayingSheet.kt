@@ -109,15 +109,17 @@ fun NowPlayingSheet(
     var cumulativeDragY by remember { mutableFloatStateOf(0f) }
     var hasTriggeredClose by remember { mutableStateOf(false) }
 
+    val colorScheme = MaterialTheme.colorScheme
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        SurfaceContainerLowestDark,
-                        BackgroundDark,
-                        SurfaceDark
+                        colorScheme.surfaceContainerLowest,
+                        colorScheme.surface,
+                        colorScheme.background
                     )
                 )
             )
@@ -165,12 +167,12 @@ fun NowPlayingSheet(
                     modifier = Modifier
                         .size(42.dp)
                         .clip(CircleShape)
-                        .background(SurfaceContainerDark)
+                        .background(colorScheme.surfaceContainer)
                 ) {
                     Icon(
                         imageVector = PeerlessIcons.ExpandMore,
                         contentDescription = "Collapse player",
-                        tint = OnSurfaceDark,
+                        tint = colorScheme.onSurface,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -179,14 +181,14 @@ fun NowPlayingSheet(
                     Text(
                         text = "PLAYING FROM",
                         style = ExpressiveTypography.labelSmall,
-                        color = OnSurfaceVariantDark.copy(alpha = 0.7f),
+                        color = colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         letterSpacing = 1.5.sp
                     )
                     Text(
                         text = track.provider.replace("_", " ").uppercase(),
                         style = ExpressiveTypography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = PrimaryDark
+                        color = colorScheme.primary
                     )
                 }
 
@@ -195,12 +197,12 @@ fun NowPlayingSheet(
                     modifier = Modifier
                         .size(42.dp)
                         .clip(CircleShape)
-                        .background(SurfaceContainerDark)
+                        .background(colorScheme.surfaceContainer)
                 ) {
                     Icon(
                         imageVector = PeerlessIcons.Settings,
                         contentDescription = "Playback settings",
-                        tint = OnSurfaceDark,
+                        tint = colorScheme.onSurface,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -214,18 +216,18 @@ fun NowPlayingSheet(
                     .shadow(
                         elevation = 24.dp,
                         shape = HeroArtworkShape,
-                        spotColor = PrimaryDark.copy(alpha = 0.35f),
-                        ambientColor = SecondaryDark.copy(alpha = 0.25f)
+                        spotColor = colorScheme.primary.copy(alpha = 0.35f),
+                        ambientColor = colorScheme.secondary.copy(alpha = 0.25f)
                     )
                     .clip(HeroArtworkShape)
-                    .background(SurfaceContainerHighDark)
-                    .border(1.dp, OutlineVariantDark, HeroArtworkShape),
+                    .background(colorScheme.surfaceContainerHigh)
+                    .border(1.dp, colorScheme.outlineVariant, HeroArtworkShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = PeerlessIcons.MusicNote,
                     contentDescription = null,
-                    tint = OnSurfaceVariantDark.copy(alpha = 0.3f),
+                    tint = colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                     modifier = Modifier.size(72.dp)
                 )
 
@@ -248,7 +250,7 @@ fun NowPlayingSheet(
                     text = track.title,
                     style = ExpressiveTypography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = OnSurfaceDark,
+                    color = colorScheme.onSurface,
                     textAlign = TextAlign.Center,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
@@ -258,7 +260,7 @@ fun NowPlayingSheet(
                     text = track.artist,
                     style = ExpressiveTypography.titleMedium,
                     fontWeight = FontWeight.Medium,
-                    color = PrimaryDark,
+                    color = colorScheme.primary,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -267,7 +269,7 @@ fun NowPlayingSheet(
                 Text(
                     text = track.album,
                     style = ExpressiveTypography.bodySmall,
-                    color = OnSurfaceVariantDark,
+                    color = colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -299,12 +301,12 @@ fun NowPlayingSheet(
                     modifier = Modifier
                         .size(34.dp)
                         .clip(CircleShape)
-                        .background(SurfaceContainerDark)
+                        .background(colorScheme.surfaceContainer)
                 ) {
                     Icon(
                         imageVector = if (isFav) PeerlessIcons.Heart else PeerlessIcons.HeartBorder,
                         contentDescription = if (isFav) "Remove favorite" else "Add favorite",
-                        tint = if (isFav) Color(0xFFFF5252) else OnSurfaceVariantDark.copy(alpha = 0.75f),
+                        tint = if (isFav) Color(0xFFFF5252) else colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -326,9 +328,9 @@ fun NowPlayingSheet(
                         onSeekTo(seekTarget)
                     },
                     colors = SliderDefaults.colors(
-                        thumbColor = PrimaryDark,
-                        activeTrackColor = PrimaryDark,
-                        inactiveTrackColor = SurfaceContainerHighestDark
+                        thumbColor = colorScheme.primary,
+                        activeTrackColor = colorScheme.primary,
+                        inactiveTrackColor = colorScheme.surfaceContainerHighest
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -344,12 +346,12 @@ fun NowPlayingSheet(
                     Text(
                         text = elapsedText,
                         style = SpecBadgeTypography,
-                        color = OnSurfaceVariantDark
+                        color = colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = remainingText,
                         style = SpecBadgeTypography,
-                        color = OnSurfaceVariantDark
+                        color = colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -370,7 +372,7 @@ fun NowPlayingSheet(
                     Icon(
                         imageVector = PeerlessIcons.Shuffle,
                         contentDescription = "Shuffle",
-                        tint = if (isShuffle) SecondaryDark else OnSurfaceVariantDark.copy(alpha = 0.6f),
+                        tint = if (isShuffle) colorScheme.secondary else colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -382,7 +384,7 @@ fun NowPlayingSheet(
                     Icon(
                         imageVector = PeerlessIcons.SkipPrevious,
                         contentDescription = "Previous Track",
-                        tint = OnSurfaceDark,
+                        tint = colorScheme.onSurface,
                         modifier = Modifier.size(30.dp)
                     )
                 }
@@ -392,7 +394,7 @@ fun NowPlayingSheet(
                         .scale(playButtonScale)
                         .size(68.dp)
                         .clip(SquircleShapeMedium)
-                        .background(PrimaryDark)
+                        .background(colorScheme.primary)
                         .clickable(
                             interactionSource = playButtonInteractionSource,
                             indication = ripple(),
@@ -402,7 +404,7 @@ fun NowPlayingSheet(
                 ) {
                     PlayPauseMorphIcon(
                         isPlaying = isPlaying,
-                        tint = OnPrimaryDark,
+                        tint = colorScheme.onPrimary,
                         size = 36.dp
                     )
                 }
@@ -414,7 +416,7 @@ fun NowPlayingSheet(
                     Icon(
                         imageVector = PeerlessIcons.SkipNext,
                         contentDescription = "Next Track",
-                        tint = OnSurfaceDark,
+                        tint = colorScheme.onSurface,
                         modifier = Modifier.size(30.dp)
                     )
                 }
@@ -425,7 +427,9 @@ fun NowPlayingSheet(
                 ) {
                     val repeatIcon = if (repeatMode == RepeatMode.ONE) PeerlessIcons.RepeatOne else PeerlessIcons.Repeat
                     val repeatTint =
-                        if (repeatMode != RepeatMode.OFF) SecondaryDark else OnSurfaceVariantDark.copy(alpha = 0.6f)
+                        if (repeatMode != RepeatMode.OFF) colorScheme.secondary else colorScheme.onSurfaceVariant.copy(
+                            alpha = 0.6f
+                        )
                     Icon(
                         imageVector = repeatIcon,
                         contentDescription = "Repeat",
@@ -440,8 +444,8 @@ fun NowPlayingSheet(
             Row(
                 modifier = Modifier
                     .clip(PillShape)
-                    .background(SurfaceContainerDark)
-                    .border(1.dp, OutlineVariantDark, PillShape)
+                    .background(colorScheme.surfaceContainer)
+                    .border(1.dp, colorScheme.outlineVariant, PillShape)
                     .clickable { onOpenSettings() }
                     .padding(horizontal = 14.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -451,19 +455,19 @@ fun NowPlayingSheet(
                     modifier = Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(SecondaryDark)
+                        .background(colorScheme.secondary)
                 )
 
                 Text(
                     text = "Authenticated Lossless Stream",
                     style = ExpressiveTypography.labelSmall,
-                    color = OnSurfaceDark
+                    color = colorScheme.onSurface
                 )
 
                 Text(
                     text = "•  $serverUrl",
                     style = SpecBadgeTypography.copy(fontSize = 9.sp),
-                    color = OnSurfaceVariantDark
+                    color = colorScheme.onSurfaceVariant
                 )
             }
         }

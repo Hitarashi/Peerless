@@ -55,11 +55,11 @@ fun AuthOnboardingScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(BackgroundDark)
+            .background(MaterialTheme.colorScheme.background)
             .ambientGlow(
-                primaryGlow = PrimaryDark,
-                secondaryGlow = SecondaryDark,
-                tertiaryGlow = TertiaryDark,
+                primaryGlow = MaterialTheme.colorScheme.primary,
+                secondaryGlow = MaterialTheme.colorScheme.secondary,
+                tertiaryGlow = MaterialTheme.colorScheme.tertiary,
                 glowAlpha = 0.30f
             )
             .statusBarsPadding()
@@ -86,7 +86,7 @@ fun AuthOnboardingScreen(
                         .clip(SquircleShapeLarge)
                         .background(
                             Brush.linearGradient(
-                                listOf(PrimaryDark, TertiaryDark)
+                                listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
                             )
                         )
                         .border(
@@ -111,22 +111,22 @@ fun AuthOnboardingScreen(
                     style = ExpressiveTypography.headlineSmall,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 2.sp,
-                    color = OnSurfaceDark,
+                    color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center
                 )
 
                 Text(
                     text = "Your private high-fidelity audio sanctuary",
                     style = ExpressiveTypography.bodyMedium,
-                    color = OnSurfaceVariantDark,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
 
                 Row(
                     modifier = Modifier
                         .clip(PillShape)
-                        .background(SurfaceContainerDark.copy(alpha = 0.8f))
-                        .border(1.dp, OutlineVariantDark.copy(alpha = 0.6f), PillShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.8f))
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), PillShape)
                         .padding(horizontal = 12.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -135,12 +135,12 @@ fun AuthOnboardingScreen(
                         modifier = Modifier
                             .size(6.dp)
                             .clip(CircleShape)
-                            .background(LosslessGold)
+                            .background(MaterialTheme.colorScheme.tertiary)
                     )
                     Text(
                         text = "24-BIT / 192KHZ DIRECT • TELEGRAM MTPROTO",
                         style = SpecBadgeTypography.copy(fontSize = 9.sp),
-                        color = LosslessGold,
+                        color = MaterialTheme.colorScheme.tertiary,
                         letterSpacing = 0.8.sp
                     )
                 }
@@ -197,7 +197,7 @@ fun AuthOnboardingScreen(
                                     Icon(
                                         imageVector = PeerlessIcons.Close,
                                         contentDescription = "Dismiss error",
-                                        tint = OnSurfaceVariantDark,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(16.dp)
                                     )
                                 }
@@ -206,7 +206,7 @@ fun AuthOnboardingScreen(
                             Text(
                                 text = errorText,
                                 style = ExpressiveTypography.bodyMedium,
-                                color = OnSurfaceDark
+                                color = MaterialTheme.colorScheme.onSurface
                             )
 
                             HorizontalDivider(color = Color(0xFFEF5350).copy(alpha = 0.25f))
@@ -216,22 +216,22 @@ fun AuthOnboardingScreen(
                                     text = "Troubleshooting:",
                                     style = ExpressiveTypography.labelSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = OnSurfaceVariantDark
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
                                     text = "• Ensure peerless-server daemon is running and reachable.",
                                     style = ExpressiveTypography.bodySmall.copy(fontSize = 11.5.sp),
-                                    color = OnSurfaceVariantDark
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
                                     text = "• Verify Telegram OTP hasn't expired (valid for 5 minutes).",
                                     style = ExpressiveTypography.bodySmall.copy(fontSize = 11.5.sp),
-                                    color = OnSurfaceVariantDark
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
                                     text = "• Confirm connection key format is valid Base64 or auth deep-link.",
                                     style = ExpressiveTypography.bodySmall.copy(fontSize = 11.5.sp),
-                                    color = OnSurfaceVariantDark
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -260,14 +260,14 @@ fun AuthOnboardingScreen(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(SecondaryDark.copy(alpha = 0.2f))
-                                .border(1.dp, SecondaryDark.copy(alpha = 0.4f), CircleShape),
+                                .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f))
+                                .border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = PeerlessIcons.Compass,
                                 contentDescription = null,
-                                tint = SecondaryDark,
+                                tint = MaterialTheme.colorScheme.secondary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -277,12 +277,12 @@ fun AuthOnboardingScreen(
                                 text = "Connect with Telegram",
                                 style = ExpressiveTypography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = OnSurfaceDark
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "Recommended • 1-tap seamless session",
                                 style = SpecBadgeTypography.copy(fontSize = 8.5.sp),
-                                color = SecondaryDark
+                                color = MaterialTheme.colorScheme.secondary
                             )
                         }
                     }
@@ -290,7 +290,7 @@ fun AuthOnboardingScreen(
                     Text(
                         text = "Open Telegram, start a session with /stream, and tap Open Peerless to pair this device instantly.",
                         style = ExpressiveTypography.bodyMedium,
-                        color = OnSurfaceVariantDark
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Button(
@@ -300,7 +300,7 @@ fun AuthOnboardingScreen(
                             .height(50.dp),
                         shape = SquircleShapeMedium,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = SecondaryDark,
+                            containerColor = MaterialTheme.colorScheme.secondary,
                             contentColor = Color(0xFF0E1A2E)
                         )
                     ) {
@@ -344,14 +344,14 @@ fun AuthOnboardingScreen(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(PrimaryDark.copy(alpha = 0.2f))
-                                .border(1.dp, PrimaryDark.copy(alpha = 0.4f), CircleShape),
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = PeerlessIcons.Key,
                                 contentDescription = null,
-                                tint = PrimaryDark,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -361,12 +361,12 @@ fun AuthOnboardingScreen(
                                 text = "Connection Key",
                                 style = ExpressiveTypography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = OnSurfaceDark
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "Paste Base64 payload or auth link",
                                 style = SpecBadgeTypography.copy(fontSize = 8.5.sp),
-                                color = PrimaryDark
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -381,7 +381,7 @@ fun AuthOnboardingScreen(
                             Text(
                                 text = "peerless://auth?data=... or Base64 key",
                                 style = ExpressiveTypography.bodyMedium,
-                                color = OnSurfaceVariantDark.copy(alpha = 0.5f)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                             )
                         },
                         singleLine = false,
@@ -389,12 +389,12 @@ fun AuthOnboardingScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = SquircleShapeSmall,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryDark,
-                            unfocusedBorderColor = OutlineVariantDark.copy(alpha = 0.7f),
-                            focusedContainerColor = SurfaceContainerDark.copy(alpha = 0.6f),
-                            unfocusedContainerColor = SurfaceContainerDark.copy(alpha = 0.4f),
-                            focusedTextColor = OnSurfaceDark,
-                            unfocusedTextColor = OnSurfaceDark
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.4f),
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                         ),
                         trailingIcon = {
                             if (connectionKey.isNotBlank()) {
@@ -402,7 +402,7 @@ fun AuthOnboardingScreen(
                                     Icon(
                                         imageVector = PeerlessIcons.Close,
                                         contentDescription = "Clear key",
-                                        tint = OnSurfaceVariantDark,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -426,9 +426,9 @@ fun AuthOnboardingScreen(
                                 .weight(1f)
                                 .height(48.dp),
                             shape = SquircleShapeSmall,
-                            border = BorderStroke(1.dp, OutlineVariantDark),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = OnSurfaceDark
+                                contentColor = MaterialTheme.colorScheme.onSurface
                             )
                         ) {
                             Row(
@@ -466,17 +466,17 @@ fun AuthOnboardingScreen(
                                 .height(48.dp),
                             shape = SquircleShapeSmall,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = PrimaryDark,
-                                contentColor = OnPrimaryDark,
-                                disabledContainerColor = PrimaryDark.copy(alpha = 0.3f),
-                                disabledContentColor = OnPrimaryDark.copy(alpha = 0.5f)
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
                             )
                         ) {
                             if (isLoading) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(20.dp),
                                     strokeWidth = 2.dp,
-                                    color = OnPrimaryDark
+                                    color = MaterialTheme.colorScheme.onPrimary
                                 )
                             } else {
                                 Text(
@@ -523,21 +523,21 @@ fun AuthOnboardingScreen(
                             Icon(
                                 imageVector = PeerlessIcons.Settings,
                                 contentDescription = null,
-                                tint = OnSurfaceVariantDark,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp)
                             )
                             Text(
                                 text = "Manual Server Configuration",
                                 style = ExpressiveTypography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = OnSurfaceDark
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
 
                         Icon(
                             imageVector = PeerlessIcons.ExpandMore,
                             contentDescription = if (isManualConfigExpanded) "Collapse" else "Expand",
-                            tint = OnSurfaceVariantDark,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
                                 .size(20.dp)
                                 .rotate(manualExpandRotation)
@@ -556,7 +556,7 @@ fun AuthOnboardingScreen(
                             Text(
                                 text = "Enter streaming daemon endpoint URL and single-use OTP generated via Telegram /stream.",
                                 style = ExpressiveTypography.bodySmall,
-                                color = OnSurfaceVariantDark
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
                             OutlinedTextField(
@@ -571,10 +571,10 @@ fun AuthOnboardingScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = SquircleShapeSmall,
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = PrimaryDark,
-                                    unfocusedBorderColor = OutlineVariantDark,
-                                    focusedTextColor = OnSurfaceDark,
-                                    unfocusedTextColor = OnSurfaceDark
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                                 )
                             )
 
@@ -590,10 +590,10 @@ fun AuthOnboardingScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = SquircleShapeSmall,
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = PrimaryDark,
-                                    unfocusedBorderColor = OutlineVariantDark,
-                                    focusedTextColor = OnSurfaceDark,
-                                    unfocusedTextColor = OnSurfaceDark
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                                 )
                             )
 
@@ -618,15 +618,15 @@ fun AuthOnboardingScreen(
                                     .height(46.dp),
                                 shape = SquircleShapeSmall,
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = PrimaryDark.copy(alpha = 0.85f),
-                                    contentColor = OnPrimaryDark
+                                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
                                 )
                             ) {
                                 if (isLoading) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(18.dp),
                                         strokeWidth = 2.dp,
-                                        color = OnPrimaryDark
+                                        color = MaterialTheme.colorScheme.onPrimary
                                     )
                                 } else {
                                     Text(
@@ -649,13 +649,13 @@ fun AuthOnboardingScreen(
                 Icon(
                     imageVector = PeerlessIcons.LosslessWave,
                     contentDescription = null,
-                    tint = OnSurfaceVariantDark.copy(alpha = 0.5f),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                     modifier = Modifier.size(14.dp)
                 )
                 Text(
                     text = "Zero-Knowledge Token Vault • Bit-Perfect Bitstream",
                     style = SpecBadgeTypography.copy(fontSize = 9.sp),
-                    color = OnSurfaceVariantDark.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
             }
         }

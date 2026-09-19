@@ -3,12 +3,10 @@ package org.shilpo.peerless.ui.shell
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -413,76 +411,6 @@ private fun CompactLayout(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-fun FloatingNavDock(
-    selectedDestination: NavigationDestination,
-    onSelectDestination: (NavigationDestination) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    HorizontalFloatingToolbar(
-        expanded = true,
-        colors = FloatingToolbarDefaults.standardFloatingToolbarColors(
-            toolbarContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            toolbarContentColor = MaterialTheme.colorScheme.onSurface
-        ),
-        shape = PillShape,
-        modifier = modifier
-            .padding(horizontal = 24.dp)
-            .height(58.dp)
-    ) {
-        NavigationDestination.PrimaryDestinations.forEach { dest ->
-            val isSelected = dest == selectedDestination
-            val pillColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else Color.Transparent
-            val iconTint =
-                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                    alpha = 0.65f
-                )
-            val borderColor =
-                if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.40f) else Color.Transparent
-
-            Box(
-                modifier = Modifier
-                    .clip(PillShape)
-                    .background(pillColor)
-                    .border(1.dp, borderColor, PillShape)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = { onSelectDestination(dest) }
-                    )
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = dest.icon,
-                        contentDescription = dest.title,
-                        tint = iconTint,
-                        modifier = Modifier.size(20.dp)
-                    )
-
-                    AnimatedVisibility(
-                        visible = isSelected,
-                        enter = expandHorizontally() + fadeIn(),
-                        exit = shrinkHorizontally() + fadeOut()
-                    ) {
-                        Text(
-                            text = dest.title,
-                            style = ExpressiveTypography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun MediumLayout(
     currentDestination: NavigationDestination,
@@ -520,7 +448,12 @@ private fun MediumLayout(
                             .size(40.dp)
                             .clip(SquircleShapeSmall)
                             .background(
-                                Brush.linearGradient(listOf(PrimaryDark, TertiaryDark))
+                                Brush.linearGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.tertiary
+                                    )
+                                )
                             ),
                         contentAlignment = Alignment.Center
                     ) {
@@ -532,8 +465,8 @@ private fun MediumLayout(
                         )
                     }
                 },
-                containerColor = SurfaceContainerLowestDark,
-                contentColor = OnSurfaceDark,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                contentColor = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
                     .width(76.dp)
                     .fillMaxHeight()
@@ -557,11 +490,11 @@ private fun MediumLayout(
                             )
                         },
                         colors = NavigationRailItemDefaults.colors(
-                            selectedIconColor = PrimaryDark,
-                            selectedTextColor = PrimaryDark,
-                            indicatorColor = PrimaryDark.copy(alpha = 0.20f),
-                            unselectedIconColor = OnSurfaceVariantDark.copy(alpha = 0.65f),
-                            unselectedTextColor = OnSurfaceVariantDark.copy(alpha = 0.65f)
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
                         )
                     )
                 }
@@ -584,8 +517,8 @@ private fun MediumLayout(
                         )
                     },
                     colors = NavigationRailItemDefaults.colors(
-                        unselectedIconColor = OnSurfaceVariantDark.copy(alpha = 0.75f),
-                        unselectedTextColor = OnSurfaceVariantDark.copy(alpha = 0.75f)
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
                     ),
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
@@ -782,11 +715,11 @@ private fun PersistentNavigationDrawer(
 ) {
     Box(
         modifier = modifier
-            .background(SurfaceContainerLowestDark)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
             .border(
                 width = 1.dp,
                 brush = Brush.horizontalGradient(
-                    listOf(Color.Transparent, OutlineVariantDark.copy(alpha = 0.5f))
+                    listOf(Color.Transparent, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 ),
                 shape = RectangleShape
             )
@@ -806,7 +739,12 @@ private fun PersistentNavigationDrawer(
                             .size(36.dp)
                             .clip(SquircleShapeSmall)
                             .background(
-                                Brush.linearGradient(listOf(PrimaryDark, TertiaryDark))
+                                Brush.linearGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.tertiary
+                                    )
+                                )
                             ),
                         contentAlignment = Alignment.Center
                     ) {
@@ -818,57 +756,28 @@ private fun PersistentNavigationDrawer(
                         )
                     }
 
-                    Column {
-                        Text(
-                            text = "PEERLESS",
-                            style = ExpressiveTypography.titleMedium,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 2.sp,
-                            color = OnSurfaceDark
-                        )
-                        Text(
-                            text = "BIT-PERFECT STREAMING",
-                            style = SpecBadgeTypography.copy(fontSize = 8.sp),
-                            color = SecondaryDark,
-                            letterSpacing = 1.sp
-                        )
-                    }
-                }
-
-                Row(
-                    modifier = Modifier
-                        .clip(PillShape)
-                        .background(SurfaceContainerDark)
-                        .border(1.dp, OutlineVariantDark, PillShape)
-                        .clickable { onOpenSettings() }
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(if (serverConnected) SecondaryDark else LosslessGold)
-                    )
-
                     Text(
-                        text = if (serverConnected) "DAEMON ONLINE" else "LOCAL DUMP CACHE",
-                        style = SpecBadgeTypography.copy(fontSize = 8.5.sp),
-                        color = if (serverConnected) SecondaryDark else LosslessGold
+                        text = "PEERLESS",
+                        style = ExpressiveTypography.titleMedium,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 2.sp,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
                 HorizontalDivider(
-                    color = OutlineVariantDark.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
 
                 NavigationDestination.PrimaryDestinations.forEach { dest ->
                     val isSelected = dest == selectedDestination
-                    val containerColor = if (isSelected) PrimaryDark.copy(alpha = 0.16f) else Color.Transparent
-                    val contentColor = if (isSelected) PrimaryDark else OnSurfaceVariantDark
-                    val borderColor = if (isSelected) PrimaryDark.copy(alpha = 0.35f) else Color.Transparent
+                    val containerColor =
+                        if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else Color.Transparent
+                    val contentColor =
+                        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    val borderColor =
+                        if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.35f) else Color.Transparent
 
                     Box(
                         modifier = Modifier
@@ -895,12 +804,12 @@ private fun PersistentNavigationDrawer(
                                     text = dest.title,
                                     style = ExpressiveTypography.labelLarge,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) OnSurfaceDark else contentColor
+                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else contentColor
                                 )
                                 Text(
                                     text = dest.subtitle,
                                     style = ExpressiveTypography.bodySmall.copy(fontSize = 10.sp),
-                                    color = OnSurfaceVariantDark.copy(alpha = 0.6f),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -915,8 +824,8 @@ private fun PersistentNavigationDrawer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(SquircleShapeSmall)
-                        .background(SurfaceContainerDark.copy(alpha = 0.8f))
-                        .border(1.dp, PrimaryDark.copy(alpha = 0.35f), SquircleShapeSmall)
+                        .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.8f))
+                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), SquircleShapeSmall)
                         .clickable { onOpenProfile() }
                         .padding(horizontal = 10.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -926,7 +835,14 @@ private fun PersistentNavigationDrawer(
                         modifier = Modifier
                             .size(28.dp)
                             .clip(CircleShape)
-                            .background(Brush.linearGradient(listOf(PrimaryDark, TertiaryDark))),
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.tertiary
+                                    )
+                                )
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -942,45 +858,23 @@ private fun PersistentNavigationDrawer(
                             text = "Account & Telemetry",
                             style = ExpressiveTypography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = OnSurfaceDark,
+                            color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "Sessions & Daemon",
                             style = SpecBadgeTypography.copy(fontSize = 7.5.sp),
-                            color = SecondaryDark
+                            color = MaterialTheme.colorScheme.secondary
                         )
                     }
 
                     Icon(
                         imageVector = PeerlessIcons.OpenInNew,
                         contentDescription = null,
-                        tint = OnSurfaceVariantDark,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(14.dp)
                     )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(SurfaceContainerDark.copy(alpha = 0.6f))
-                        .border(1.dp, OutlineVariantDark.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                        .padding(10.dp)
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            text = "AUDIO ENGINE",
-                            style = SpecBadgeTypography.copy(fontSize = 8.sp),
-                            color = SecondaryDark
-                        )
-                        Text(
-                            text = "24-BIT / 192KHZ DIRECT",
-                            style = SpecBadgeLargeTypography.copy(fontSize = 10.sp),
-                            color = OnSurfaceDark
-                        )
-                    }
                 }
             }
         }
@@ -1003,11 +897,11 @@ private fun SupportingPaneContainer(
 
     Box(
         modifier = modifier
-            .background(SurfaceContainerLowDark)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .border(
                 width = 1.dp,
                 brush = Brush.horizontalGradient(
-                    listOf(OutlineVariantDark.copy(alpha = 0.5f), Color.Transparent)
+                    listOf(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), Color.Transparent)
                 ),
                 shape = RectangleShape
             )
@@ -1033,7 +927,7 @@ private fun SupportingPaneContainer(
                     Icon(
                         imageVector = paneIcon,
                         contentDescription = null,
-                        tint = PrimaryDark,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
 
@@ -1041,7 +935,7 @@ private fun SupportingPaneContainer(
                         text = paneType.title,
                         style = ExpressiveTypography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = OnSurfaceDark
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
@@ -1052,13 +946,13 @@ private fun SupportingPaneContainer(
                     Icon(
                         imageVector = PeerlessIcons.Close,
                         contentDescription = "Close supporting pane",
-                        tint = OnSurfaceVariantDark,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )
                 }
             }
 
-            HorizontalDivider(color = OutlineVariantDark.copy(alpha = 0.4f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
             Box(
                 modifier = Modifier
@@ -1116,13 +1010,13 @@ private fun QueuePaneContent(
                 Icon(
                     imageVector = PeerlessIcons.Queue,
                     contentDescription = null,
-                    tint = OnSurfaceVariantDark.copy(alpha = 0.4f),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                     modifier = Modifier.size(36.dp)
                 )
                 Text(
                     text = "Queue is empty",
                     style = ExpressiveTypography.bodyMedium,
-                    color = OnSurfaceVariantDark
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -1154,7 +1048,7 @@ private fun LyricsPaneContent(currentTrack: TrackSummaryDto?) {
             Text(
                 text = "Play a track to view synced lyrics",
                 style = ExpressiveTypography.bodyMedium,
-                color = OnSurfaceVariantDark
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     } else {
@@ -1169,14 +1063,14 @@ private fun LyricsPaneContent(currentTrack: TrackSummaryDto?) {
                 text = currentTrack.title,
                 style = ExpressiveTypography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = OnSurfaceDark,
+                color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center
             )
 
             Text(
                 text = currentTrack.artist,
                 style = ExpressiveTypography.bodyMedium,
-                color = PrimaryDark,
+                color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.Center
             )
 
@@ -1196,7 +1090,9 @@ private fun LyricsPaneContent(currentTrack: TrackSummaryDto?) {
                     text = line,
                     style = if (isActive) ExpressiveTypography.titleMedium else ExpressiveTypography.bodyLarge,
                     fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                    color = if (isActive) PrimaryDark else OnSurfaceVariantDark.copy(alpha = 0.5f),
+                    color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                        alpha = 0.5f
+                    ),
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1219,7 +1115,7 @@ private fun SignalPathPaneContent(
             Text(
                 text = "No active audio stream to inspect",
                 style = ExpressiveTypography.bodyMedium,
-                color = OnSurfaceVariantDark
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     } else {
@@ -1235,7 +1131,7 @@ private fun SignalPathPaneContent(
                 stageName = "SOURCE ORIGIN",
                 primaryInfo = if (track.is_cached) "Telegram Dump Channel (Instant)" else "${track.provider.uppercase()} Mirror",
                 secondaryInfo = "Endpoint: $serverUrl • HMAC Signed Ticket",
-                accentColor = SecondaryDark
+                accentColor = MaterialTheme.colorScheme.secondary
             )
 
             val codec = playbackInfo?.codec ?: track.codec
@@ -1246,7 +1142,7 @@ private fun SignalPathPaneContent(
                 stageName = "CONTAINER & CODEC",
                 primaryInfo = "${codec.uppercase()} Lossless",
                 secondaryInfo = "${bitDepth ?: 24}-Bit • ${((sampleRate ?: 96000) / 1000.0)} kHz • 2.0 Stereo",
-                accentColor = LosslessGold
+                accentColor = MaterialTheme.colorScheme.tertiary
             )
 
             SignalPathStageCard(
@@ -1254,7 +1150,7 @@ private fun SignalPathPaneContent(
                 stageName = "PLATFORM DECODER",
                 primaryInfo = "Native Multiplatform Audio Engine",
                 secondaryInfo = "Bit-perfect PCM Uncompressed Buffer",
-                accentColor = PrimaryDark
+                accentColor = MaterialTheme.colorScheme.primary
             )
 
             SignalPathStageCard(
@@ -1262,7 +1158,7 @@ private fun SignalPathPaneContent(
                 stageName = "STREAM PIPE / CACHE",
                 primaryInfo = "HTTP Chunk Buffer (Chunked Transfer)",
                 secondaryInfo = "Latency: <120ms • Gapless Engine Active",
-                accentColor = SecondaryDark
+                accentColor = MaterialTheme.colorScheme.secondary
             )
 
             SignalPathStageCard(
@@ -1270,7 +1166,7 @@ private fun SignalPathPaneContent(
                 stageName = "OUTPUT & SINK",
                 primaryInfo = "Hardware Audio Sink",
                 secondaryInfo = "High-Res Direct Path • No Resampling",
-                accentColor = TertiaryDark
+                accentColor = MaterialTheme.colorScheme.tertiary
             )
         }
     }
@@ -1288,8 +1184,8 @@ private fun SignalPathStageCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(SquircleShapeSmall)
-            .background(SurfaceContainerDark)
-            .border(1.dp, OutlineVariantDark.copy(alpha = 0.5f), SquircleShapeSmall)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), SquircleShapeSmall)
             .padding(12.dp)
     ) {
         Row(
@@ -1323,12 +1219,12 @@ private fun SignalPathStageCard(
                     text = primaryInfo,
                     style = ExpressiveTypography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = OnSurfaceDark
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = secondaryInfo,
                     style = ExpressiveTypography.bodySmall.copy(fontSize = 10.5.sp),
-                    color = OnSurfaceVariantDark
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -1504,7 +1400,7 @@ private fun LibraryDestinationView(
                 Box(
                     modifier = Modifier
                         .clip(PillShape)
-                        .background(if (isSelected) PrimaryDark else SurfaceContainerDark)
+                        .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer)
                         .clickable { selectedTab = tab }
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
@@ -1512,7 +1408,7 @@ private fun LibraryDestinationView(
                         text = if (tab == "Favorites" && favorites.isNotEmpty()) "Favorites (${favorites.size})" else tab,
                         style = ExpressiveTypography.labelMedium,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isSelected) OnPrimaryDark else OnSurfaceVariantDark
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -1528,7 +1424,7 @@ private fun LibraryDestinationView(
             ) {
                 if (isFavoritesLoading) {
                     CircularProgressIndicator(
-                        color = PrimaryDark,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(32.dp)
                     )
                 } else {
@@ -1541,13 +1437,13 @@ private fun LibraryDestinationView(
                             modifier = Modifier
                                 .size(56.dp)
                                 .clip(CircleShape)
-                                .background(SurfaceContainerDark),
+                                .background(MaterialTheme.colorScheme.surfaceContainer),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = PeerlessIcons.Heart,
                                 contentDescription = null,
-                                tint = OnSurfaceVariantDark.copy(alpha = 0.5f),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                                 modifier = Modifier.size(28.dp)
                             )
                         }
@@ -1556,13 +1452,13 @@ private fun LibraryDestinationView(
                             text = "No Favorite Tracks Yet",
                             style = ExpressiveTypography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = OnSurfaceDark
+                            color = MaterialTheme.colorScheme.onSurface
                         )
 
                         Text(
                             text = "Tap the heart icon on any track in Search or Home to bookmark it in your personal high-fidelity library.",
                             style = ExpressiveTypography.bodyMedium,
-                            color = OnSurfaceVariantDark,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )
                     }
@@ -1626,7 +1522,7 @@ private fun SettingsDestinationView(
             text = "Settings & Configuration",
             style = ExpressiveTypography.headlineMedium,
             fontWeight = FontWeight.Bold,
-            color = OnSurfaceDark
+            color = MaterialTheme.colorScheme.onSurface
         )
 
         // Telegram Account & Telemetry Card
@@ -1634,8 +1530,8 @@ private fun SettingsDestinationView(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(SquircleShapeMedium)
-                .background(SurfaceContainerDark)
-                .border(1.dp, PrimaryDark.copy(alpha = 0.4f), SquircleShapeMedium)
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), SquircleShapeMedium)
                 .clickable { onOpenProfile() }
                 .padding(16.dp)
         ) {
@@ -1652,7 +1548,14 @@ private fun SettingsDestinationView(
                         modifier = Modifier
                             .size(42.dp)
                             .clip(CircleShape)
-                            .background(Brush.linearGradient(listOf(PrimaryDark, TertiaryDark))),
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.tertiary
+                                    )
+                                )
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -1668,12 +1571,12 @@ private fun SettingsDestinationView(
                             text = "Telegram Account & Telemetry",
                             style = ExpressiveTypography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = OnSurfaceDark
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "View active device sessions, daemon metrics, and logout",
                             style = ExpressiveTypography.bodySmall,
-                            color = OnSurfaceVariantDark
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -1681,7 +1584,7 @@ private fun SettingsDestinationView(
                 Icon(
                     imageVector = PeerlessIcons.OpenInNew,
                     contentDescription = "Open profile",
-                    tint = PrimaryDark,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -1691,8 +1594,8 @@ private fun SettingsDestinationView(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(SquircleShapeMedium)
-                .background(SurfaceContainerDark)
-                .border(1.dp, OutlineVariantDark, SquircleShapeMedium)
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, SquircleShapeMedium)
                 .clickable { onOpenSettingsDialog() }
                 .padding(16.dp)
         ) {
@@ -1706,25 +1609,25 @@ private fun SettingsDestinationView(
                         text = "Streaming Daemon",
                         style = ExpressiveTypography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = OnSurfaceDark
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = if (serverConnected) "ONLINE" else "DISCONNECTED",
                         style = SpecBadgeTypography,
-                        color = if (serverConnected) SecondaryDark else LosslessGold
+                        color = if (serverConnected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary
                     )
                 }
 
                 Text(
                     text = if (serverUrl.isNotBlank()) "Endpoint: $serverUrl" else "Endpoint: Unconfigured",
                     style = ExpressiveTypography.bodyMedium,
-                    color = OnSurfaceVariantDark
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Text(
                     text = "Verified Session & HMAC Ticket Auth Active",
                     style = ExpressiveTypography.bodySmall,
-                    color = PrimaryDark
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -1733,8 +1636,8 @@ private fun SettingsDestinationView(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(SquircleShapeMedium)
-                .background(SurfaceContainerDark)
-                .border(1.dp, OutlineVariantDark, SquircleShapeMedium)
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, SquircleShapeMedium)
                 .padding(16.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1742,12 +1645,12 @@ private fun SettingsDestinationView(
                     text = "Audio Engine Capabilities",
                     style = ExpressiveTypography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = OnSurfaceDark
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "• Hi-Res PCM 24-bit / 192kHz output\n• FLAC & Apple Lossless (ALAC) gapless playback\n• Poweramp Signal Path Real-Time Inspector",
                     style = ExpressiveTypography.bodyMedium,
-                    color = OnSurfaceVariantDark
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

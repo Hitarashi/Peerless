@@ -3,6 +3,7 @@ package org.shilpo.peerless.theme
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Canvas
@@ -75,7 +76,7 @@ private val artworkColorCache = mutableMapOf<String, Color>()
 @Composable
 fun rememberArtworkSeedColor(
     artworkUrl: String?,
-    fallbackColor: Color = PrimaryDark
+    fallbackColor: Color = MaterialTheme.colorScheme.primary
 ): Color {
     val cached = remember(artworkUrl) {
         if (!artworkUrl.isNullOrBlank()) artworkColorCache[artworkUrl] else null

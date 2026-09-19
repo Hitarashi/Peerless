@@ -8,13 +8,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import org.shilpo.peerless.theme.*
+import org.shilpo.peerless.theme.PillShape
+import org.shilpo.peerless.theme.SpecBadgeLargeTypography
+import org.shilpo.peerless.theme.SpecBadgeTypography
 
 enum class LosslessTier {
     HI_RES_LOSSLESS,
@@ -63,11 +65,14 @@ fun LosslessBadge(
     showTierTag: Boolean = true
 ) {
     val tier = determineLosslessTier(bitDepth, sampleRate, codec)
-    val (badgeAccentColor, badgeBgColor, badgeBorderColor) = when (tier) {
-        LosslessTier.HI_RES_LOSSLESS -> Triple(LosslessGold, Color(0x18FFD54F), LosslessGoldBorder)
-        LosslessTier.LOSSLESS -> Triple(SecondaryDark, Color(0x184DD0E1), LosslessCyanBorder)
-        LosslessTier.HIGH_QUALITY -> Triple(PrimaryDark, Color(0x14D0BCFF), LosslessPurpleBorder)
+    val colorScheme = MaterialTheme.colorScheme
+    val badgeAccentColor = when (tier) {
+        LosslessTier.HI_RES_LOSSLESS -> colorScheme.tertiary
+        LosslessTier.LOSSLESS -> colorScheme.secondary
+        LosslessTier.HIGH_QUALITY -> colorScheme.primary
     }
+    val badgeBgColor = badgeAccentColor.copy(alpha = 0.12f)
+    val badgeBorderColor = badgeAccentColor.copy(alpha = 0.35f)
 
     val depthStr = formatBitDepth(bitDepth)
     val rateStr = formatSampleRate(sampleRate)

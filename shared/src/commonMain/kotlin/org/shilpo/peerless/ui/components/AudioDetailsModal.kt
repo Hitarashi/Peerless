@@ -4,16 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,16 +35,17 @@ fun AudioDetailsModal(
         bitDepth = track.bit_depth,
         sampleRate = track.sample_rate
     )
+    val colorScheme = MaterialTheme.colorScheme
     val isHiRes = specs.isHiRes
-    val tierColor = if (isHiRes) LosslessGold else SecondaryDark
-    val tierBorder = if (isHiRes) LosslessGoldBorder else LosslessCyanBorder
+    val tierColor = if (isHiRes) colorScheme.tertiary else colorScheme.secondary
+    val tierBorder = tierColor.copy(alpha = 0.35f)
 
     Dialog(onDismissRequest = onDismiss) {
         LiquidGlassSurface(
             shape = SquircleShapeLarge,
-            containerColor = SurfaceContainerHighestDark.copy(alpha = 0.95f),
+            containerColor = colorScheme.surfaceContainerHigh.copy(alpha = 0.95f),
             borderBrush = Brush.verticalGradient(
-                listOf(tierColor.copy(alpha = 0.5f), OutlineVariantDark)
+                listOf(tierColor.copy(alpha = 0.5f), colorScheme.outlineVariant)
             ),
             modifier = Modifier
                 .widthIn(min = 320.dp, max = 460.dp)
@@ -110,7 +107,7 @@ fun AudioDetailsModal(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(SquircleShapeMedium)
-                        .background(SurfaceContainerHighDark)
+                        .background(colorScheme.surfaceContainerHigh)
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -119,13 +116,13 @@ fun AudioDetailsModal(
                         modifier = Modifier
                             .size(54.dp)
                             .clip(ArtworkShape)
-                            .background(SurfaceContainerLowestDark),
+                            .background(colorScheme.surfaceContainerLowest),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = PeerlessIcons.MusicNote,
                             contentDescription = null,
-                            tint = OnSurfaceVariantDark.copy(alpha = 0.4f),
+                            tint = colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                             modifier = Modifier.size(24.dp)
                         )
                         if (!artworkUrl.isNullOrBlank()) {
@@ -146,21 +143,21 @@ fun AudioDetailsModal(
                             text = track.title,
                             style = ExpressiveTypography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = OnSurfaceDark,
+                            color = colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = track.artist,
                             style = ExpressiveTypography.bodyMedium,
-                            color = PrimaryDark,
+                            color = colorScheme.primary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = track.album,
                             style = ExpressiveTypography.bodySmall,
-                            color = OnSurfaceVariantDark,
+                            color = colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -171,8 +168,8 @@ fun AudioDetailsModal(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(SquircleShapeMedium)
-                        .background(Color(0xFF0D0D14))
-                        .border(1.dp, OutlineVariantDark.copy(alpha = 0.6f), SquircleShapeMedium)
+                        .background(colorScheme.surfaceContainer)
+                        .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.6f), SquircleShapeMedium)
                         .padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -203,7 +200,7 @@ fun AudioDetailsModal(
                     Text(
                         text = "Dismiss",
                         style = ExpressiveTypography.labelLarge,
-                        color = OnSurfaceVariantDark,
+                        color = colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .clickable { onDismiss() }
                             .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -216,8 +213,8 @@ fun AudioDetailsModal(
                                 onDismiss()
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = PrimaryDark,
-                                contentColor = OnPrimaryDark
+                                containerColor = colorScheme.primary,
+                                contentColor = colorScheme.onPrimary
                             ),
                             shape = PillShape
                         ) {
@@ -238,6 +235,7 @@ fun AudioDetailsModal(
 
 @Composable
 private fun SpecRow(label: String, value: String) {
+    val colorScheme = MaterialTheme.colorScheme
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -247,7 +245,7 @@ private fun SpecRow(label: String, value: String) {
             text = label,
             style = SpecBadgeTypography.copy(
                 fontSize = 9.sp,
-                color = OnSurfaceVariantDark.copy(alpha = 0.7f)
+                color = colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
         )
         Text(
@@ -255,7 +253,7 @@ private fun SpecRow(label: String, value: String) {
             style = SpecBadgeTypography.copy(
                 fontSize = 9.5.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = OnSurfaceDark
+                color = colorScheme.onSurface
             )
         )
     }

@@ -12,7 +12,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import org.shilpo.peerless.theme.*
+import org.shilpo.peerless.theme.ExpressiveTypography
+import org.shilpo.peerless.theme.PillShape
+import org.shilpo.peerless.theme.SquircleShapeLarge
 
 @Composable
 fun ServerSettingsDialog(
@@ -22,13 +24,15 @@ fun ServerSettingsDialog(
 ) {
     var urlInput by remember(currentServerUrl) { mutableStateOf(currentServerUrl) }
 
+    val colorScheme = MaterialTheme.colorScheme
+
     Dialog(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier
                 .widthIn(min = 320.dp, max = 460.dp)
                 .clip(SquircleShapeLarge)
-                .background(SurfaceContainerHighDark)
-                .border(1.dp, OutlineVariantDark, SquircleShapeLarge)
+                .background(colorScheme.surfaceContainerHigh)
+                .border(1.dp, colorScheme.outlineVariant, SquircleShapeLarge)
                 .padding(24.dp)
         ) {
             Column(
@@ -44,30 +48,30 @@ fun ServerSettingsDialog(
                         Text(
                             text = "Server & Playback",
                             style = ExpressiveTypography.headlineSmall,
-                            color = OnSurfaceDark
+                            color = colorScheme.onSurface
                         )
                         Text(
                             text = "Configure your Peerless daemon endpoint",
                             style = ExpressiveTypography.bodySmall,
-                            color = OnSurfaceVariantDark
+                            color = colorScheme.onSurfaceVariant
                         )
                     }
 
                     Icon(
                         imageVector = PeerlessIcons.Settings,
                         contentDescription = null,
-                        tint = PrimaryDark,
+                        tint = colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )
                 }
 
-                HorizontalDivider(color = OutlineVariantDark)
+                HorizontalDivider(color = colorScheme.outlineVariant)
 
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = "API Base URL",
                         style = ExpressiveTypography.labelMedium,
-                        color = OnSurfaceDark
+                        color = colorScheme.onSurface
                     )
                     OutlinedTextField(
                         value = urlInput,
@@ -76,17 +80,17 @@ fun ServerSettingsDialog(
                         placeholder = {
                             Text(
                                 "http://localhost:4444",
-                                color = OnSurfaceVariantDark.copy(alpha = 0.5f)
+                                color = colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                             )
                         },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = OnSurfaceDark,
-                            unfocusedTextColor = OnSurfaceDark,
-                            focusedBorderColor = PrimaryDark,
-                            unfocusedBorderColor = OutlineDark,
-                            cursorColor = PrimaryDark,
-                            focusedContainerColor = SurfaceContainerDark,
-                            unfocusedContainerColor = SurfaceContainerDark
+                            focusedTextColor = colorScheme.onSurface,
+                            unfocusedTextColor = colorScheme.onSurface,
+                            focusedBorderColor = colorScheme.primary,
+                            unfocusedBorderColor = colorScheme.outlineVariant,
+                            cursorColor = colorScheme.primary,
+                            focusedContainerColor = colorScheme.surfaceContainer,
+                            unfocusedContainerColor = colorScheme.surfaceContainer
                         ),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
@@ -102,7 +106,7 @@ fun ServerSettingsDialog(
                         onClick = onDismiss,
                         shape = PillShape
                     ) {
-                        Text("Cancel", color = OnSurfaceVariantDark)
+                        Text("Cancel", color = colorScheme.onSurfaceVariant)
                     }
 
                     Spacer(modifier = Modifier.width(8.dp))
@@ -114,8 +118,8 @@ fun ServerSettingsDialog(
                             onDismiss()
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = PrimaryDark,
-                            contentColor = OnPrimaryDark
+                            containerColor = colorScheme.primary,
+                            contentColor = colorScheme.onPrimary
                         ),
                         shape = PillShape
                     ) {

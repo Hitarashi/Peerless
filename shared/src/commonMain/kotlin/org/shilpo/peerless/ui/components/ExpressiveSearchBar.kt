@@ -21,7 +21,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.shilpo.peerless.model.SearchFilter
-import org.shilpo.peerless.theme.*
+import org.shilpo.peerless.theme.ExpressiveTypography
+import org.shilpo.peerless.theme.PillShape
+import org.shilpo.peerless.theme.SpecBadgeTypography
 
 val DefaultSearchFilters = listOf(
     SearchFilter.ALL,
@@ -66,6 +68,8 @@ fun ExpressiveSearchBar(
         label = "SearchPulseScale"
     )
 
+    val colorScheme = MaterialTheme.colorScheme
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -77,8 +81,8 @@ fun ExpressiveSearchBar(
                 .fillMaxWidth()
                 .height(52.dp)
                 .clip(PillShape)
-                .background(SurfaceContainerHighDark)
-                .border(1.dp, OutlineVariantDark, PillShape)
+                .background(colorScheme.surfaceContainerHigh)
+                .border(1.dp, colorScheme.outlineVariant, PillShape)
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -86,7 +90,7 @@ fun ExpressiveSearchBar(
                 Icon(
                     imageVector = PeerlessIcons.Search,
                     contentDescription = "Search",
-                    tint = if (isSearching) SecondaryDark else PrimaryDark,
+                    tint = if (isSearching) colorScheme.secondary else colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
 
@@ -102,7 +106,7 @@ fun ExpressiveSearchBar(
                                 alpha = pulseAlpha
                             }
                             .clip(CircleShape)
-                            .background(SecondaryDark)
+                            .background(colorScheme.secondary)
                     )
                 }
             }
@@ -117,7 +121,7 @@ fun ExpressiveSearchBar(
                     Text(
                         text = "Search lossless tracks, artists, albums...",
                         style = ExpressiveTypography.bodyMedium,
-                        color = OnSurfaceVariantDark.copy(alpha = 0.6f)
+                        color = colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 }
 
@@ -126,10 +130,10 @@ fun ExpressiveSearchBar(
                     onValueChange = onQueryChange,
                     singleLine = true,
                     textStyle = ExpressiveTypography.bodyMedium.copy(
-                        color = OnSurfaceDark,
+                        color = colorScheme.onSurface,
                         fontWeight = FontWeight.Medium
                     ),
-                    cursorBrush = SolidColor(PrimaryDark),
+                    cursorBrush = SolidColor(colorScheme.primary),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -140,7 +144,7 @@ fun ExpressiveSearchBar(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier
                         .clip(PillShape)
-                        .background(SecondaryDark.copy(alpha = 0.12f))
+                        .background(colorScheme.secondary.copy(alpha = 0.12f))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Box(
@@ -152,12 +156,12 @@ fun ExpressiveSearchBar(
                                 alpha = pulseAlpha
                             }
                             .clip(CircleShape)
-                            .background(SecondaryDark)
+                            .background(colorScheme.secondary)
                     )
                     Text(
                         text = "SEARCHING",
                         style = SpecBadgeTypography.copy(fontSize = 8.sp),
-                        color = SecondaryDark
+                        color = colorScheme.secondary
                     )
                 }
                 Spacer(modifier = Modifier.width(4.dp))
@@ -171,7 +175,7 @@ fun ExpressiveSearchBar(
                     Icon(
                         imageVector = PeerlessIcons.Close,
                         contentDescription = "Clear search",
-                        tint = OnSurfaceVariantDark,
+                        tint = colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -189,7 +193,7 @@ fun ExpressiveSearchBar(
                     Icon(
                         imageVector = PeerlessIcons.Settings,
                         contentDescription = "Server Settings",
-                        tint = if (serverUrl.isNotBlank()) PrimaryDark else OnSurfaceVariantDark,
+                        tint = if (serverUrl.isNotBlank()) colorScheme.primary else colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -198,7 +202,11 @@ fun ExpressiveSearchBar(
                     modifier = Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(if (serverUrl.isNotBlank()) SecondaryDark else OnSurfaceVariantDark.copy(alpha = 0.5f))
+                        .background(
+                            if (serverUrl.isNotBlank()) colorScheme.secondary else colorScheme.onSurfaceVariant.copy(
+                                alpha = 0.5f
+                            )
+                        )
                 )
             }
         }
@@ -229,7 +237,7 @@ fun ExpressiveSearchBar(
                                 Icon(
                                     imageVector = PeerlessIcons.CloudDone,
                                     contentDescription = null,
-                                    tint = if (isSelected) SecondaryDark else OnSurfaceVariantDark,
+                                    tint = if (isSelected) colorScheme.secondary else colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(14.dp)
                                 )
                             }
@@ -240,7 +248,7 @@ fun ExpressiveSearchBar(
                                 Icon(
                                     imageVector = PeerlessIcons.LosslessWave,
                                     contentDescription = null,
-                                    tint = if (isSelected) LosslessGold else OnSurfaceVariantDark,
+                                    tint = if (isSelected) colorScheme.tertiary else colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(13.dp)
                                 )
                             }
@@ -251,7 +259,7 @@ fun ExpressiveSearchBar(
                                 Icon(
                                     imageVector = PeerlessIcons.MusicNote,
                                     contentDescription = null,
-                                    tint = if (isSelected) LosslessPurple else OnSurfaceVariantDark,
+                                    tint = if (isSelected) colorScheme.primary else colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(13.dp)
                                 )
                             }
@@ -266,7 +274,7 @@ fun ExpressiveSearchBar(
                                         else -> PeerlessIcons.MusicNote
                                     },
                                     contentDescription = null,
-                                    tint = if (isSelected) PrimaryDark else OnSurfaceVariantDark,
+                                    tint = if (isSelected) colorScheme.primary else colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(13.dp)
                                 )
                             }
@@ -276,16 +284,16 @@ fun ExpressiveSearchBar(
                     },
                     shape = RoundedCornerShape(12.dp),
                     colors = FilterChipDefaults.filterChipColors(
-                        containerColor = SurfaceContainerDark,
-                        labelColor = OnSurfaceVariantDark,
-                        selectedContainerColor = PrimaryContainerDark,
-                        selectedLabelColor = OnPrimaryContainerDark
+                        containerColor = colorScheme.surfaceContainer,
+                        labelColor = colorScheme.onSurfaceVariant,
+                        selectedContainerColor = colorScheme.primaryContainer,
+                        selectedLabelColor = colorScheme.onPrimaryContainer
                     ),
                     border = FilterChipDefaults.filterChipBorder(
                         enabled = true,
                         selected = isSelected,
-                        borderColor = OutlineVariantDark,
-                        selectedBorderColor = PrimaryDark.copy(alpha = 0.6f)
+                        borderColor = colorScheme.outlineVariant,
+                        selectedBorderColor = colorScheme.primary.copy(alpha = 0.6f)
                     )
                 )
             }
