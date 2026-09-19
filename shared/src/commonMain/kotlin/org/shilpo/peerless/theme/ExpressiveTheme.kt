@@ -44,6 +44,31 @@ object ExpressiveMotion {
     val StandardDecelerateEasing = CubicBezierEasing(0.0f, 0.0f, 0.0f, 1.0f)
     val StandardAccelerateEasing = CubicBezierEasing(0.3f, 0.0f, 1.0f, 1.0f)
 
+    const val SpringDefaultSpatialDamping = 0.8f
+    const val SpringDefaultSpatialStiffness = 380f
+    const val SpringFastSpatialDamping = 0.6f
+    const val SpringFastSpatialStiffness = 800f
+    const val SpringDefaultEffectsDamping = 1.0f
+    const val SpringDefaultEffectsStiffness = 1600f
+
+    fun <T> spatialSpring(visibilityThreshold: T? = null) = spring<T>(
+        dampingRatio = SpringDefaultSpatialDamping,
+        stiffness = SpringDefaultSpatialStiffness,
+        visibilityThreshold = visibilityThreshold
+    )
+
+    fun <T> fastSpatialSpring(visibilityThreshold: T? = null) = spring<T>(
+        dampingRatio = SpringFastSpatialDamping,
+        stiffness = SpringFastSpatialStiffness,
+        visibilityThreshold = visibilityThreshold
+    )
+
+    fun <T> effectsSpring(visibilityThreshold: T? = null) = spring<T>(
+        dampingRatio = SpringDefaultEffectsDamping,
+        stiffness = SpringDefaultEffectsStiffness,
+        visibilityThreshold = visibilityThreshold
+    )
+
     fun <T> bouncySpring() = spring<T>(
         dampingRatio = Spring.DampingRatioMediumBouncy,
         stiffness = Spring.StiffnessMediumLow

@@ -1,7 +1,8 @@
 package org.shilpo.peerless.ui.components
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -150,21 +151,13 @@ fun FloatingNavigationToolbar(
                                                 )
                                             }
 
-                                            else -> {
-                                                Crossfade(
-                                                    targetState = selected,
-                                                    animationSpec = tween(
-                                                        durationMillis = 220,
-                                                        easing = FastOutSlowInEasing
-                                                    ),
-                                                    label = "navIconCrossfade"
-                                                ) { isSelected ->
-                                                    Icon(
-                                                        imageVector = if (isSelected) dest.selectedIcon else dest.icon,
-                                                        contentDescription = dest.title,
-                                                        modifier = Modifier.size(24.dp)
-                                                    )
-                                                }
+                                            NavigationDestination.SETTINGS -> {
+                                                SettingsMorphIcon(
+                                                    selected = selected,
+                                                    size = 24.dp,
+                                                    contentDescription = dest.title,
+                                                    animateRotation = false,
+                                                )
                                             }
                                         }
                                     }

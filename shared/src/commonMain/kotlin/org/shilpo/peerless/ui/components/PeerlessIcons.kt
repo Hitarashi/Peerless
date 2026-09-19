@@ -19,6 +19,8 @@ object PeerlessIcons {
     val RepeatOne: ImageVector get() = Icons.Rounded.RepeatOne
     val Search: ImageVector get() = Icons.Rounded.Search
     val Close: ImageVector get() = Icons.Rounded.Close
+    val Menu: ImageVector get() = Icons.Rounded.Menu
+    val MenuOpen: ImageVector get() = Icons.AutoMirrored.Rounded.MenuOpen
     val Settings: ImageVector get() = Icons.Rounded.Settings
     val ExpandMore: ImageVector get() = Icons.Rounded.ExpandMore
     val MusicNote: ImageVector get() = Icons.Rounded.MusicNote

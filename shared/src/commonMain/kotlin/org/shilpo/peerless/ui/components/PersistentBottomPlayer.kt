@@ -10,6 +10,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,9 +19,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -31,7 +37,10 @@ import coil3.compose.AsyncImage
 import org.shilpo.peerless.model.PlaybackInfo
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.player.PlaybackStatus
-import org.shilpo.peerless.theme.*
+import org.shilpo.peerless.theme.ExpressiveMotion
+import org.shilpo.peerless.theme.ExpressiveTypography
+import org.shilpo.peerless.theme.SpecBadgeTypography
+import org.shilpo.peerless.theme.SquircleShapeSmall
 import org.shilpo.peerless.ui.shell.SupportingPaneType
 import kotlin.math.PI
 import kotlin.math.sin
@@ -48,8 +57,8 @@ fun PersistentBottomPlayer(
     onSeekTo: (Long) -> Unit,
     onPlayNext: () -> Unit,
     onPlayPrevious: () -> Unit,
-    activeSupportingPane: SupportingPaneType?,
-    onToggleSupportingPane: (SupportingPaneType) -> Unit,
+    activeSupportingPane: SupportingPaneType? = null,
+    onToggleSupportingPane: ((SupportingPaneType) -> Unit)? = null,
     modifier: Modifier = Modifier,
     volume: Float = 0.8f,
     onVolumeChange: (Float) -> Unit = {},
@@ -57,10 +66,26 @@ fun PersistentBottomPlayer(
     onToggleShuffle: () -> Unit = {},
     isRepeat: Boolean = false,
     onToggleRepeat: () -> Unit = {},
-    onOpenNowPlaying: () -> Unit = {}
+    onOpenNowPlaying: () -> Unit = {},
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val isPlaying = status == PlaybackStatus.PLAYING
+
+    val topEndCorner by animateDpAsState(
+        targetValue = if (activeSupportingPane != null) 8.dp else 24.dp,
+        animationSpec = spring(
+            dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
+            stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness
+        ),
+        label = "BottomPlayerTopEndCorner"
+    )
+
+    val containerShape = RoundedCornerShape(
+        topStart = 8.dp,
+        topEnd = topEndCorner,
+        bottomStart = 24.dp,
+        bottomEnd = 24.dp
+    )
 
     val playButtonInteractionSource = remember { MutableInteractionSource() }
     val isPlayPressed by playButtonInteractionSource.collectIsPressedAsState()
@@ -72,34 +97,15 @@ fun PersistentBottomPlayer(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(88.dp)
-            .background(LiquidGlassDefaults.ElevatedContainerColor)
-            .border(
-                width = 1.dp,
-                brush = LiquidGlassDefaults.BorderBrush,
-                shape = RectangleShape
-            )
+            .height(80.dp)
+            .clip(containerShape)
+            .background(colorScheme.surfaceContainerLow)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            Color.Transparent,
-                            Color.White.copy(alpha = 0.18f),
-                            Color.White.copy(alpha = 0.05f),
-                            Color.Transparent
-                        )
-                    )
-                )
-        )
 
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 8.dp),
+                .padding(horizontal = 20.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -268,81 +274,41 @@ fun PersistentBottomPlayer(
             }
 
             Row(
-                modifier = Modifier.weight(1.1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End
+                modifier = Modifier
+                    .weight(1.15f)
+                    .fillMaxHeight(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                var isMuted by remember { mutableStateOf(false) }
-                var lastVolume by remember { mutableFloatStateOf(volume) }
-
-                IconButton(
-                    onClick = {
-                        if (isMuted) {
-                            isMuted = false
-                            onVolumeChange(if (lastVolume > 0f) lastVolume else 0.5f)
-                        } else {
-                            lastVolume = volume
-                            isMuted = true
-                            onVolumeChange(0f)
-                        }
-                    },
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = if (volume <= 0.01f || isMuted) PeerlessIcons.VolumeMute else PeerlessIcons.VolumeUp,
-                        contentDescription = "Volume",
-                        tint = colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                Slider(
-                    value = if (isMuted) 0f else volume,
-                    onValueChange = {
-                        isMuted = false
-                        onVolumeChange(it)
-                    },
-                    colors = SliderDefaults.colors(
-                        thumbColor = colorScheme.primary,
-                        activeTrackColor = colorScheme.primary,
-                        inactiveTrackColor = colorScheme.surfaceContainerHighest
-                    ),
-                    modifier = Modifier
-                        .width(85.dp)
-                        .height(20.dp)
-                )
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Box(
-                    modifier = Modifier
-                        .height(24.dp)
-                        .width(1.dp)
-                        .background(colorScheme.outlineVariant.copy(alpha = 0.6f))
+                ExpressiveVolumeSlider(
+                    volume = volume,
+                    onVolumeChange = onVolumeChange,
+                    modifier = Modifier.width(160.dp)
                 )
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                SupportingPaneToggleButton(
-                    icon = PeerlessIcons.Queue,
-                    contentDescription = "Queue Pane",
-                    isActive = activeSupportingPane == SupportingPaneType.QUEUE,
-                    onClick = { onToggleSupportingPane(SupportingPaneType.QUEUE) }
-                )
-
-                SupportingPaneToggleButton(
-                    icon = PeerlessIcons.Lyrics,
-                    contentDescription = "Lyrics Pane",
-                    isActive = activeSupportingPane == SupportingPaneType.LYRICS,
-                    onClick = { onToggleSupportingPane(SupportingPaneType.LYRICS) }
-                )
-
-                SupportingPaneToggleButton(
-                    icon = PeerlessIcons.SignalPath,
-                    contentDescription = "Signal Path Inspector",
-                    isActive = activeSupportingPane == SupportingPaneType.SIGNAL_PATH,
-                    onClick = { onToggleSupportingPane(SupportingPaneType.SIGNAL_PATH) }
-                )
+                val isPaneOpen = activeSupportingPane != null
+                IconButton(
+                    onClick = {
+                        if (isPaneOpen) {
+                            onToggleSupportingPane?.invoke(activeSupportingPane)
+                        } else {
+                            onToggleSupportingPane?.invoke(SupportingPaneType.QUEUE)
+                        }
+                    },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                ) {
+                    NavToggleMorphIcon(
+                        isExpanded = isPaneOpen,
+                        size = 20.dp,
+                        tint = if (isPaneOpen) colorScheme.primary else colorScheme.onSurfaceVariant,
+                        contentDescription = if (isPaneOpen) "Close supporting pane" else "Open supporting pane"
+                    )
+                }
             }
         }
     }
@@ -500,33 +466,4 @@ fun ExpressiveWavySeekBar(
     }
 }
 
-@Composable
-private fun SupportingPaneToggleButton(
-    icon: ImageVector,
-    contentDescription: String,
-    isActive: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val colorScheme = MaterialTheme.colorScheme
-    val backgroundColor = if (isActive) colorScheme.primary.copy(alpha = 0.22f) else Color.Transparent
-    val contentColor = if (isActive) colorScheme.primary else colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
-    val borderColor = if (isActive) colorScheme.primary.copy(alpha = 0.40f) else Color.Transparent
 
-    Box(
-        modifier = modifier
-            .clip(PillShape)
-            .background(backgroundColor)
-            .border(1.dp, borderColor, PillShape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = contentColor,
-            modifier = Modifier.size(18.dp)
-        )
-    }
-}

@@ -1,27 +1,34 @@
 package org.shilpo.peerless.ui.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.vector.PathParser
-import androidx.compose.ui.graphics.vector.toPath
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.PI
+import kotlin.math.min
+import kotlin.math.sin
 
+/**
+ * An expressive morphing Search icon that smoothly transitions between
+ * an outlined magnifying glass and a solid filled magnifying glass.
+ *
+ * Modeled using exact Material Symbols vector path data, continuous
+ * outer contour drawing, and centered geometric aperture morphing.
+ */
 @Composable
 fun SearchMorphIcon(
     selected: Boolean,
@@ -30,22 +37,14 @@ fun SearchMorphIcon(
     tint: Color = LocalContentColor.current,
     contentDescription: String? = "Search",
 ) {
-    val animatable = remember { Animatable(0f) }
-
-    LaunchedEffect(selected) {
-        if (selected) {
-            animatable.snapTo(0f)
-            animatable.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(
-                    durationMillis = 1167,
-                    easing = LinearEasing
-                )
-            )
-        } else {
-            animatable.snapTo(0f)
-        }
-    }
+    val progress by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = 0.78f,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "SearchMorphProgress"
+    )
 
     val descModifier = if (contentDescription != null) {
         modifier.semantics { this.contentDescription = contentDescription }
@@ -53,75 +52,141 @@ fun SearchMorphIcon(
         modifier
     }
 
-    val lensPath = remember {
-        PathParser().parsePathString(SEARCH_LENS_PATH_DATA).toNodes().toPath()
-    }
-    val handlePath = remember {
-        PathParser().parsePathString(SEARCH_HANDLE_PATH_DATA).toNodes().toPath()
-    }
-
-    val progress = animatable.value
-    val frameFloat = (progress * 27f).coerceIn(0f, 27f)
-    val lowerIndex = frameFloat.toInt().coerceIn(0, 26)
-    val upperIndex = lowerIndex + 1
-    val frac = frameFloat - lowerIndex
-
-    val lowerOffset = lowerIndex * 3
-    val upperOffset = upperIndex * 3
-
-    val dx = SEARCH_FRAMES[lowerOffset] + (SEARCH_FRAMES[upperOffset] - SEARCH_FRAMES[lowerOffset]) * frac
-    val dy = SEARCH_FRAMES[lowerOffset + 1] + (SEARCH_FRAMES[upperOffset + 1] - SEARCH_FRAMES[lowerOffset + 1]) * frac
-    val rot = SEARCH_FRAMES[lowerOffset + 2] + (SEARCH_FRAMES[upperOffset + 2] - SEARCH_FRAMES[lowerOffset + 2]) * frac
+    val path = remember { Path() }
 
     Canvas(modifier = descModifier.size(size)) {
-        val scale = this.size.minDimension / 24f
-        val centerX = this.size.width / 2f
-        val centerY = this.size.height / 2f
-
-        translate(left = centerX + dx * scale, top = centerY + dy * scale) {
-            rotate(degrees = rot, pivot = Offset.Zero) {
-                scale(scaleX = scale, scaleY = scale, pivot = Offset.Zero) {
-                    drawPath(path = lensPath, color = tint.copy(alpha = tint.alpha * 0.35f))
-                    drawPath(path = handlePath, color = tint)
-                }
-            }
-        }
+        drawSearchMorph(
+            progress = progress,
+            tint = tint,
+            path = path
+        )
     }
 }
 
-private const val SEARCH_LENS_PATH_DATA =
-    "M -1 -10 C 3.971 -10.000 8.000 -5.971 8.000 -1.000 C 8.000 0.760 7.495 2.403 6.621 3.790 C 6.621 3.790 6.358 6.248 6.358 6.248 C 6.358 6.248 3.790 6.621 3.790 6.621 C 2.403 7.495 0.760 8.000 -1.000 8.000 C -5.971 8.000 -10.000 3.971 -10.000 -1.000 C -10.000 -5.971 -5.971 -10.000 -1.000 -10.000 Z"
+private fun DrawScope.drawSearchMorph(
+    progress: Float,
+    tint: Color,
+    path: Path,
+) {
+    val p = progress.coerceIn(0f, 1f)
 
-private const val SEARCH_HANDLE_PATH_DATA =
-    "M 9.414 6.586 C 9.127 6.299 7.472 4.644 6.613 3.785 C 5.894 4.927 4.927 5.894 3.785 6.613 C 4.644 7.472 6.299 9.127 6.586 9.414 C 7.367 10.195 8.633 10.195 9.414 9.414 C 10.195 8.633 10.195 7.367 9.414 6.586 Z"
+    // Subtle elastic squash-and-stretch during state transition
+    val elasticScale = 1f - 0.04f * sin(p * PI.toFloat())
 
-private val SEARCH_FRAMES = floatArrayOf(
-    0.000f, 0.000f, 0.000f,
-    0.000f, 0.000f, 0.000f,
-    0.000f, 0.000f, 0.000f,
-    0.000f, 0.000f, 0.000f,
-    -0.223f, 0.051f, -1.000f,
-    -0.485f, 0.092f, -2.000f,
-    -0.764f, 0.115f, -3.000f,
-    -1.040f, 0.113f, -4.000f,
-    -1.293f, 0.077f, -5.000f,
-    -1.500f, 0.000f, -6.000f,
-    -1.683f, -0.180f, -4.800f,
-    -1.796f, -0.446f, -3.600f,
-    -1.827f, -0.747f, -2.400f,
-    -1.766f, -1.032f, -1.200f,
-    -1.600f, -1.250f, 0.000f,
-    -1.327f, -1.386f, 1.200f,
-    -0.971f, -1.461f, 2.400f,
-    -0.581f, -1.469f, 3.600f,
-    -0.208f, -1.401f, 4.800f,
-    0.100f, -1.250f, 6.000f,
-    0.218f, -1.085f, 5.000f,
-    0.289f, -0.875f, 4.000f,
-    0.308f, -0.639f, 3.000f,
-    0.269f, -0.400f, 2.000f,
-    0.168f, -0.180f, 1.000f,
-    0.000f, 0.000f, 0.000f,
-    0.000f, 0.000f, 0.000f,
-    0.000f, 0.000f, 0.000f
-)
+    val baseSize = min(this.size.width, this.size.height)
+    val s = (baseSize / 960f) * elasticScale
+    val cx = this.size.width / 2f
+    val cy = this.size.height / 2f
+
+    fun toCanvasX(x: Float): Float = cx + (x - 480f) * s
+    fun toCanvasY(y: Float): Float = cy + (y + 480f) * s
+
+    path.reset()
+    path.fillType = PathFillType.EvenOdd
+
+    // 1. Outer rim of the magnifying glass and handle (solid silhouette)
+    path.moveTo(toCanvasX(380f), toCanvasY(-320f))
+    path.quadraticTo(
+        toCanvasX(271f), toCanvasY(-320f),
+        toCanvasX(195.5f), toCanvasY(-395.5f)
+    )
+    path.quadraticTo(
+        toCanvasX(120f), toCanvasY(-471f),
+        toCanvasX(120f), toCanvasY(-580f)
+    )
+    path.quadraticTo(
+        toCanvasX(120f), toCanvasY(-689f),
+        toCanvasX(195.5f), toCanvasY(-764.5f)
+    )
+    path.quadraticTo(
+        toCanvasX(271f), toCanvasY(-840f),
+        toCanvasX(380f), toCanvasY(-840f)
+    )
+    path.quadraticTo(
+        toCanvasX(489f), toCanvasY(-840f),
+        toCanvasX(564.5f), toCanvasY(-764.5f)
+    )
+    path.quadraticTo(
+        toCanvasX(640f), toCanvasY(-689f),
+        toCanvasX(640f), toCanvasY(-580f)
+    )
+    path.quadraticTo(
+        toCanvasX(640f), toCanvasY(-536f),
+        toCanvasX(626f), toCanvasY(-497f)
+    )
+    path.quadraticTo(
+        toCanvasX(612f), toCanvasY(-458f),
+        toCanvasX(588f), toCanvasY(-428f)
+    )
+    path.lineTo(toCanvasX(812f), toCanvasY(-204f))
+    path.quadraticTo(
+        toCanvasX(823f), toCanvasY(-193f),
+        toCanvasX(823f), toCanvasY(-176f)
+    )
+    path.quadraticTo(
+        toCanvasX(823f), toCanvasY(-159f),
+        toCanvasX(812f), toCanvasY(-148f)
+    )
+    path.quadraticTo(
+        toCanvasX(801f), toCanvasY(-137f),
+        toCanvasX(784f), toCanvasY(-137f)
+    )
+    path.quadraticTo(
+        toCanvasX(767f), toCanvasY(-137f),
+        toCanvasX(756f), toCanvasY(-148f)
+    )
+    path.lineTo(toCanvasX(532f), toCanvasY(-372f))
+    path.quadraticTo(
+        toCanvasX(502f), toCanvasY(-348f),
+        toCanvasX(463f), toCanvasY(-334f)
+    )
+    path.quadraticTo(
+        toCanvasX(424f), toCanvasY(-320f),
+        toCanvasX(380f), toCanvasY(-320f)
+    )
+    path.close()
+
+    // 2. Inner circular aperture: contracts smoothly to center (380, -580) as p goes 0 -> 1
+    val holeScale = (1f - p).coerceIn(0f, 1f)
+    if (holeScale > 0.001f) {
+        fun holeX(x: Float): Float = toCanvasX(380f + (x - 380f) * holeScale)
+        fun holeY(y: Float): Float = toCanvasY(-580f + (y + 580f) * holeScale)
+
+        path.moveTo(holeX(380f), holeY(-400f))
+        path.quadraticTo(
+            holeX(455f), holeY(-400f),
+            holeX(507.5f), holeY(-452.5f)
+        )
+        path.quadraticTo(
+            holeX(560f), holeY(-505f),
+            holeX(560f), holeY(-580f)
+        )
+        path.quadraticTo(
+            holeX(560f), holeY(-655f),
+            holeX(507.5f), holeY(-707.5f)
+        )
+        path.quadraticTo(
+            holeX(455f), holeY(-760f),
+            holeX(380f), holeY(-760f)
+        )
+        path.quadraticTo(
+            holeX(305f), holeY(-760f),
+            holeX(252.5f), holeY(-707.5f)
+        )
+        path.quadraticTo(
+            holeX(200f), holeY(-655f),
+            holeX(200f), holeY(-580f)
+        )
+        path.quadraticTo(
+            holeX(200f), holeY(-505f),
+            holeX(252.5f), holeY(-452.5f)
+        )
+        path.quadraticTo(
+            holeX(305f), holeY(-400f),
+            holeX(380f), holeY(-400f)
+        )
+        path.close()
+    }
+
+    drawPath(path = path, color = tint)
+}

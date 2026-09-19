@@ -1,12 +1,19 @@
 package org.shilpo.peerless.ui.shell
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,10 +21,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -41,6 +56,7 @@ import org.shilpo.peerless.ui.screens.AuthOnboardingScreen
 import org.shilpo.peerless.ui.screens.ProfileScreen
 import org.shilpo.peerless.ui.screens.SearchScreen
 import org.shilpo.peerless.ui.toTrackSummary
+import kotlin.ranges.coerceIn
 
 @Composable
 fun AdaptiveShell(
@@ -73,6 +89,7 @@ fun AdaptiveShell(
 
     var currentDestination by remember { mutableStateOf(NavigationDestination.HOME) }
     var activeSupportingPane by remember { mutableStateOf<SupportingPaneType?>(SupportingPaneType.QUEUE) }
+    var supportingPaneWidth by remember { mutableStateOf(340.dp) }
     var isNowPlayingOpen by remember { mutableStateOf(false) }
     var isSettingsOpen by remember { mutableStateOf(false) }
 
@@ -214,6 +231,11 @@ fun AdaptiveShell(
                             onToggleSupportingPane = { pane ->
                                 activeSupportingPane = if (activeSupportingPane == pane) null else pane
                             },
+                            onSelectSupportingPane = { pane ->
+                                activeSupportingPane = pane
+                            },
+                            supportingPaneWidth = supportingPaneWidth,
+                            onSupportingPaneWidthChange = { supportingPaneWidth = it.coerceIn(280.dp, 560.dp) },
                             playerConnection = playerConnection,
                             currentTrackDto = currentTrackDto,
                             status = status,
@@ -440,89 +462,12 @@ private fun MediumLayout(
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            NavigationRail(
-                header = {
-                    Box(
-                        modifier = Modifier
-                            .padding(top = 12.dp)
-                            .size(40.dp)
-                            .clip(SquircleShapeSmall)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.tertiary
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = PeerlessIcons.MusicNote,
-                            contentDescription = "Peerless Logo",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                },
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier
-                    .width(76.dp)
-                    .fillMaxHeight()
-            ) {
-                Spacer(modifier = Modifier.height(16.dp))
-                NavigationDestination.PrimaryDestinations.forEach { dest ->
-                    val isSelected = dest == currentDestination
-                    NavigationRailItem(
-                        selected = isSelected,
-                        onClick = { onSelectDestination(dest) },
-                        icon = {
-                            Icon(
-                                imageVector = dest.icon,
-                                contentDescription = dest.title
-                            )
-                        },
-                        label = {
-                            Text(
-                                text = dest.title,
-                                style = ExpressiveTypography.labelSmall
-                            )
-                        },
-                        colors = NavigationRailItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
-                        )
-                    )
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                NavigationRailItem(
-                    selected = false,
-                    onClick = onOpenProfile,
-                    icon = {
-                        Icon(
-                            imageVector = PeerlessIcons.Person,
-                            contentDescription = "Profile & Telemetry"
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = "Profile",
-                            style = ExpressiveTypography.labelSmall
-                        )
-                    },
-                    colors = NavigationRailItemDefaults.colors(
-                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
-                    ),
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-            }
+            ExpressiveWideNavigationRail(
+                selectedDestination = currentDestination,
+                onSelectDestination = onSelectDestination,
+                initialExpanded = false,
+                modifier = Modifier.fillMaxHeight()
+            )
 
             Box(
                 modifier = Modifier
@@ -586,6 +531,9 @@ private fun ExpandedLayout(
     onSelectDestination: (NavigationDestination) -> Unit,
     activeSupportingPane: SupportingPaneType?,
     onToggleSupportingPane: (SupportingPaneType) -> Unit,
+    onSelectSupportingPane: (SupportingPaneType) -> Unit = onToggleSupportingPane,
+    supportingPaneWidth: Dp = 340.dp,
+    onSupportingPaneWidthChange: (Dp) -> Unit = {},
     playerConnection: PlayerConnection,
     currentTrackDto: TrackSummaryDto?,
     status: PlaybackStatus,
@@ -610,21 +558,22 @@ private fun ExpandedLayout(
     val apiClient = LocalPeerlessApiClient.current
     val isRepeat = repeatMode != org.shilpo.peerless.model.RepeatMode.OFF
 
+    var displayedSupportingPane by remember { mutableStateOf(activeSupportingPane) }
+    if (activeSupportingPane != null) {
+        displayedSupportingPane = activeSupportingPane
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            PersistentNavigationDrawer(
+            ExpressiveWideNavigationRail(
                 selectedDestination = currentDestination,
                 onSelectDestination = onSelectDestination,
-                serverConnected = serverConnected,
-                onOpenSettings = onOpenSettings,
-                onOpenProfile = onOpenProfile,
-                modifier = Modifier
-                    .width(240.dp)
-                    .fillMaxHeight()
+                initialExpanded = true,
+                modifier = Modifier.fillMaxHeight().padding(start = 4.dp, top = 4.dp, bottom = 2.dp)
             )
 
             Box(
@@ -658,226 +607,307 @@ private fun ExpandedLayout(
                 visible = activeSupportingPane != null,
                 enter = slideInHorizontally(
                     initialOffsetX = { it },
-                    animationSpec = tween(350, easing = ExpressiveMotion.EmphasizedEasing)
-                ) + fadeIn(),
+                    animationSpec = spring(
+                        dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
+                        stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
+                        visibilityThreshold = IntOffset(1, 1)
+                    )
+                ) + expandHorizontally(
+                    animationSpec = spring(
+                        dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
+                        stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
+                        visibilityThreshold = IntSize(1, 1)
+                    ),
+                    expandFrom = Alignment.End,
+                    clip = false
+                ),
                 exit = slideOutHorizontally(
                     targetOffsetX = { it },
-                    animationSpec = tween(280, easing = ExpressiveMotion.EmphasizedAccelerateEasing)
-                ) + fadeOut()
+                    animationSpec = spring(
+                        dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
+                        stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
+                        visibilityThreshold = IntOffset(1, 1)
+                    )
+                ) + shrinkHorizontally(
+                    animationSpec = spring(
+                        dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
+                        stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
+                        visibilityThreshold = IntSize(1, 1)
+                    ),
+                    shrinkTowards = Alignment.End,
+                    clip = false
+                )
             ) {
-                activeSupportingPane?.let { paneType ->
+                val paneType = activeSupportingPane ?: displayedSupportingPane
+                if (paneType != null) {
                     SupportingPaneContainer(
                         paneType = paneType,
                         playerConnection = playerConnection,
                         currentTrackDto = currentTrackDto,
                         status = status,
                         onClose = { onToggleSupportingPane(paneType) },
+                        onSelectPane = onSelectSupportingPane,
+                        currentWidth = supportingPaneWidth,
+                        onWidthChange = onSupportingPaneWidthChange,
+                        onResetWidth = {
+                            onSupportingPaneWidthChange(340.dp)
+                        },
                         modifier = Modifier
-                            .width(340.dp)
+                            .width(supportingPaneWidth)
                             .fillMaxHeight()
                     )
                 }
             }
         }
 
-        PersistentBottomPlayer(
-            track = currentTrackDto,
-            playbackInfo = playerConnection.playbackInfo.collectAsState().value,
-            status = status,
-            positionMs = playerConnection.currentPositionMs,
-            durationMs = playerConnection.currentDurationMs,
-            artworkUrl = currentTrackDto?.let { apiClient.getArtworkUrl(it, 200) } ?: "",
-            onTogglePlayPause = { playerConnection.togglePlayPause() },
-            onSeekTo = { pos -> playerConnection.seekTo(pos) },
-            onPlayNext = { playerConnection.playNext() },
-            onPlayPrevious = { playerConnection.playPrevious() },
-            activeSupportingPane = activeSupportingPane,
-            onToggleSupportingPane = onToggleSupportingPane,
-            volume = volume,
-            onVolumeChange = onVolumeChange,
-            isShuffle = isShuffle,
-            onToggleShuffle = onToggleShuffle,
-            isRepeat = isRepeat,
-            onToggleRepeat = onToggleRepeat,
-            onOpenNowPlaying = onOpenNowPlaying
+        AnimatedVisibility(
+            visible = currentTrackDto != null,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+        ) {
+            PersistentBottomPlayer(
+                track = currentTrackDto,
+                playbackInfo = playerConnection.playbackInfo.collectAsState().value,
+                status = status,
+                positionMs = playerConnection.currentPositionMs,
+                durationMs = playerConnection.currentDurationMs,
+                artworkUrl = currentTrackDto?.let { apiClient.getArtworkUrl(it, 200) } ?: "",
+                onTogglePlayPause = { playerConnection.togglePlayPause() },
+                onSeekTo = { pos -> playerConnection.seekTo(pos) },
+                onPlayNext = { playerConnection.playNext() },
+                onPlayPrevious = { playerConnection.playPrevious() },
+                activeSupportingPane = activeSupportingPane,
+                onToggleSupportingPane = onToggleSupportingPane,
+                volume = volume,
+                onVolumeChange = onVolumeChange,
+                isShuffle = isShuffle,
+                onToggleShuffle = onToggleShuffle,
+                isRepeat = isRepeat,
+                onToggleRepeat = onToggleRepeat,
+                onOpenNowPlaying = onOpenNowPlaying,
+                modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 4.dp, top = 2.dp)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ExpressiveWideNavigationRail(
+    selectedDestination: NavigationDestination,
+    onSelectDestination: (NavigationDestination) -> Unit,
+    initialExpanded: Boolean = true,
+    modifier: Modifier = Modifier
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val railState = rememberWideNavigationRailState(
+        initialValue = if (initialExpanded) WideNavigationRailValue.Expanded else WideNavigationRailValue.Collapsed
+    )
+    val isExpanded = railState.targetValue == WideNavigationRailValue.Expanded
+    val outlineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+    val headerWidth by animateDpAsState(
+        targetValue = if (isExpanded) 220.dp else 96.dp
+    )
+
+    val railShape = remember {
+        RoundedCornerShape(
+            topStart = 24.dp,
+            topEnd = 24.dp,
+            bottomStart = 8.dp,
+            bottomEnd = 8.dp
         )
+    }
+
+    WideNavigationRail(
+        state = railState,
+        shape = railShape,
+        colors = WideNavigationRailDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        ),
+        header = {
+            Box(
+                modifier = Modifier
+                    .width(headerWidth)
+                    .padding(top = 8.dp, bottom = 8.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                IconButton(
+                    modifier = Modifier.padding(start = 24.dp),
+                    onClick = {
+                        coroutineScope.launch {
+                            if (isExpanded) {
+                                railState.collapse()
+                            } else {
+                                railState.expand()
+                            }
+                        }
+                    }
+                ) {
+                    NavToggleMorphIcon(
+                        isExpanded = isExpanded,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        modifier = modifier
+            .clip(railShape)
+    ) {
+        Spacer(modifier = Modifier.height(8.dp))
+
+        NavigationDestination.PrimaryDestinations.forEach { dest ->
+            val isSelected = dest == selectedDestination
+            WideNavigationRailItem(
+                selected = isSelected,
+                onClick = { onSelectDestination(dest) },
+                icon = {
+                    when (dest) {
+                        NavigationDestination.HOME -> {
+                            HomeMorphIcon(
+                                selected = isSelected,
+                                size = 24.dp,
+                                contentDescription = dest.title,
+                            )
+                        }
+
+                        NavigationDestination.SEARCH -> {
+                            SearchMorphIcon(
+                                selected = isSelected,
+                                size = 24.dp,
+                                contentDescription = dest.title,
+                            )
+                        }
+
+                        NavigationDestination.LIBRARY -> {
+                            LibraryMorphIcon(
+                                selected = isSelected,
+                                size = 24.dp,
+                                contentDescription = dest.title,
+                            )
+                        }
+
+                        NavigationDestination.SETTINGS -> {
+                            SettingsMorphIcon(
+                                selected = isSelected,
+                                size = 24.dp,
+                                contentDescription = dest.title,
+                            )
+                        }
+                    }
+                },
+                label = {
+                    Text(
+                        text = dest.title,
+                        style = ExpressiveTypography.labelSmall,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                railExpanded = isExpanded,
+                colors = WideNavigationRailItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    selectedTextColor = if (isExpanded) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.secondary,
+                    selectedIndicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
+        }
     }
 }
 
 @Composable
-private fun PersistentNavigationDrawer(
-    selectedDestination: NavigationDestination,
-    onSelectDestination: (NavigationDestination) -> Unit,
-    serverConnected: Boolean,
-    onOpenSettings: () -> Unit,
-    onOpenProfile: () -> Unit,
+private fun SupportingPaneSplitter(
+    currentWidth: Dp,
+    onWidthChange: (Dp) -> Unit,
+    onResetWidth: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val density = LocalDensity.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    var isDragging by remember { mutableStateOf(false) }
+
+    val isActive = isHovered || isDragging
+    val handleColor by animateColorAsState(
+        targetValue = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        animationSpec = tween(150),
+        label = "SplitterHandleColor"
+    )
+    val handleWidth by animateDpAsState(
+        targetValue = if (isActive) 6.dp else 4.dp,
+        animationSpec = tween(150),
+        label = "SplitterHandleWidth"
+    )
+
+    var splitterCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var lastClickUptime by remember { mutableLongStateOf(0L) }
+
     Box(
         modifier = modifier
-            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-            .border(
-                width = 1.dp,
-                brush = Brush.horizontalGradient(
-                    listOf(Color.Transparent, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                ),
-                shape = RectangleShape
-            )
-            .padding(16.dp)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(SquircleShapeSmall)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.tertiary
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = PeerlessIcons.MusicNote,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
+            .fillMaxHeight()
+            .width(16.dp)
+            .pointerHoverIcon(PointerIcon.Crosshair)
+            .hoverable(interactionSource)
+            .onGloballyPositioned { splitterCoordinates = it }
+            .pointerInput(density) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val coords = splitterCoordinates
+                    val startRootX = coords?.localToWindow(down.position)?.x
+                        ?: coords?.localToRoot(down.position)?.x
+                        ?: down.position.x
+                    val startWidth = currentWidth
+                    isDragging = true
+
+                    var dragged = false
+                    var finalUptime = down.uptimeMillis
+
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id }
+                        if (change == null || !change.pressed) {
+                            if (change != null) {
+                                finalUptime = change.uptimeMillis
+                            }
+                            isDragging = false
+                            break
+                        }
+                        finalUptime = change.uptimeMillis
+                        val currentCoords = splitterCoordinates
+                        val currentRootX = currentCoords?.localToWindow(change.position)?.x
+                            ?: currentCoords?.localToRoot(change.position)?.x
+                            ?: change.position.x
+                        val deltaPx = currentRootX - startRootX
+                        if (kotlin.math.abs(deltaPx) > 0.5f) {
+                            dragged = true
+                            val deltaDp = with(density) { deltaPx.toDp() }
+                            onWidthChange((startWidth - deltaDp).coerceIn(280.dp, 560.dp))
+                            change.consume()
+                        }
                     }
 
-                    Text(
-                        text = "PEERLESS",
-                        style = ExpressiveTypography.titleMedium,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 2.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-
-                NavigationDestination.PrimaryDestinations.forEach { dest ->
-                    val isSelected = dest == selectedDestination
-                    val containerColor =
-                        if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else Color.Transparent
-                    val contentColor =
-                        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    val borderColor =
-                        if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.35f) else Color.Transparent
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(SquircleShapeMedium)
-                            .background(containerColor)
-                            .border(1.dp, borderColor, SquircleShapeMedium)
-                            .clickable { onSelectDestination(dest) }
-                            .padding(horizontal = 12.dp, vertical = 10.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Icon(
-                                imageVector = dest.icon,
-                                contentDescription = dest.title,
-                                tint = contentColor,
-                                modifier = Modifier.size(20.dp)
-                            )
-
-                            Column {
-                                Text(
-                                    text = dest.title,
-                                    style = ExpressiveTypography.labelLarge,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else contentColor
-                                )
-                                Text(
-                                    text = dest.subtitle,
-                                    style = ExpressiveTypography.bodySmall.copy(fontSize = 10.sp),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
+                    if (!dragged) {
+                        if (finalUptime - lastClickUptime < 350L) {
+                            onResetWidth()
+                            lastClickUptime = 0L
+                        } else {
+                            lastClickUptime = finalUptime
                         }
                     }
                 }
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(SquircleShapeSmall)
-                        .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.8f))
-                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), SquircleShapeSmall)
-                        .clickable { onOpenProfile() }
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.tertiary
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = PeerlessIcons.Person,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Account & Telemetry",
-                            style = ExpressiveTypography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = "Sessions & Daemon",
-                            style = SpecBadgeTypography.copy(fontSize = 7.5.sp),
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    }
-
-                    Icon(
-                        imageVector = PeerlessIcons.OpenInNew,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-            }
-        }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(handleWidth)
+                .height(48.dp)
+                .clip(CircleShape)
+                .background(handleColor)
+        )
     }
 }
 
@@ -888,6 +918,10 @@ private fun SupportingPaneContainer(
     currentTrackDto: TrackSummaryDto?,
     status: PlaybackStatus,
     onClose: () -> Unit,
+    onSelectPane: (SupportingPaneType) -> Unit,
+    currentWidth: Dp,
+    onWidthChange: (Dp) -> Unit,
+    onResetWidth: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val apiClient = LocalPeerlessApiClient.current
@@ -895,69 +929,118 @@ private fun SupportingPaneContainer(
     val queue by playerConnection.queue.collectAsState()
     val queueDtos = remember(queue) { queue.map { it.toSummaryDto() } }
 
-    Box(
-        modifier = modifier
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(
-                width = 1.dp,
-                brush = Brush.horizontalGradient(
-                    listOf(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), Color.Transparent)
-                ),
-                shape = RectangleShape
-            )
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Row(
+        SupportingPaneSplitter(
+            currentWidth = currentWidth,
+            onWidthChange = onWidthChange,
+            onResetWidth = onResetWidth
+        )
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .padding(top = 4.dp, bottom = 2.dp, end = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            // Floating Header Card
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .clip(
+                        RoundedCornerShape(
+                            topStart = 24.dp,
+                            topEnd = 24.dp,
+                            bottomStart = 8.dp,
+                            bottomEnd = 8.dp
+                        )
+                    )
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val paneIcon = when (paneType) {
-                        SupportingPaneType.QUEUE -> PeerlessIcons.Queue
-                        SupportingPaneType.LYRICS -> PeerlessIcons.Lyrics
-                        SupportingPaneType.SIGNAL_PATH -> PeerlessIcons.SignalPath
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f, fill = false)
+                    ) {
+                        val paneIcon = when (paneType) {
+                            SupportingPaneType.QUEUE -> PeerlessIcons.Queue
+                            SupportingPaneType.LYRICS -> PeerlessIcons.Lyrics
+                            SupportingPaneType.SIGNAL_PATH -> PeerlessIcons.SignalPath
+                        }
+
+                        Icon(
+                            imageVector = paneIcon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+
+                        Text(
+                            text = paneType.title,
+                            style = ExpressiveTypography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        if (paneType == SupportingPaneType.QUEUE && queueDtos.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "${queueDtos.size}",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 10.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
                     }
 
-                    Icon(
-                        imageVector = paneIcon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-
-                    Text(
-                        text = paneType.title,
-                        style = ExpressiveTypography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                IconButton(
-                    onClick = onClose,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = PeerlessIcons.Close,
-                        contentDescription = "Close supporting pane",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                    SupportingPaneQuickSwitcherPill(
+                        activeSupportingPane = paneType,
+                        onToggleSupportingPane = { type ->
+                            if (type == paneType) {
+                                onClose()
+                            } else {
+                                onSelectPane(type)
+                            }
+                        }
                     )
                 }
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
+            // Floating Content Card
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .clip(
+                        RoundedCornerShape(
+                            topStart = 8.dp,
+                            topEnd = 8.dp,
+                            bottomStart = 8.dp,
+                            bottomEnd = 8.dp
+                        )
+                    )
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     .padding(12.dp)
             ) {
                 when (paneType) {
@@ -1023,16 +1106,65 @@ private fun QueuePaneContent(
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             items(items = queueDtos, key = { it.id }) { trackDto ->
-                val isPlaying = currentTrackDto?.id == trackDto.id
-                TrackRow(
-                    track = trackDto,
-                    artworkUrl = apiClient.getArtworkUrl(trackDto, 120),
-                    isPlaying = isPlaying && status == PlaybackStatus.PLAYING,
-                    onTrackClick = { playerConnection.play(it.toTrack(), queueDtos.map { t -> t.toTrack() }) }
-                )
+                val isCurrent = currentTrackDto?.id == trackDto.id
+                val isPlaying = isCurrent && status == PlaybackStatus.PLAYING
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (isCurrent) {
+                                Modifier
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f))
+                                    .border(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                                        shape = RoundedCornerShape(14.dp)
+                                    )
+                                    .padding(bottom = 2.dp)
+                            } else {
+                                Modifier
+                            }
+                        )
+                ) {
+                    if (isCurrent) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (isPlaying) "NOW PLAYING" else "CURRENT TRACK",
+                                style = SpecBadgeTypography.copy(
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.6.sp
+                                ),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            AnimatedEqualizer(
+                                isPlaying = isPlaying,
+                                color = MaterialTheme.colorScheme.primary,
+                                barCount = 3,
+                                barWidth = 2.5.dp,
+                                maxHeight = 10.dp
+                            )
+                        }
+                    }
+
+                    TrackRow(
+                        track = trackDto,
+                        artworkUrl = apiClient.getArtworkUrl(trackDto, 120),
+                        isPlaying = isPlaying,
+                        onTrackClick = { playerConnection.play(it.toTrack(), queueDtos.map { t -> t.toTrack() }) }
+                    )
+                }
             }
         }
     }
@@ -1249,7 +1381,7 @@ private fun DestinationContent(
     onOpenProfile: () -> Unit,
     onOpenNowPlaying: () -> Unit,
     onToggleStats: (() -> Unit)? = null,
-    contentBottomPadding: androidx.compose.ui.unit.Dp,
+    contentBottomPadding: Dp,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
     when (destination) {
@@ -1319,7 +1451,7 @@ private fun HomeDestinationView(
     onOpenSettings: () -> Unit,
     onNavigateToSearch: () -> Unit,
     onToggleStats: () -> Unit,
-    contentBottomPadding: androidx.compose.ui.unit.Dp,
+    contentBottomPadding: Dp,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
     HomeExpressiveContent(
@@ -1343,7 +1475,7 @@ private fun HomeDestinationView(
 private fun SearchDestinationView(
     playerConnection: PlayerConnection,
     onOpenSettings: () -> Unit,
-    contentBottomPadding: androidx.compose.ui.unit.Dp,
+    contentBottomPadding: Dp,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
     SearchScreen(
@@ -1360,7 +1492,7 @@ private fun LibraryDestinationView(
     currentTrackDto: TrackSummaryDto?,
     status: PlaybackStatus,
     allTracks: List<TrackSummaryDto>,
-    contentBottomPadding: androidx.compose.ui.unit.Dp
+    contentBottomPadding: Dp
 ) {
     val apiClient = LocalPeerlessApiClient.current
     val favoritesManager = LocalFavoritesManager.current
@@ -1505,7 +1637,7 @@ private fun SettingsDestinationView(
     serverConnected: Boolean,
     onOpenSettingsDialog: () -> Unit,
     onOpenProfile: () -> Unit,
-    contentBottomPadding: androidx.compose.ui.unit.Dp
+    contentBottomPadding: Dp
 ) {
     val apiClient = LocalPeerlessApiClient.current
     val serverUrl = apiClient.baseUrl
