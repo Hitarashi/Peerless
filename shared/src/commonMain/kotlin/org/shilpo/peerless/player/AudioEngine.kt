@@ -35,6 +35,7 @@ data class AudioEngineState(
     val status: PlaybackStatus = PlaybackStatus.IDLE,
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
+    val bufferedPositionMs: Long = 0L,
     val errorMessage: String? = null
 )
 

@@ -94,3 +94,9 @@ tasks.register("testDebugUnitTest") {
     group = "verification"
     dependsOn("testAndroidHostTest")
 }
+
+tasks.named<Jar>("jvmJar") {
+    from(kotlin.jvm().compilations.getByName("main").output.classesDirs)
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+

@@ -1,12 +1,11 @@
 package org.shilpo.peerless.ui.components
 
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -18,17 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -42,8 +33,6 @@ import org.shilpo.peerless.theme.ExpressiveTypography
 import org.shilpo.peerless.theme.SpecBadgeTypography
 import org.shilpo.peerless.theme.SquircleShapeSmall
 import org.shilpo.peerless.ui.shell.SupportingPaneType
-import kotlin.math.PI
-import kotlin.math.sin
 
 @Composable
 fun PersistentBottomPlayer(
@@ -52,6 +41,7 @@ fun PersistentBottomPlayer(
     status: PlaybackStatus,
     positionMs: Long,
     durationMs: Long,
+    bufferedPositionMs: Long = 0L,
     artworkUrl: String,
     onTogglePlayPause: () -> Unit,
     onSeekTo: (Long) -> Unit,
@@ -267,6 +257,7 @@ fun PersistentBottomPlayer(
                 ExpressiveWavySeekBar(
                     positionMs = positionMs,
                     durationMs = durationMs,
+                    bufferedPositionMs = if (track?.is_cached == true && durationMs > 0L) durationMs else bufferedPositionMs,
                     isPlaying = isPlaying,
                     onSeekTo = onSeekTo,
                     modifier = Modifier.fillMaxWidth()
@@ -306,7 +297,8 @@ fun PersistentBottomPlayer(
                         isExpanded = isPaneOpen,
                         size = 20.dp,
                         tint = if (isPaneOpen) colorScheme.primary else colorScheme.onSurfaceVariant,
-                        contentDescription = if (isPaneOpen) "Close supporting pane" else "Open supporting pane"
+                        contentDescription = if (isPaneOpen) "Close supporting pane" else "Open supporting pane",
+                        flipHorizontal = true
                     )
                 }
             }
@@ -315,51 +307,32 @@ fun PersistentBottomPlayer(
 }
 
 @Composable
-fun ExpressiveWavySeekBar(
+private fun ExpressiveWavySeekBar(
     positionMs: Long,
     durationMs: Long,
+    bufferedPositionMs: Long = 0L,
     isPlaying: Boolean,
     onSeekTo: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var isDragging by remember { mutableStateOf(false) }
-    var dragFraction by remember { mutableFloatStateOf(0f) }
+    val colorScheme = MaterialTheme.colorScheme
+    var scrubPositionMs by remember { mutableStateOf<Long?>(null) }
 
-    val currentFraction = if (durationMs > 0L) {
-        (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
+    val (smoothProgressFraction, displayedPosition) = rememberSmoothProgress(
+        isPlayingProvider = { isPlaying },
+        currentPositionProvider = { scrubPositionMs ?: positionMs },
+        totalDuration = durationMs.coerceAtLeast(0L),
+        isVisible = true
+    )
 
-    val displayFraction = if (isDragging) dragFraction else currentFraction
-    val displayPositionMs = (displayFraction * durationMs).toLong()
-
-    val elapsedText = formatDuration((displayPositionMs / 1000).toInt())
+    val currentPosition = scrubPositionMs ?: displayedPosition.value
+    val elapsedText = formatDuration((currentPosition / 1000).toInt())
     val totalText = formatDuration((durationMs / 1000).toInt())
 
-    val infiniteTransition = rememberInfiniteTransition(label = "WavySeekBarTransition")
-    val wavePhase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2 * PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "WavePhase"
-    )
-
-    val waveAmplitude by animateFloatAsState(
-        targetValue = if (isPlaying && !isDragging) 2.2f else 0f,
-        animationSpec = tween(durationMillis = 350, easing = ExpressiveMotion.EmphasizedEasing),
-        label = "WaveAmplitude"
-    )
-
-    val density = LocalDensity.current
-    val waveWavelengthPx = with(density) { 28.dp.toPx() }
-    val waveAmplitudePx = with(density) { waveAmplitude.dp.toPx() }
-    val strokeWidthPx = with(density) { 3.dp.toPx() }
-
-    val colorScheme = MaterialTheme.colorScheme
+    val effectiveBufferedMs = maxOf(bufferedPositionMs, positionMs)
+    val bufferedFraction = if (durationMs > 0L) {
+        (effectiveBufferedMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+    } else 0f
 
     Row(
         modifier = modifier,
@@ -372,91 +345,32 @@ fun ExpressiveWavySeekBar(
             color = colorScheme.onSurfaceVariant
         )
 
-        Box(
+        WavySliderExpressive(
+            value = { smoothProgressFraction.value },
+            bufferedValue = { bufferedFraction },
+            onValueChange = { fraction ->
+                scrubPositionMs = (fraction * durationMs.coerceAtLeast(0L)).toLong()
+            },
+            onValueCommit = { fraction ->
+                val targetMs = (fraction * durationMs.coerceAtLeast(0L)).toLong()
+                onSeekTo(targetMs)
+                scrubPositionMs = null
+            },
+            enabled = durationMs > 0L,
+            activeTrackColor = colorScheme.primary,
+            inactiveTrackColor = colorScheme.surfaceContainerHighest,
+            bufferedTrackColor = colorScheme.onSurface.copy(alpha = 0.42f),
+            thumbColor = colorScheme.primary,
+            isPlaying = isPlaying,
+            isVisible = true,
+            strokeWidth = 3.5.dp,
+            thumbRadius = 5.dp,
+            idleGap = 3.5.dp,
+            thumbLineHeightWhenInteracting = 18.dp,
             modifier = Modifier
                 .weight(1f)
                 .height(24.dp)
-                .pointerInput(durationMs) {
-                    detectTapGestures { offset ->
-                        if (durationMs > 0L) {
-                            val newFraction = (offset.x / size.width).coerceIn(0f, 1f)
-                            onSeekTo((newFraction * durationMs).toLong())
-                        }
-                    }
-                }
-                .pointerInput(durationMs) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            isDragging = true
-                            dragFraction = (offset.x / size.width).coerceIn(0f, 1f)
-                        },
-                        onDragEnd = {
-                            isDragging = false
-                            onSeekTo((dragFraction * durationMs).toLong())
-                        },
-                        onDragCancel = {
-                            isDragging = false
-                        },
-                        onDrag = { change, _ ->
-                            change.consume()
-                            dragFraction = (change.position.x / size.width).coerceIn(0f, 1f)
-                        }
-                    )
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Canvas(modifier = Modifier.fillMaxWidth().height(16.dp)) {
-                val totalWidth = size.width
-                val centerY = size.height / 2f
-                val activeWidth = totalWidth * displayFraction
-
-                if (activeWidth < totalWidth) {
-                    drawLine(
-                        color = colorScheme.surfaceContainerHighest,
-                        start = Offset(activeWidth, centerY),
-                        end = Offset(totalWidth, centerY),
-                        strokeWidth = strokeWidthPx,
-                        cap = StrokeCap.Round
-                    )
-                }
-
-                if (activeWidth > 0f) {
-                    val path = Path()
-                    path.moveTo(0f, centerY)
-
-                    var x = 0f
-                    val step = 3f
-                    while (x <= activeWidth) {
-                        val angle = (x / waveWavelengthPx) * (2 * PI).toFloat() + wavePhase
-                        val y = centerY + sin(angle) * waveAmplitudePx
-                        path.lineTo(x, y)
-                        x += step
-                    }
-
-                    drawPath(
-                        path = path,
-                        brush = Brush.horizontalGradient(
-                            listOf(colorScheme.primary, colorScheme.secondary)
-                        ),
-                        style = Stroke(
-                            width = strokeWidthPx,
-                            cap = StrokeCap.Round,
-                            join = StrokeJoin.Round
-                        )
-                    )
-
-                    val currentY =
-                        centerY + sin((activeWidth / waveWavelengthPx) * (2 * PI).toFloat() + wavePhase) * waveAmplitudePx
-                    val thumbRadius = if (isDragging) 6.dp.toPx() else 4.5.dp.toPx()
-
-                    drawCircle(
-                        color = colorScheme.onSurface,
-                        radius = thumbRadius,
-                        center = Offset(activeWidth, currentY)
-                    )
-                }
-            }
-        }
+        )
 
         Text(
             text = totalText,

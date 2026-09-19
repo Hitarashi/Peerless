@@ -3,18 +3,20 @@ package org.shilpo.peerless.ui.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -186,7 +188,10 @@ fun TrackRow(
     modifier: Modifier = Modifier,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null,
     isFavorite: Boolean? = null,
-    onToggleFavorite: ((TrackSummaryDto) -> Unit)? = null
+    onToggleFavorite: ((TrackSummaryDto) -> Unit)? = null,
+    isCurrent: Boolean = isPlaying,
+    embedded: Boolean = false,
+    showArtworkOverlay: Boolean = !embedded
 ) {
     val favoritesManager = org.shilpo.peerless.library.LocalFavoritesManager.current
     val favoriteIds by (favoritesManager?.favoriteIds
@@ -206,14 +211,22 @@ fun TrackRow(
 
     val colorScheme = MaterialTheme.colorScheme
 
-    val rowBg by animateColorAsState(
-        targetValue = if (isPlaying) colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent,
-        animationSpec = tween(200)
-    )
+    val rowInteractionSource = remember { MutableInteractionSource() }
+    val isRowHovered by rowInteractionSource.collectIsHoveredAsState()
 
-    val rowBorderColor by animateColorAsState(
-        targetValue = if (isPlaying) colorScheme.primary.copy(alpha = 0.35f) else Color.Transparent,
-        animationSpec = tween(200)
+    val rowBg by animateColorAsState(
+        targetValue = when {
+            embedded -> Color.Transparent
+            isCurrent && isRowHovered -> {
+                colorScheme.onSecondaryContainer.copy(alpha = 0.08f)
+                    .compositeOver(colorScheme.secondaryContainer)
+            }
+
+            isCurrent -> colorScheme.secondaryContainer
+            isRowHovered -> colorScheme.onSurfaceVariant.copy(alpha = 0.08f)
+            else -> Color.Transparent
+        },
+        animationSpec = tween(150)
     )
 
     Row(
@@ -221,19 +234,35 @@ fun TrackRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(rowBg)
-            .border(1.dp, rowBorderColor, RoundedCornerShape(14.dp))
             .combinedClickable(
+                interactionSource = rowInteractionSource,
+                indication = ripple(),
                 onClick = { onTrackClick(track) },
                 onLongClick = { showAudioDetails = true }
             )
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(
+                horizontal = if (embedded) 8.dp else 10.dp,
+                vertical = if (embedded) 6.dp else 8.dp
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        val artworkInteractionSource = remember { MutableInteractionSource() }
+        val isArtworkHovered by artworkInteractionSource.collectIsHoveredAsState()
+
         Box(
             modifier = Modifier
                 .size(52.dp)
                 .clip(ArtworkShape)
-                .background(colorScheme.surfaceContainerHighest),
+                .background(colorScheme.surfaceContainerHighest)
+                .hoverable(artworkInteractionSource)
+                .pointerHoverIcon(if (isCurrent) PointerIcon.Hand else PointerIcon.Default)
+                .clickable(
+                    interactionSource = artworkInteractionSource,
+                    indication = null,
+                    enabled = isCurrent
+                ) {
+                    onTrackClick(track)
+                },
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -250,7 +279,7 @@ fun TrackRow(
                 modifier = Modifier.fillMaxSize()
             )
 
-            if (isPlaying) {
+            if (isPlaying && showArtworkOverlay && !isArtworkHovered) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -264,6 +293,19 @@ fun TrackRow(
                         maxHeight = 16.dp
                     )
                 }
+            } else if (isCurrent && isArtworkHovered) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.5f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    PlayPauseMorphIcon(
+                        isPlaying = isPlaying,
+                        size = 20.dp,
+                        tint = Color.White
+                    )
+                }
             }
         }
 
@@ -275,7 +317,6 @@ fun TrackRow(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
@@ -285,79 +326,16 @@ fun TrackRow(
                     color = if (isPlaying) colorScheme.primary else colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(
+                            if (isPlaying) {
+                                Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                            } else {
+                                Modifier
+                            }
+                        )
                 )
-
-                if (track.is_cached) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp),
-                        modifier = Modifier
-                            .clip(PillShape)
-                            .background(colorScheme.secondary.copy(alpha = 0.14f))
-                            .border(1.dp, colorScheme.secondary.copy(alpha = 0.45f), PillShape)
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = PeerlessIcons.CloudDone,
-                            contentDescription = "Cached",
-                            tint = colorScheme.secondary,
-                            modifier = Modifier.size(10.dp)
-                        )
-                        Text(
-                            text = "CACHED",
-                            style = SpecBadgeTypography.copy(
-                                fontSize = 7.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp
-                            ),
-                            color = colorScheme.secondary,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp),
-                        modifier = Modifier
-                            .clip(PillShape)
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(
-                                        colorScheme.tertiary.copy(alpha = 0.20f),
-                                        colorScheme.primary.copy(alpha = 0.20f)
-                                    )
-                                )
-                            )
-                            .border(
-                                1.dp,
-                                Brush.horizontalGradient(
-                                    listOf(
-                                        colorScheme.tertiary.copy(alpha = 0.60f),
-                                        colorScheme.primary.copy(alpha = 0.60f)
-                                    )
-                                ),
-                                PillShape
-                            )
-                            .then(
-                                if (onRipClick != null) Modifier.clickable { onRipClick(track) } else Modifier
-                            )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = "RIP & STREAM",
-                            style = SpecBadgeTypography.copy(
-                                fontSize = 7.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp
-                            ),
-                            color = colorScheme.tertiary,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                }
             }
 
             Text(
@@ -370,7 +348,7 @@ fun TrackRow(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 PowerampLosslessBadge(
                     bitDepth = track.bit_depth,
@@ -404,11 +382,11 @@ fun TrackRow(
             }
         }
 
-        Spacer(modifier = Modifier.width(6.dp))
+        Spacer(modifier = Modifier.width(4.dp))
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
+            horizontalArrangement = Arrangement.spacedBy(1.dp)
         ) {
             IconButton(
                 onClick = {
@@ -418,19 +396,19 @@ fun TrackRow(
                         favoritesManager?.toggleFavorite(track)
                     }
                 },
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(28.dp)
             ) {
                 Icon(
                     imageVector = if (isFav) PeerlessIcons.Heart else PeerlessIcons.HeartBorder,
                     contentDescription = if (isFav) "Remove from favorites" else "Add to favorites",
                     tint = if (isFav) Color(0xFFFF5252) else colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
 
             Column(
                 horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
                     text = formatDuration(track.duration),
@@ -468,13 +446,13 @@ fun TrackRow(
 
             IconButton(
                 onClick = { showAudioDetails = true },
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(28.dp)
             ) {
                 Icon(
                     imageVector = PeerlessIcons.MoreVert,
                     contentDescription = "Track options",
                     tint = colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }

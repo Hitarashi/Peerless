@@ -193,7 +193,8 @@ class AndroidAudioEngine(
         _state.value = _state.value.copy(
             status = status,
             positionMs = position,
-            durationMs = duration
+            durationMs = duration,
+            bufferedPositionMs = player.bufferedPosition.coerceAtLeast(0L)
         )
 
         if (status == PlaybackStatus.PLAYING) {
@@ -211,7 +212,8 @@ class AndroidAudioEngine(
                 if (player != null && player.isPlaying) {
                     _state.value = _state.value.copy(
                         positionMs = player.currentPosition,
-                        durationMs = if (player.duration > 0) player.duration else _state.value.durationMs
+                        durationMs = if (player.duration > 0) player.duration else _state.value.durationMs,
+                        bufferedPositionMs = player.bufferedPosition.coerceAtLeast(0L)
                     )
                 }
                 delay(250)

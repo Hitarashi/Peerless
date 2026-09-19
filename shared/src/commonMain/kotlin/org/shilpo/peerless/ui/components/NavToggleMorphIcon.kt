@@ -38,6 +38,7 @@ fun NavToggleMorphIcon(
     size: Dp = 24.dp,
     tint: Color = LocalContentColor.current,
     contentDescription: String? = if (isExpanded) "Collapse rail" else "Expand rail",
+    flipHorizontal: Boolean = false,
 ) {
     val progress by animateFloatAsState(
         targetValue = if (isExpanded) 1f else 0f,
@@ -58,7 +59,8 @@ fun NavToggleMorphIcon(
 
     Canvas(modifier = descModifier.size(size)) {
         val isRtl = layoutDirection == LayoutDirection.Rtl
-        if (isRtl) {
+        val shouldFlip = if (flipHorizontal) !isRtl else isRtl
+        if (shouldFlip) {
             scale(scaleX = -1f, scaleY = 1f, pivot = center) {
                 drawNavToggleMorph(progress = progress, tint = tint)
             }

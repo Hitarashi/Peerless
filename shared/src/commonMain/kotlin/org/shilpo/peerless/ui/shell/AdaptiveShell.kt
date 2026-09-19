@@ -86,6 +86,9 @@ fun AdaptiveShell(
     val canSkipNext by playerConnection.canSkipNext.collectAsState()
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
     val volume by playerConnection.volume.collectAsState()
+    val positionMs by playerConnection.positionMs.collectAsState()
+    val durationMs by playerConnection.durationMs.collectAsState()
+    val bufferedPositionMs by playerConnection.bufferedPositionMs.collectAsState()
 
     var currentDestination by remember { mutableStateOf(NavigationDestination.HOME) }
     var activeSupportingPane by remember { mutableStateOf<SupportingPaneType?>(SupportingPaneType.QUEUE) }
@@ -283,8 +286,9 @@ fun AdaptiveShell(
                             track = trackDto,
                             playbackInfo = playerConnection.playbackInfo.collectAsState().value,
                             status = status,
-                            positionMs = playerConnection.currentPositionMs,
-                            durationMs = playerConnection.currentDurationMs,
+                            positionMs = positionMs,
+                            durationMs = durationMs,
+                            bufferedPositionMs = bufferedPositionMs,
                             artworkUrl = apiClient.getArtworkUrl(trackDto, 600),
                             serverUrl = apiClient.baseUrl,
                             onTogglePlayPause = { playerConnection.togglePlayPause() },
@@ -353,6 +357,8 @@ private fun CompactLayout(
     val apiClient = LocalPeerlessApiClient.current
     val canSkipNext by playerConnection.canSkipNext.collectAsState()
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
+    val positionMs by playerConnection.positionMs.collectAsState()
+    val durationMs by playerConnection.durationMs.collectAsState()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
@@ -400,8 +406,8 @@ private fun CompactLayout(
                         track = trackDto,
                         playbackInfo = playerConnection.playbackInfo.collectAsState().value,
                         status = status,
-                        positionMs = playerConnection.currentPositionMs,
-                        durationMs = playerConnection.currentDurationMs,
+                        positionMs = positionMs,
+                        durationMs = durationMs,
                         artworkUrl = apiClient.getArtworkUrl(trackDto, 200),
                         onTogglePlayPause = { playerConnection.togglePlayPause() },
                         onPlayNext = { playerConnection.playNext() },
@@ -455,6 +461,8 @@ private fun MediumLayout(
     val apiClient = LocalPeerlessApiClient.current
     val canSkipNext by playerConnection.canSkipNext.collectAsState()
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
+    val positionMs by playerConnection.positionMs.collectAsState()
+    val durationMs by playerConnection.durationMs.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -507,8 +515,8 @@ private fun MediumLayout(
                     track = trackDto,
                     playbackInfo = playerConnection.playbackInfo.collectAsState().value,
                     status = status,
-                    positionMs = playerConnection.currentPositionMs,
-                    durationMs = playerConnection.currentDurationMs,
+                    positionMs = positionMs,
+                    durationMs = durationMs,
                     artworkUrl = apiClient.getArtworkUrl(trackDto, 200),
                     onTogglePlayPause = { playerConnection.togglePlayPause() },
                     onPlayNext = { playerConnection.playNext() },
@@ -557,6 +565,10 @@ private fun ExpandedLayout(
 ) {
     val apiClient = LocalPeerlessApiClient.current
     val isRepeat = repeatMode != org.shilpo.peerless.model.RepeatMode.OFF
+
+    val positionMs by playerConnection.positionMs.collectAsState()
+    val durationMs by playerConnection.durationMs.collectAsState()
+    val bufferedPositionMs by playerConnection.bufferedPositionMs.collectAsState()
 
     var displayedSupportingPane by remember { mutableStateOf(activeSupportingPane) }
     if (activeSupportingPane != null) {
@@ -669,8 +681,9 @@ private fun ExpandedLayout(
                 track = currentTrackDto,
                 playbackInfo = playerConnection.playbackInfo.collectAsState().value,
                 status = status,
-                positionMs = playerConnection.currentPositionMs,
-                durationMs = playerConnection.currentDurationMs,
+                positionMs = positionMs,
+                durationMs = durationMs,
+                bufferedPositionMs = bufferedPositionMs,
                 artworkUrl = currentTrackDto?.let { apiClient.getArtworkUrl(it, 200) } ?: "",
                 onTogglePlayPause = { playerConnection.togglePlayPause() },
                 onSeekTo = { pos -> playerConnection.seekTo(pos) },
@@ -1112,59 +1125,20 @@ private fun QueuePaneContent(
                 val isCurrent = currentTrackDto?.id == trackDto.id
                 val isPlaying = isCurrent && status == PlaybackStatus.PLAYING
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .then(
-                            if (isCurrent) {
-                                Modifier
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f))
-                                    .border(
-                                        width = 1.dp,
-                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
-                                        shape = RoundedCornerShape(14.dp)
-                                    )
-                                    .padding(bottom = 2.dp)
-                            } else {
-                                Modifier
-                            }
-                        )
-                ) {
-                    if (isCurrent) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 2.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = if (isPlaying) "NOW PLAYING" else "CURRENT TRACK",
-                                style = SpecBadgeTypography.copy(
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.6.sp
-                                ),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            AnimatedEqualizer(
-                                isPlaying = isPlaying,
-                                color = MaterialTheme.colorScheme.primary,
-                                barCount = 3,
-                                barWidth = 2.5.dp,
-                                maxHeight = 10.dp
-                            )
+                TrackRow(
+                    track = trackDto,
+                    artworkUrl = apiClient.getArtworkUrl(trackDto, 120),
+                    isPlaying = isPlaying,
+                    isCurrent = isCurrent,
+                    onTrackClick = {
+                        if (isCurrent) {
+                            playerConnection.togglePlayPause()
+                        } else {
+                            playerConnection.play(it.toTrack(), queueDtos.map { t -> t.toTrack() })
                         }
-                    }
-
-                    TrackRow(
-                        track = trackDto,
-                        artworkUrl = apiClient.getArtworkUrl(trackDto, 120),
-                        isPlaying = isPlaying,
-                        onTrackClick = { playerConnection.play(it.toTrack(), queueDtos.map { t -> t.toTrack() }) }
-                    )
-                }
+                    },
+                    showArtworkOverlay = false
+                )
             }
         }
     }
@@ -1610,15 +1584,21 @@ private fun LibraryDestinationView(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 items(tracksToShow, key = { it.id }) { track ->
-                    val isPlaying = currentTrackDto?.id == track.id &&
+                    val isCurrent = currentTrackDto?.id == track.id
+                    val isPlaying = isCurrent &&
                             status == PlaybackStatus.PLAYING
 
                     TrackRow(
                         track = track,
                         artworkUrl = apiClient.getArtworkUrl(track, 200),
                         isPlaying = isPlaying,
+                        isCurrent = isCurrent,
                         onTrackClick = { clicked ->
-                            playerConnection.playTrack(clicked, tracksToShow)
+                            if (isCurrent) {
+                                playerConnection.togglePlayPause()
+                            } else {
+                                playerConnection.playTrack(clicked, tracksToShow)
+                            }
                         },
                         isFavorite = favoritesManager?.isFavorite(track.id),
                         onToggleFavorite = { clicked ->

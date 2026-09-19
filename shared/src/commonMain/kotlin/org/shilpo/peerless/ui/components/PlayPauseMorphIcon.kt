@@ -34,7 +34,8 @@ fun PlayPauseMorphIcon(
         targetValue = if (isPlaying) 1f else 0f,
         animationSpec = spring(
             dampingRatio = 0.78f,
-            stiffness = Spring.StiffnessMediumLow
+            stiffness = Spring.StiffnessMediumLow,
+            visibilityThreshold = 0.001f
         ),
         label = "PlayPauseMorphProgress"
     )
@@ -75,12 +76,27 @@ private fun DrawScope.drawPlayPauseMorph(
 
     val cornerRadius = lerp(3.4f * s, 2.0f * s, p)
     val tipRadius = lerp(3.6f * s, 2.0f * s, p)
+
+    if (p <= 0.015f) {
+        val playVertices = listOf(
+            Vertex(toCanvas(8.0f, 5.0f), cornerRadius),
+            Vertex(toCanvas(19.0f, 12.0f), tipRadius),
+            Vertex(toCanvas(8.0f, 19.0f), cornerRadius)
+        )
+        val playPath = Path().apply { addRoundedPolygon(playVertices) }
+        drawPath(playPath, color = tint)
+        return
+    }
+
     val seamRadius = lerp(0f, 2.0f * s, p)
+    val bar1SeamX = lerp(13.4f, 10.0f, p)
+    val bar1SeamTopY = lerp(8.436f, 5.0f, p)
+    val bar1SeamBotY = lerp(15.564f, 19.0f, p)
 
     val bar1Vertices = listOf(
         Vertex(toCanvas(lerp(8.0f, 6.0f, p), lerp(5.0f, 5.0f, p)), cornerRadius),
-        Vertex(toCanvas(lerp(13.0f, 10.0f, p), lerp(8.182f, 5.0f, p)), seamRadius),
-        Vertex(toCanvas(lerp(13.0f, 10.0f, p), lerp(15.818f, 19.0f, p)), seamRadius),
+        Vertex(toCanvas(bar1SeamX, bar1SeamTopY), seamRadius),
+        Vertex(toCanvas(bar1SeamX, bar1SeamBotY), seamRadius),
         Vertex(toCanvas(lerp(8.0f, 6.0f, p), lerp(19.0f, 19.0f, p)), cornerRadius)
     )
 

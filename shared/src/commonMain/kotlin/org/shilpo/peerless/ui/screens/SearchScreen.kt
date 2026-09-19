@@ -522,7 +522,13 @@ private fun ZeroStateDiscovery(
                 track = track,
                 artworkUrl = apiClient.getArtworkUrl(track, 200),
                 isPlaying = isPlaying,
-                onTrackClick = { playerConnection.play(it.toTrack(), cachedSampleTracks.map { t -> t.toTrack() }) }
+                onTrackClick = {
+                    if (currentTrackDto?.id == it.id) {
+                        playerConnection.togglePlayPause()
+                    } else {
+                        playerConnection.play(it.toTrack(), cachedSampleTracks.map { t -> t.toTrack() })
+                    }
+                }
             )
         }
     }
@@ -660,7 +666,13 @@ private fun SearchResultsContent(
                     track = track,
                     artworkUrl = apiClient.getArtworkUrl(track, 200),
                     isPlaying = isPlaying,
-                    onTrackClick = { playerConnection.play(it.toTrack(), cachedTracks.map { t -> t.toTrack() }) }
+                    onTrackClick = {
+                        if (currentTrackDto?.id == it.id) {
+                            playerConnection.togglePlayPause()
+                        } else {
+                            playerConnection.play(it.toTrack(), cachedTracks.map { t -> t.toTrack() })
+                        }
+                    }
                 )
             }
         }
@@ -685,7 +697,13 @@ private fun SearchResultsContent(
                     track = trackSummary,
                     artworkUrl = apiClient.getArtworkUrl(trackSummary, 200),
                     isPlaying = isPlaying,
-                    onTrackClick = { playerConnection.play(it.toTrack(), emptyList()) },
+                    onTrackClick = {
+                        if (currentTrackDto?.id == it.id) {
+                            playerConnection.togglePlayPause()
+                        } else {
+                            playerConnection.play(it.toTrack(), emptyList())
+                        }
+                    },
                     onRipClick = onRipClick
                 )
             }

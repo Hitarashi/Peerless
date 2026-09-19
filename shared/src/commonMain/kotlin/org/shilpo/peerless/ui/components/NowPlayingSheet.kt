@@ -31,9 +31,6 @@ import org.shilpo.peerless.model.RepeatMode
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.theme.*
-import kotlin.math.abs
-
-private const val SeekbarSettleToleranceMs = 1500L
 
 @Composable
 fun NowPlayingSheet(
@@ -42,6 +39,7 @@ fun NowPlayingSheet(
     status: PlaybackStatus,
     positionMs: Long,
     durationMs: Long,
+    bufferedPositionMs: Long = 0L,
     artworkUrl: String,
     serverUrl: String,
     onTogglePlayPause: () -> Unit,
@@ -65,35 +63,18 @@ fun NowPlayingSheet(
 
     val isPlaying = status == PlaybackStatus.PLAYING
 
-    var isDraggingSlider by remember { mutableStateOf(false) }
-    var targetSeekPositionMs by remember { mutableStateOf<Long?>(null) }
-    var sliderDragPosition by remember { mutableFloatStateOf(0f) }
+    var scrubPositionMs by remember { mutableStateOf<Long?>(null) }
 
-    LaunchedEffect(track.id) {
-        targetSeekPositionMs = null
-    }
+    val (smoothProgressFraction, displayedPosition) = rememberSmoothProgress(
+        isPlayingProvider = { isPlaying },
+        currentPositionProvider = { scrubPositionMs ?: positionMs },
+        totalDuration = durationMs.coerceAtLeast(0L),
+        isVisible = true
+    )
 
-    if (!isDraggingSlider) {
-        targetSeekPositionMs?.let { target ->
-            val clampedTarget = if (durationMs > 0L) target.coerceIn(0L, durationMs) else target.coerceAtLeast(0L)
-            if (abs(positionMs - clampedTarget) <= SeekbarSettleToleranceMs) {
-                targetSeekPositionMs = null
-            }
-        }
-    }
-
-    val displayPositionMs = when {
-        isDraggingSlider -> (sliderDragPosition * durationMs).toLong()
-        targetSeekPositionMs != null -> targetSeekPositionMs!!
-        else -> positionMs
-    }
-
-    val displayFraction = if (durationMs > 0L) {
-        (displayPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
-    } else 0f
-
-    val elapsedText = formatDuration((displayPositionMs / 1000).toInt())
-    val remainingMs = (durationMs - displayPositionMs).coerceAtLeast(0L)
+    val currentPosition = scrubPositionMs ?: displayedPosition.value
+    val elapsedText = formatDuration((currentPosition / 1000).toInt())
+    val remainingMs = (durationMs - currentPosition).coerceAtLeast(0L)
     val remainingText = "-${formatDuration((remainingMs / 1000).toInt())}"
 
     val playButtonInteractionSource = remember { MutableInteractionSource() }
@@ -315,32 +296,43 @@ fun NowPlayingSheet(
             Spacer(modifier = Modifier.height(20.dp))
 
             Column(modifier = Modifier.fillMaxWidth()) {
-                Slider(
-                    value = displayFraction,
-                    onValueChange = { frac ->
-                        isDraggingSlider = true
-                        sliderDragPosition = frac
+                val effectiveBufferedMs =
+                    if (track.is_cached && durationMs > 0L) durationMs else maxOf(bufferedPositionMs, positionMs)
+                val bufferedFraction = if (durationMs > 0L) {
+                    (effectiveBufferedMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+                } else 0f
+
+                WavySliderExpressive(
+                    value = { smoothProgressFraction.value },
+                    bufferedValue = { bufferedFraction },
+                    onValueChange = { fraction ->
+                        scrubPositionMs = (fraction * durationMs.coerceAtLeast(0L)).toLong()
                     },
-                    onValueChangeFinished = {
-                        isDraggingSlider = false
-                        val seekTarget = (sliderDragPosition * durationMs).toLong()
-                        targetSeekPositionMs = seekTarget
-                        onSeekTo(seekTarget)
+                    onValueCommit = { fraction ->
+                        val targetMs = (fraction * durationMs.coerceAtLeast(0L)).toLong()
+                        onSeekTo(targetMs)
+                        scrubPositionMs = null
                     },
-                    colors = SliderDefaults.colors(
-                        thumbColor = colorScheme.primary,
-                        activeTrackColor = colorScheme.primary,
-                        inactiveTrackColor = colorScheme.surfaceContainerHighest
-                    ),
+                    enabled = durationMs > 0L,
+                    activeTrackColor = colorScheme.primary,
+                    inactiveTrackColor = colorScheme.surfaceContainerHighest,
+                    bufferedTrackColor = colorScheme.onSurface.copy(alpha = 0.42f),
+                    thumbColor = colorScheme.primary,
+                    isPlaying = isPlaying,
+                    isVisible = true,
+                    strokeWidth = 4.dp,
+                    thumbRadius = 6.dp,
+                    idleGap = 3.5.dp,
+                    thumbLineHeightWhenInteracting = 22.dp,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(28.dp)
+                        .height(36.dp)
                 )
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp),
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(

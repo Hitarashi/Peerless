@@ -188,6 +188,9 @@ class DesktopAudioEngine : AudioEngine {
             lib.mpv_set_option_string(ctx, "audio-client-name", "Peerless")
             lib.mpv_set_option_string(ctx, "terminal", "yes")
             lib.mpv_set_option_string(ctx, "msg-level", "all=warn,ao=info")
+            lib.mpv_set_option_string(ctx, "cache", "yes")
+            lib.mpv_set_option_string(ctx, "demuxer-max-bytes", "150MiB")
+            lib.mpv_set_option_string(ctx, "demuxer-readahead-secs", "120")
 
             val initStatus = lib.mpv_initialize(ctx)
             if (initStatus < 0) {
@@ -204,6 +207,8 @@ class DesktopAudioEngine : AudioEngine {
             lib.mpv_observe_property(ctx, 5L, "audio-params", MpvConstants.FORMAT_NONE)
             lib.mpv_observe_property(ctx, 6L, "audio-codec-name", MpvConstants.FORMAT_NONE)
             lib.mpv_observe_property(ctx, 7L, "audio-bitrate", MpvConstants.FORMAT_NONE)
+            lib.mpv_observe_property(ctx, 8L, "demuxer-cache-time", MpvConstants.FORMAT_NONE)
+            lib.mpv_observe_property(ctx, 9L, "demuxer-cache-duration", MpvConstants.FORMAT_NONE)
 
             setVolume(currentVolume)
             startEventLoop()
@@ -272,6 +277,7 @@ class DesktopAudioEngine : AudioEngine {
                         if (isPlaying) {
                             setProperty("pause", "no")
                             _state.value = _state.value.copy(status = PlaybackStatus.PLAYING)
+                            startProgressUpdates()
                         }
                     }
 
@@ -282,6 +288,7 @@ class DesktopAudioEngine : AudioEngine {
 
                         if (eofReached && playlistPos >= playlistCount - 1 && isPlaying) {
                             isPlaying = false
+                            stopProgressUpdates()
                             _state.value = _state.value.copy(status = PlaybackStatus.COMPLETED)
                             _events.emit(AudioEngineEvent.TrackCompleted)
                         }
@@ -314,11 +321,28 @@ class DesktopAudioEngine : AudioEngine {
             _state.value = _state.value.copy(durationMs = (durSec * 1000.0).toLong())
         }
 
+        val cacheDurSec = getProperty("demuxer-cache-duration")?.toDoubleOrNull()
+        val cacheTimeSec = getProperty("demuxer-cache-time")?.toDoubleOrNull()
+        val bufMs = when {
+            cacheDurSec != null && cacheDurSec > 0.0 && timePosSec != null -> ((timePosSec + cacheDurSec) * 1000.0).toLong()
+                .coerceAtLeast((timePosSec * 1000.0).toLong())
+
+            cacheTimeSec != null && cacheTimeSec > 0.0 -> (cacheTimeSec * 1000.0).toLong()
+            else -> null
+        }
+        if (bufMs != null) {
+            _state.value = _state.value.copy(bufferedPositionMs = bufMs)
+        }
+
         val pauseVal = getProperty("pause")
         if (pauseVal == "yes") {
+            isPlaying = false
+            stopProgressUpdates()
             _state.value = _state.value.copy(status = PlaybackStatus.PAUSED)
-        } else if (pauseVal == "no" && isPlaying) {
+        } else if (pauseVal == "no") {
+            isPlaying = true
             _state.value = _state.value.copy(status = PlaybackStatus.PLAYING)
+            startProgressUpdates()
         }
 
         val eofVal = getProperty("eof-reached")
@@ -447,9 +471,51 @@ class DesktopAudioEngine : AudioEngine {
         }
     }
 
+    private var progressJob: Job? = null
+
+    private fun startProgressUpdates() {
+        if (progressJob?.isActive == true) return
+        progressJob = scope.launch(Dispatchers.IO) {
+            while (isActive && isPlaying) {
+                val timePosSec = getProperty("time-pos")?.toDoubleOrNull()
+                val durSec = getProperty("duration")?.toDoubleOrNull()
+                val cacheDurSec = getProperty("demuxer-cache-duration")?.toDoubleOrNull()
+                val cacheTimeSec = getProperty("demuxer-cache-time")?.toDoubleOrNull()
+
+                if (timePosSec != null) {
+                    val ms = (timePosSec * 1000.0).toLong()
+                    val durMs =
+                        if (durSec != null && durSec > 0.0) (durSec * 1000.0).toLong() else _state.value.durationMs
+                    val bufferedMs = when {
+                        cacheDurSec != null && cacheDurSec > 0.0 -> ((timePosSec + cacheDurSec) * 1000.0).toLong()
+                            .coerceAtLeast(ms)
+
+                        cacheTimeSec != null && cacheTimeSec > 0.0 -> (cacheTimeSec * 1000.0).toLong().coerceAtLeast(ms)
+                        durMs > 0L && _state.value.bufferedPositionMs >= durMs -> durMs
+                        else -> maxOf(ms, _state.value.bufferedPositionMs)
+                    }
+
+                    _state.value = _state.value.copy(
+                        positionMs = ms,
+                        durationMs = if (durMs > 0L) durMs else _state.value.durationMs,
+                        bufferedPositionMs = bufferedMs,
+                        status = PlaybackStatus.PLAYING
+                    )
+                }
+                delay(100)
+            }
+        }
+    }
+
+    private fun stopProgressUpdates() {
+        progressJob?.cancel()
+        progressJob = null
+    }
+
     override fun play() {
         isPlaying = true
         _state.value = _state.value.copy(status = PlaybackStatus.PLAYING)
+        startProgressUpdates()
         scope.launch {
             if (initMpv()) {
                 setProperty("pause", "no")
@@ -459,6 +525,7 @@ class DesktopAudioEngine : AudioEngine {
 
     override fun pause() {
         isPlaying = false
+        stopProgressUpdates()
         _state.value = _state.value.copy(status = PlaybackStatus.PAUSED)
         scope.launch {
             setProperty("pause", "yes")
@@ -467,6 +534,7 @@ class DesktopAudioEngine : AudioEngine {
 
     override fun stop() {
         isPlaying = false
+        stopProgressUpdates()
         _state.value = AudioEngineState(status = PlaybackStatus.IDLE, positionMs = 0L)
         scope.launch {
             executeCommand("stop")
@@ -494,6 +562,7 @@ class DesktopAudioEngine : AudioEngine {
     override fun release() {
         if (isReleased.getAndSet(true)) return
         isPlaying = false
+        stopProgressUpdates()
         eventLoopJob?.cancel()
 
         val ctx = mpvContext

@@ -540,7 +540,11 @@ fun HomeExpressiveContent(
                         currentTrackId = currentTrackDto?.id,
                         isPlaying = status == PlaybackStatus.PLAYING,
                         onTrackClick = { clicked ->
-                            playerConnection.play(clicked.toTrack(), allTracks.map { it.toTrack() })
+                            if (currentTrackDto?.id == clicked.id) {
+                                playerConnection.togglePlayPause()
+                            } else {
+                                playerConnection.play(clicked.toTrack(), allTracks.map { it.toTrack() })
+                            }
                         },
                         getArtworkUrl = { track ->
                             apiClient.getArtworkUrl(track, 300)
@@ -607,7 +611,11 @@ fun HomeExpressiveContent(
                         artworkUrl = apiClient.getArtworkUrl(track, 200),
                         isPlaying = isPlaying,
                         onTrackClick = { clicked ->
-                            playerConnection.play(clicked.toTrack(), displayedTracks.map { it.toTrack() })
+                            if (currentTrackDto?.id == clicked.id) {
+                                playerConnection.togglePlayPause()
+                            } else {
+                                playerConnection.play(clicked.toTrack(), displayedTracks.map { it.toTrack() })
+                            }
                         },
                         onRipClick = onRipClick
                     )
@@ -631,6 +639,9 @@ fun HomeScreen(
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
     val shuffleMode by playerConnection.shuffleMode.collectAsState()
     val repeatMode by playerConnection.repeatMode.collectAsState()
+    val positionMs by playerConnection.positionMs.collectAsState()
+    val durationMs by playerConnection.durationMs.collectAsState()
+    val bufferedPositionMs by playerConnection.bufferedPositionMs.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("All") }
@@ -730,8 +741,8 @@ fun HomeScreen(
                     track = trackDto,
                     playbackInfo = playbackInfo,
                     status = status,
-                    positionMs = playerConnection.currentPositionMs,
-                    durationMs = playerConnection.currentDurationMs,
+                    positionMs = positionMs,
+                    durationMs = durationMs,
                     artworkUrl = apiClient.getArtworkUrl(trackDto, 200),
                     onTogglePlayPause = { playerConnection.togglePlayPause() },
                     onPlayNext = { playerConnection.playNext() },
@@ -754,8 +765,9 @@ fun HomeScreen(
                     track = trackDto,
                     playbackInfo = playbackInfo,
                     status = status,
-                    positionMs = playerConnection.currentPositionMs,
-                    durationMs = playerConnection.currentDurationMs,
+                    positionMs = positionMs,
+                    durationMs = durationMs,
+                    bufferedPositionMs = bufferedPositionMs,
                     artworkUrl = apiClient.getArtworkUrl(trackDto, 600),
                     serverUrl = apiClient.baseUrl,
                     onTogglePlayPause = { playerConnection.togglePlayPause() },

@@ -59,11 +59,17 @@ class RealPlayerConnection(
     private val _durationMs = MutableStateFlow(0L)
     override val durationMs: StateFlow<Long> = _durationMs.asStateFlow()
 
+    private val _bufferedPositionMs = MutableStateFlow(0L)
+    override val bufferedPositionMs: StateFlow<Long> = _bufferedPositionMs.asStateFlow()
+
     override val currentPositionMs: Long
         get() = _positionMs.value
 
     override val currentDurationMs: Long
         get() = _durationMs.value
+
+    override val currentBufferedPositionMs: Long
+        get() = _bufferedPositionMs.value
 
     private var loadJob: Job? = null
     private var preloadJob: Job? = null
@@ -82,13 +88,22 @@ class RealPlayerConnection(
                     } else {
                         stopTicker()
                     }
-                } else if (!playing) {
-                    _positionMs.value = engState.positionMs
                 }
+                _positionMs.value = engState.positionMs
 
                 val dur = engState.durationMs.takeIf { it > 0L }
                     ?: (_currentTrack.value?.durationMs ?: 0L)
                 _durationMs.value = dur
+
+                val isCached = _currentTrack.value?.isCached == true
+                val engBuffered = engState.bufferedPositionMs
+                if (isCached && dur > 0L) {
+                    _bufferedPositionMs.value = dur
+                } else if (engBuffered > 0L) {
+                    _bufferedPositionMs.value = maxOf(engBuffered, engState.positionMs)
+                } else if (engState.positionMs > 0L) {
+                    _bufferedPositionMs.value = maxOf(_bufferedPositionMs.value, engState.positionMs)
+                }
 
                 if (engState.status == PlaybackStatus.COMPLETED) {
                     handlePlaybackCompleted()
@@ -118,16 +133,26 @@ class RealPlayerConnection(
         tickerJob?.cancel()
         tickerJob = scope.launch {
             while (isActive && _isPlaying.value) {
-                val pos = audioEngine.state.value.positionMs
+                val engState = audioEngine.state.value
+                val pos = engState.positionMs
                 if (pos >= 0L) {
                     _positionMs.value = pos
                 }
-                val dur = audioEngine.state.value.durationMs.takeIf { it > 0L }
+                val dur = engState.durationMs.takeIf { it > 0L }
                     ?: (_currentTrack.value?.durationMs ?: 0L)
                 if (dur > 0L) {
                     _durationMs.value = dur
                 }
-                delay(16.milliseconds)
+                val buf = engState.bufferedPositionMs
+                val isCached = _currentTrack.value?.isCached == true
+                if (isCached && _durationMs.value > 0L) {
+                    _bufferedPositionMs.value = _durationMs.value
+                } else if (buf > 0L) {
+                    _bufferedPositionMs.value = maxOf(buf, pos)
+                } else if (pos > 0L) {
+                    _bufferedPositionMs.value = maxOf(_bufferedPositionMs.value, pos)
+                }
+                delay(50.milliseconds)
             }
         }
     }
@@ -216,6 +241,10 @@ class RealPlayerConnection(
     }
 
     override fun play(track: Track, queue: List<Track>) {
+        if (_currentTrack.value?.id == track.id && (_status.value == PlaybackStatus.PLAYING || _status.value == PlaybackStatus.PAUSED)) {
+            togglePlayPause()
+            return
+        }
         if (queue.isNotEmpty()) {
             originalQueue.clear()
             originalQueue.addAll(queue)
@@ -249,6 +278,7 @@ class RealPlayerConnection(
         _status.value = PlaybackStatus.BUFFERING
         _positionMs.value = 0L
         _durationMs.value = track.durationMs
+        _bufferedPositionMs.value = if (track.isCached && track.durationMs > 0L) track.durationMs else 0L
         loadJob?.cancel()
         preloadJob?.cancel()
 
