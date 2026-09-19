@@ -378,6 +378,13 @@ fun PersistentBottomPlayer(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
+                PlaybackDeviceIndicator(
+                    showLabel = false,
+                    modifier = Modifier.size(36.dp)
+                )
+
+                Spacer(modifier = Modifier.width(4.dp))
+
                 val isPaneOpen = activeSupportingPane != null
                 IconButton(
                     onClick = {
@@ -478,5 +485,4 @@ private fun ExpressiveWavySeekBar(
         )
     }
 }
-
 

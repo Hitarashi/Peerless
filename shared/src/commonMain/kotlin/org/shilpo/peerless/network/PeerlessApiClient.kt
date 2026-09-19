@@ -5,6 +5,7 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.utils.io.*
@@ -371,6 +372,45 @@ open class PeerlessApiClient(
             error("Create playlist failed with status: ${response.status}")
         }
         response.body<PlaylistDto>()
+    }
+
+    open suspend fun loginLastFm(
+        username: String,
+        password: String,
+        token: String? = null
+    ): Result<LastFmIntegrationResponse> = runCatching {
+        val authToken = resolveToken(token) ?: error("Not authenticated")
+        val response = httpClient.post("$baseUrl/api/v1/integrations/lastfm/login") {
+            contentType(ContentType.Application.Json)
+            header(HttpHeaders.Authorization, "Bearer $authToken")
+            setBody(LastFmLoginRequest(username = username, password = password))
+        }
+        if (!response.status.isSuccess()) {
+            val errText = response.bodyAsText()
+            error("Last.fm login failed: $errText")
+        }
+        response.body<LastFmIntegrationResponse>()
+    }
+
+    open suspend fun getLastFmStatus(token: String? = null): Result<LastFmIntegrationResponse> = runCatching {
+        val authToken = resolveToken(token) ?: error("Not authenticated")
+        val response = httpClient.get("$baseUrl/api/v1/integrations/lastfm/status") {
+            header(HttpHeaders.Authorization, "Bearer $authToken")
+        }
+        if (!response.status.isSuccess()) {
+            error("Get Last.fm status failed with status: ${response.status}")
+        }
+        response.body<LastFmIntegrationResponse>()
+    }
+
+    open suspend fun disconnectLastFm(token: String? = null): Result<Unit> = runCatching {
+        val authToken = resolveToken(token) ?: error("Not authenticated")
+        val response = httpClient.delete("$baseUrl/api/v1/integrations/lastfm") {
+            header(HttpHeaders.Authorization, "Bearer $authToken")
+        }
+        if (!response.status.isSuccess()) {
+            error("Disconnect Last.fm failed with status: ${response.status}")
+        }
     }
 }
 

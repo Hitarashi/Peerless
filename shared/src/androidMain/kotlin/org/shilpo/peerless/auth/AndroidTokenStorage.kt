@@ -14,6 +14,8 @@ class AndroidTokenStorage(
     private val contextProvider: () -> Context? = { AndroidContextProvider.context }
 ) : TokenStorage {
 
+    private val deviceIdKey = "playback_device_id"
+
     private val prefs: SharedPreferences?
         get() = contextProvider()?.getSharedPreferences("peerless_auth", Context.MODE_PRIVATE)
 
@@ -22,6 +24,12 @@ class AndroidTokenStorage(
 
     private val _serverUrlFlow = MutableStateFlow<String?>(null)
     override val serverUrlFlow: StateFlow<String?> = _serverUrlFlow.asStateFlow()
+
+    override fun getOrCreateDeviceId(): String = synchronized(deviceIdLock) {
+        prefs?.getString(deviceIdKey, null) ?: newDeviceId().also { generated ->
+            prefs?.edit()?.putString(deviceIdKey, generated)?.commit()
+        }
+    }
 
     init {
         _tokenFlow.value = prefs?.getString("session_token", null)
@@ -68,6 +76,10 @@ class AndroidTokenStorage(
         prefs?.edit()?.remove("session_token")?.remove("server_url")?.apply()
         _tokenFlow.value = null
         _serverUrlFlow.value = null
+    }
+
+    private companion object {
+        val deviceIdLock = Any()
     }
 }
 

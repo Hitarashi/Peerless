@@ -17,12 +17,19 @@ class DesktopTokenStorage : TokenStorage {
 
     private val tokenFile: File by lazy { File(configDir, "session.token") }
     private val serverUrlFile: File by lazy { File(configDir, "server.url") }
+    private val deviceIdFile: File by lazy { File(configDir, "device.id") }
 
     private val _tokenFlow = MutableStateFlow(loadFile(tokenFile))
     override val tokenFlow: StateFlow<String?> = _tokenFlow.asStateFlow()
 
     private val _serverUrlFlow = MutableStateFlow(loadFile(serverUrlFile))
     override val serverUrlFlow: StateFlow<String?> = _serverUrlFlow.asStateFlow()
+
+    override fun getOrCreateDeviceId(): String = synchronized(deviceIdLock) {
+        loadFile(deviceIdFile) ?: newDeviceId().also { generated ->
+            deviceIdFile.writeText(generated)
+        }
+    }
 
     private fun loadFile(file: File): String? {
         return try {
@@ -84,6 +91,10 @@ class DesktopTokenStorage : TokenStorage {
     override suspend fun clearAll() {
         clearToken()
         clearServerUrl()
+    }
+
+    private companion object {
+        val deviceIdLock = Any()
     }
 }
 

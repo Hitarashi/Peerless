@@ -73,6 +73,12 @@ private class TestFakeAudioEngine : AudioEngine {
 
 class PlayerConnectionTest {
 
+    @Test
+    fun remoteSnapshotPlaybackStateDrivesTransportVisuals() {
+        assertEquals(PlaybackStatus.PLAYING, remotePlaybackStatus(isPlaying = true))
+        assertEquals(PlaybackStatus.PAUSED, remotePlaybackStatus(isPlaying = false))
+    }
+
     private fun createTrack(id: Int, title: String): Track = Track(
         id = id,
         title = title,

@@ -8,6 +8,9 @@ class IOSPlatform : Platform {
 
 actual fun getPlatform(): Platform = IOSPlatform()
 
+actual fun getDeviceDisplayName(): String =
+    UIDevice.currentDevice.name.takeIf { it.isNotBlank() } ?: "Apple device"
+
 actual fun getGreetingAndDate(): Pair<String, String> {
     val date = platform.Foundation.NSDate()
     val calendar = platform.Foundation.NSCalendar.currentCalendar

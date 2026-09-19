@@ -269,6 +269,13 @@ fun NowPlayingSheet(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                PlaybackDeviceIndicator(
+                    showLabel = true,
+                    modifier = Modifier.wrapContentWidth()
+                )
             }
 
             Spacer(modifier = Modifier.height(14.dp))

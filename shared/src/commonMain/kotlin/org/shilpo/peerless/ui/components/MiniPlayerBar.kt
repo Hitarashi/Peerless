@@ -33,13 +33,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.shilpo.peerless.model.PlaybackInfo
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.player.PlaybackStatus
-import org.shilpo.peerless.theme.rememberArtworkSeedColor
+import org.shilpo.peerless.theme.createSoftwareArtworkRequest
+import org.shilpo.peerless.theme.extractArtworkSeedColor
 import org.shilpo.peerless.theme.rememberMiniPlayerGlowPalette
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
@@ -73,8 +75,14 @@ fun MiniPlayerBar(
     val isPlaying = status == PlaybackStatus.PLAYING
     val isBuffering = status == PlaybackStatus.BUFFERING
 
-    val seedColor = rememberArtworkSeedColor(artworkUrl, fallbackColor = MaterialTheme.colorScheme.primary)
+    val fallbackArtworkColor = MaterialTheme.colorScheme.primary
+    var extractedArtworkColor by remember(artworkUrl, fallbackArtworkColor) { mutableStateOf<Color?>(null) }
+    val seedColor = extractedArtworkColor ?: fallbackArtworkColor
     val glowPalette = rememberMiniPlayerGlowPalette(seedColor)
+    val imageContext = LocalPlatformContext.current
+    val artworkRequest = remember(artworkUrl, imageContext) {
+        createSoftwareArtworkRequest(imageContext, artworkUrl, size = 200)
+    }
     val motionScheme = MaterialTheme.motionScheme
 
     val shouldShrink = isPlaying || isBuffering
@@ -418,12 +426,17 @@ fun MiniPlayerBar(
                             tint = Color.White.copy(alpha = 0.45f),
                             modifier = Modifier.size(artworkSize * 0.5f)
                         )
-
                         AsyncImage(
-                            model = artworkUrl,
+                            model = artworkRequest,
                             contentDescription = "${track.title} artwork",
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize(),
+                            onSuccess = { state ->
+                                extractedArtworkColor = extractArtworkSeedColor(
+                                    painter = state.painter,
+                                    fallback = fallbackArtworkColor
+                                )
+                            }
                         )
                     }
                 }
@@ -517,7 +530,7 @@ fun MiniPlayerBar(
                     }
                 }
             }
+
         }
     }
 }
-

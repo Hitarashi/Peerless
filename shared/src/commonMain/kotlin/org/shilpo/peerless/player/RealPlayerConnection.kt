@@ -2,12 +2,17 @@ package org.shilpo.peerless.player
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.serialization.json.*
 import org.shilpo.peerless.model.PlaybackInfo
 import org.shilpo.peerless.model.PlaybackStateSnapshot
 import org.shilpo.peerless.model.RepeatMode
 import org.shilpo.peerless.model.Track
 import org.shilpo.peerless.network.PeerlessApiClient
+import org.shilpo.peerless.sync.PlaybackSyncManager
 import kotlin.time.Duration.Companion.milliseconds
+
+internal fun remotePlaybackStatus(isPlaying: Boolean): PlaybackStatus =
+    if (isPlaying) PlaybackStatus.PLAYING else PlaybackStatus.PAUSED
 
 class RealPlayerConnection(
     val apiClient: PeerlessApiClient = PeerlessApiClient(),
@@ -75,10 +80,114 @@ class RealPlayerConnection(
     private var preloadJob: Job? = null
     private var saveDebounceJob: Job? = null
     private var tickerJob: Job? = null
+    private var syncManager: PlaybackSyncManager? = null
+    private var syncSnapshotJob: Job? = null
+    private var syncCommandJob: Job? = null
+    private var syncActiveDeviceJob: Job? = null
+    private var lastSyncReportMs: Long = 0L
+
+    fun attachSync(sync: PlaybackSyncManager) {
+        this.syncManager = sync
+        syncSnapshotJob?.cancel()
+        syncCommandJob?.cancel()
+        syncActiveDeviceJob?.cancel()
+
+        // 1. Observe remote snapshots when not the active playback device
+        syncSnapshotJob = scope.launch {
+            sync.remoteSnapshot.collect { snapshot ->
+                if (snapshot != null && !sync.isSelfActiveDevice.value) {
+                    val remoteTrack = snapshot.queue.getOrNull(snapshot.currentIndex)
+                    _currentTrack.value = remoteTrack
+                    _queue.value = snapshot.queue
+                    _currentIndex.value = snapshot.currentIndex
+                    _positionMs.value = snapshot.positionMs
+                    _durationMs.value = remoteTrack?.durationMs ?: 0L
+                    _isPlaying.value = snapshot.isPlaying
+                    _status.value = remotePlaybackStatus(snapshot.isPlaying)
+                    updateSkipFlags()
+                    if (audioEngine.state.value.status == PlaybackStatus.PLAYING) {
+                        audioEngine.pause()
+                    }
+                }
+            }
+        }
+
+        // 2. Observe remote commands directed to this active device
+        syncCommandJob = scope.launch {
+            sync.incomingCommands.collect { cmd ->
+                if (sync.isSelfActiveDevice.value) {
+                    when (cmd.action) {
+                        "play" -> play()
+                        "pause" -> pause()
+                        "next" -> skipNext()
+                        "prev" -> skipPrevious()
+                        "seek" -> {
+                            val pos = cmd.data?.jsonPrimitive?.longOrNull ?: 0L
+                            seekTo(pos)
+                        }
+
+                        "select_track" -> {
+                            val snapshot = cmd.data?.let {
+                                runCatching { Json.decodeFromJsonElement<PlaybackStateSnapshot>(it) }
+                                    .getOrNull()
+                            }
+                            val track = snapshot?.queue?.getOrNull(snapshot.currentIndex)
+                            if (snapshot != null && track != null) {
+                                play(track, snapshot.queue)
+                                if (snapshot.positionMs > 0L) seekTo(snapshot.positionMs)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Explicit device selection is the only operation that moves audio output.
+        syncActiveDeviceJob = scope.launch {
+            sync.isSelfActiveDevice
+                .drop(1)
+                .collect { isActive ->
+                    if (isActive && _isPlaying.value && audioEngine.state.value.status != PlaybackStatus.PLAYING) {
+                        val track = _currentTrack.value ?: return@collect
+                        val resumePosition = _positionMs.value
+                        startLoadingTrack(track)
+                        if (resumePosition > 0L) {
+                            audioEngine.state.first {
+                                it.status == PlaybackStatus.PAUSED ||
+                                        it.status == PlaybackStatus.PLAYING ||
+                                        it.status == PlaybackStatus.BUFFERING ||
+                                        it.durationMs > 0L
+                            }
+                            audioEngine.seekTo(resumePosition)
+                        }
+                    }
+                }
+        }
+    }
+
+    private fun notifySyncState() {
+        val sync = syncManager ?: return
+        if (sync.isSelfActiveDevice.value) {
+            scope.launch {
+                sync.reportState(
+                    PlaybackStateSnapshot(
+                        queue = _queue.value,
+                        currentIndex = _currentIndex.value,
+                        positionMs = _positionMs.value,
+                        shuffleMode = _shuffleMode.value,
+                        repeatMode = _repeatMode.value,
+                        isPlaying = _isPlaying.value
+                    )
+                )
+            }
+        }
+    }
 
     init {
         scope.launch {
             audioEngine.state.collect { engState ->
+                // A dormant local engine must not overwrite the active remote device's snapshot.
+                if (syncManager?.isSelfActiveDevice?.value == false) return@collect
                 _status.value = engState.status
                 val playing = (engState.status == PlaybackStatus.PLAYING)
                 if (_isPlaying.value != playing) {
@@ -88,6 +197,7 @@ class RealPlayerConnection(
                     } else {
                         stopTicker()
                     }
+                    notifySyncState()
                 }
                 _positionMs.value = engState.positionMs
 
@@ -152,6 +262,10 @@ class RealPlayerConnection(
                 } else if (pos > 0L) {
                     _bufferedPositionMs.value = maxOf(_bufferedPositionMs.value, pos)
                 }
+                if (kotlin.math.abs(pos - lastSyncReportMs) >= 2000L) {
+                    lastSyncReportMs = pos
+                    notifySyncState()
+                }
                 delay(50.milliseconds)
             }
         }
@@ -164,6 +278,8 @@ class RealPlayerConnection(
         if (pos >= 0L) {
             _positionMs.value = pos
         }
+        lastSyncReportMs = _positionMs.value
+        notifySyncState()
     }
 
     private fun handleEngineTransitionedToNext() {
@@ -180,6 +296,7 @@ class RealPlayerConnection(
             updateSkipFlags()
             preloadNextTrack()
             scheduleSave()
+            notifySyncState()
         }
     }
 
@@ -215,7 +332,7 @@ class RealPlayerConnection(
                     streamUrl,
                     title = track.title,
                     artist = track.artist,
-                    artworkUrl = track.artworkUrl
+                    artworkUrl = apiClient.getArtworkUrl(track.toSummaryDto(), size = 600)
                 )
                 scope.launch {
                     audioEngine.state.first {
@@ -241,6 +358,25 @@ class RealPlayerConnection(
     }
 
     override fun play(track: Track, queue: List<Track>) {
+        if (syncManager?.isSelfActiveDevice?.value == false) {
+            val effectiveQueue = queue.ifEmpty { listOf(track) }
+            val selectedIndex = effectiveQueue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
+            val snapshot = PlaybackStateSnapshot(
+                queue = effectiveQueue,
+                currentIndex = selectedIndex,
+                positionMs = 0L,
+                shuffleMode = _shuffleMode.value,
+                repeatMode = _repeatMode.value,
+                isPlaying = true
+            )
+            scope.launch {
+                syncManager?.sendCommand(
+                    "select_track",
+                    Json.encodeToJsonElement(snapshot)
+                )
+            }
+            return
+        }
         if (_currentTrack.value?.id == track.id && (_status.value == PlaybackStatus.PLAYING || _status.value == PlaybackStatus.PAUSED)) {
             togglePlayPause()
             return
@@ -279,6 +415,7 @@ class RealPlayerConnection(
         _positionMs.value = 0L
         _durationMs.value = track.durationMs
         _bufferedPositionMs.value = if (track.isCached && track.durationMs > 0L) track.durationMs else 0L
+        notifySyncState()
         loadJob?.cancel()
         preloadJob?.cancel()
 
@@ -292,7 +429,12 @@ class RealPlayerConnection(
                 }
             }
 
-            audioEngine.prepare(streamUrl, title = track.title, artist = track.artist, artworkUrl = track.artworkUrl)
+            audioEngine.prepare(
+                streamUrl,
+                title = track.title,
+                artist = track.artist,
+                artworkUrl = apiClient.getArtworkUrl(track.toSummaryDto(), size = 600)
+            )
             audioEngine.play()
 
             preloadNextTrack()
@@ -323,10 +465,33 @@ class RealPlayerConnection(
     }
 
     override fun play() {
+        if (syncManager?.isSelfActiveDevice?.value == false) {
+            scope.launch { syncManager?.sendCommand("play") }
+            return
+        }
         val currentStatus = _status.value
         if (currentStatus == PlaybackStatus.PAUSED || currentStatus == PlaybackStatus.IDLE) {
             if (_currentTrack.value != null) {
-                audioEngine.play()
+                if (audioEngine.state.value.status == PlaybackStatus.IDLE) {
+                    val track = _currentTrack.value!!
+                    val resumePos = _positionMs.value
+                    startLoadingTrack(track)
+                    if (resumePos > 0L) {
+                        scope.launch {
+                            audioEngine.state.first {
+                                it.status == PlaybackStatus.PAUSED ||
+                                        it.status == PlaybackStatus.PLAYING ||
+                                        it.status == PlaybackStatus.BUFFERING ||
+                                        it.durationMs > 0L
+                            }
+                            audioEngine.seekTo(resumePos)
+                            _positionMs.value = resumePos
+                            notifySyncState()
+                        }
+                    }
+                } else {
+                    audioEngine.play()
+                }
             } else if (_queue.value.isNotEmpty()) {
                 val first = _queue.value.first()
                 play(first, _queue.value)
@@ -335,13 +500,17 @@ class RealPlayerConnection(
     }
 
     override fun pause() {
+        if (syncManager?.isSelfActiveDevice?.value == false) {
+            scope.launch { syncManager?.sendCommand("pause") }
+            return
+        }
         if (_status.value == PlaybackStatus.PLAYING || _status.value == PlaybackStatus.BUFFERING) {
             audioEngine.pause()
         }
     }
 
     override fun togglePlayPause() {
-        if (_status.value == PlaybackStatus.PLAYING) {
+        if (_isPlaying.value) {
             pause()
         } else {
             play()
@@ -349,7 +518,19 @@ class RealPlayerConnection(
     }
 
     override fun playNext() {
+        if (syncManager?.isSelfActiveDevice?.value == false) {
+            scope.launch { syncManager?.sendCommand("next") }
+            return
+        }
         playNextInternal(autoTriggered = false)
+    }
+
+    override fun skipNext() {
+        if (syncManager?.isSelfActiveDevice?.value == false) {
+            scope.launch { syncManager?.sendCommand("next") }
+            return
+        }
+        playNext()
     }
 
     private fun playNextInternal(autoTriggered: Boolean) {
@@ -367,7 +548,9 @@ class RealPlayerConnection(
         } else {
             if (autoTriggered) {
                 _status.value = PlaybackStatus.IDLE
+                val wasPlaying = _isPlaying.value
                 _isPlaying.value = false
+                if (wasPlaying) notifySyncState()
             }
         }
     }
@@ -384,11 +567,17 @@ class RealPlayerConnection(
     }
 
     override fun playPrevious() {
+        if (syncManager?.isSelfActiveDevice?.value == false) {
+            scope.launch { syncManager?.sendCommand("prev") }
+            return
+        }
         val q = _queue.value
         if (q.isEmpty()) return
 
         if (currentPositionMs > 3000L) {
             audioEngine.seekTo(0L)
+            _positionMs.value = 0L
+            notifySyncState()
             return
         }
 
@@ -408,13 +597,29 @@ class RealPlayerConnection(
             scheduleSave()
         } else {
             audioEngine.seekTo(0L)
+            _positionMs.value = 0L
+            notifySyncState()
         }
     }
 
+    override fun skipPrevious() {
+        if (syncManager?.isSelfActiveDevice?.value == false) {
+            scope.launch { syncManager?.sendCommand("prev") }
+            return
+        }
+        playPrevious()
+    }
+
     override fun seekTo(positionMs: Long) {
+        if (syncManager?.isSelfActiveDevice?.value == false) {
+            scope.launch { syncManager?.sendCommand("seek", JsonPrimitive(positionMs)) }
+            _positionMs.value = positionMs
+            return
+        }
         _positionMs.value = positionMs
         audioEngine.seekTo(positionMs)
         scheduleSave()
+        notifySyncState()
     }
 
     override fun setVolume(volume: Float) {
@@ -559,6 +764,7 @@ class RealPlayerConnection(
         _positionMs.value = 0L
         _durationMs.value = 0L
         updateSkipFlags()
+        notifySyncState()
         scope.launch {
             storage.clearState()
         }
@@ -595,9 +801,11 @@ class RealPlayerConnection(
                 currentIndex = _currentIndex.value,
                 positionMs = currentPositionMs,
                 shuffleMode = _shuffleMode.value,
-                repeatMode = _repeatMode.value
+                repeatMode = _repeatMode.value,
+                isPlaying = _isPlaying.value
             )
             storage.saveState(snapshot)
+            notifySyncState()
         }
     }
 }

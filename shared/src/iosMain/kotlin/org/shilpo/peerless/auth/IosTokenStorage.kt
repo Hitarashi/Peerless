@@ -9,12 +9,19 @@ class IosTokenStorage : TokenStorage {
     private val defaults = NSUserDefaults.standardUserDefaults
     private val tokenKey = "peerless_session_token"
     private val serverUrlKey = "peerless_server_url"
+    private val deviceIdKey = "peerless_playback_device_id"
 
     private val _tokenFlow = MutableStateFlow<String?>(defaults.stringForKey(tokenKey))
     override val tokenFlow: StateFlow<String?> = _tokenFlow.asStateFlow()
 
     private val _serverUrlFlow = MutableStateFlow<String?>(defaults.stringForKey(serverUrlKey))
     override val serverUrlFlow: StateFlow<String?> = _serverUrlFlow.asStateFlow()
+
+    override fun getOrCreateDeviceId(): String {
+        return defaults.stringForKey(deviceIdKey) ?: newDeviceId().also { generated ->
+            defaults.setObject(generated, forKey = deviceIdKey)
+        }
+    }
 
     override suspend fun getToken(): String? {
         val stored = defaults.stringForKey(tokenKey)

@@ -345,6 +345,21 @@ data class ExchangeRequest(
 )
 
 @Serializable
+data class LastFmLoginRequest(
+    val username: String,
+    val password: String
+)
+
+@Serializable
+data class LastFmIntegrationResponse(
+    val connected: Boolean,
+    val username: String? = null,
+    val session_key: String? = null,
+    val api_key: String? = null,
+    val api_secret: String? = null
+)
+
+@Serializable
 data class UserDto(
     val telegram_id: Long,
     val name: String? = null,
@@ -988,5 +1003,6 @@ data class PlaybackStateSnapshot(
     val currentIndex: Int,
     val positionMs: Long,
     val shuffleMode: Boolean = false,
-    val repeatMode: RepeatMode = RepeatMode.OFF
+    val repeatMode: RepeatMode = RepeatMode.OFF,
+    val isPlaying: Boolean = false
 )

@@ -3,8 +3,11 @@ package org.shilpo.peerless.theme
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
@@ -13,12 +16,20 @@ import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import coil3.PlatformContext
 import coil3.compose.LocalPlatformContext
 import coil3.compose.rememberAsyncImagePainter
 import coil3.request.ImageRequest
 import com.materialkolor.ktx.themeColorOrNull
 import kotlin.math.abs
 import kotlin.math.max
+
+internal expect fun createSoftwareArtworkRequest(
+    context: PlatformContext,
+    artworkUrl: String,
+    size: Int
+): ImageRequest
 
 fun Painter.toSampledImageBitmap(sampleWidth: Int = 64, sampleHeight: Int = 64): ImageBitmap {
     val bitmap = ImageBitmap(sampleWidth, sampleHeight)
@@ -71,6 +82,20 @@ fun extractDominantArtworkColor(bitmap: ImageBitmap, fallback: Color): Color {
     return bestColor ?: fallback
 }
 
+fun extractArtworkSeedColor(painter: Painter, fallback: Color): Color {
+    val bitmap = runCatching {
+        painter.toSampledImageBitmap(sampleWidth = 64, sampleHeight = 64)
+    }.getOrNull() ?: return fallback
+
+    // Prefer pixels sampled from the rendered cover. MaterialKolor can return a
+    // plausible but unrelated theme seed for poster-style artwork, which makes
+    // the mini-player appear to keep the app's default color.
+    val sampledColor = extractDominantArtworkColor(bitmap, fallback)
+    if (sampledColor != fallback) return sampledColor
+
+    return runCatching { bitmap.themeColorOrNull(filter = false) }.getOrNull() ?: fallback
+}
+
 private val artworkColorCache = mutableMapOf<String, Color>()
 
 @Composable
@@ -86,28 +111,24 @@ fun rememberArtworkSeedColor(
 
     if (!artworkUrl.isNullOrBlank() && cached == null) {
         val context = LocalPlatformContext.current
-        val request = remember(artworkUrl) {
-            ImageRequest.Builder(context)
-                .data(artworkUrl)
-                .size(64, 64)
-                .build()
+        val request = remember(artworkUrl, context) {
+            createSoftwareArtworkRequest(context, artworkUrl, size = 64)
         }
         val painter = rememberAsyncImagePainter(
             model = request,
             onSuccess = { state ->
-                try {
-                    val bitmap = state.painter.toSampledImageBitmap(sampleWidth = 64, sampleHeight = 64)
-                    val extracted = bitmap.themeColorOrNull(filter = false)
-                        ?: extractDominantArtworkColor(bitmap, fallbackColor)
-                    artworkColorCache[artworkUrl] = extracted
-                    seedColor = extracted
-                } catch (_: Throwable) {
-                }
+                val extracted = extractArtworkSeedColor(state.painter, fallbackColor)
+                artworkColorCache[artworkUrl] = extracted
+                seedColor = extracted
             }
         )
 
-        LaunchedEffect(painter) {
-        }
+        // Attach the probe painter so Coil starts loading the image for color sampling.
+        Image(
+            painter = painter,
+            contentDescription = null,
+            modifier = androidx.compose.ui.Modifier.size(1.dp).alpha(0f)
+        )
     }
 
     return seedColor

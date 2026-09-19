@@ -3,41 +3,38 @@ package org.shilpo.peerless.ui.screens
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import org.shilpo.peerless.auth.LocalSessionManager
 import org.shilpo.peerless.auth.SessionState
-import org.shilpo.peerless.theme.*
+import org.shilpo.peerless.theme.ExpressiveMotion
 import org.shilpo.peerless.ui.components.PeerlessIcons
 
 @Composable
-fun AuthOnboardingScreen(
-    modifier: Modifier = Modifier
-) {
+fun AuthOnboardingScreen(modifier: Modifier = Modifier) {
     val sessionManager = LocalSessionManager.current
     val sessionState by sessionManager.sessionState.collectAsState()
     val isLoading = sessionState is SessionState.Loading
-
     val uriHandler = LocalUriHandler.current
-    val clipboardManager = LocalClipboard.current
+
+    @Suppress("DEPRECATION")
+    val clipboardManager = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
 
     var connectionKey by remember { mutableStateOf("") }
@@ -48,616 +45,405 @@ fun AuthOnboardingScreen(
 
     val manualExpandRotation by animateFloatAsState(
         targetValue = if (isManualConfigExpanded) 180f else 0f,
-        animationSpec = tween(durationMillis = 250, easing = ExpressiveMotion.EmphasizedEasing),
+        animationSpec = tween(250, easing = ExpressiveMotion.EmphasizedEasing),
         label = "ManualConfigExpandRotation"
     )
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .ambientGlow(
-                primaryGlow = MaterialTheme.colorScheme.primary,
-                secondaryGlow = MaterialTheme.colorScheme.secondary,
-                tertiaryGlow = MaterialTheme.colorScheme.tertiary,
-                glowAlpha = 0.30f
-            )
-            .statusBarsPadding()
-            .navigationBarsPadding(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
+    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+        BoxWithConstraints(
             modifier = Modifier
-                .widthIn(max = 520.dp)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding()
         ) {
-            // Main Header
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+            val isExpanded = maxWidth >= 900.dp
+
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(x = (-120).dp, y = (-180).dp)
+                    .size(if (isExpanded) 500.dp else 300.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
+            ) {}
+
+            Row(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .widthIn(max = 1040.dp)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = if (isExpanded) 40.dp else 20.dp, vertical = 32.dp),
+                horizontalArrangement = Arrangement.spacedBy(64.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .clip(SquircleShapeLarge)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
-                            )
-                        )
-                        .border(
-                            width = 1.5.dp,
-                            brush = Brush.verticalGradient(
-                                listOf(Color.White.copy(alpha = 0.6f), Color.White.copy(alpha = 0.1f))
-                            ),
-                            shape = SquircleShapeLarge
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = PeerlessIcons.MusicNote,
-                        contentDescription = "Peerless Logo",
-                        tint = Color.White,
-                        modifier = Modifier.size(38.dp)
-                    )
-                }
+                if (isExpanded) PeerlessWelcomePanel(modifier = Modifier.weight(1f))
 
-                Text(
-                    text = "PEERLESS LOSSLESS STREAM",
-                    style = ExpressiveTypography.headlineSmall,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 2.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center
-                )
-
-                Text(
-                    text = "Your private high-fidelity audio sanctuary",
-                    style = ExpressiveTypography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-
-                Row(
-                    modifier = Modifier
-                        .clip(PillShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.8f))
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), PillShape)
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.tertiary)
-                    )
-                    Text(
-                        text = "24-BIT / 192KHZ DIRECT • TELEGRAM MTPROTO",
-                        style = SpecBadgeTypography.copy(fontSize = 9.sp),
-                        color = MaterialTheme.colorScheme.tertiary,
-                        letterSpacing = 0.8.sp
-                    )
-                }
-            }
-
-            // Error Banner
-            AnimatedVisibility(
-                visible = errorMessage != null,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                errorMessage?.let { errorText ->
-                    LiquidGlassSurface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        containerColor = Color(0xFF281114).copy(alpha = 0.90f),
-                        borderBrush = Brush.verticalGradient(
-                            listOf(Color(0xFFEF5350).copy(alpha = 0.7f), Color(0xFFB71C1C).copy(alpha = 0.3f))
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = PeerlessIcons.Warning,
-                                        contentDescription = "Error",
-                                        tint = Color(0xFFEF5350),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Text(
-                                        text = "AUTHENTICATION FAILED",
-                                        style = SpecBadgeTypography.copy(fontSize = 10.sp),
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFEF5350)
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = { errorMessage = null },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = PeerlessIcons.Close,
-                                        contentDescription = "Dismiss error",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-
-                            Text(
-                                text = errorText,
-                                style = ExpressiveTypography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-
-                            HorizontalDivider(color = Color(0xFFEF5350).copy(alpha = 0.25f))
-
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(
-                                    text = "Troubleshooting:",
-                                    style = ExpressiveTypography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "• Ensure peerless-server daemon is running and reachable.",
-                                    style = ExpressiveTypography.bodySmall.copy(fontSize = 11.5.sp),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "• Verify Telegram OTP hasn't expired (valid for 5 minutes).",
-                                    style = ExpressiveTypography.bodySmall.copy(fontSize = 11.5.sp),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "• Confirm connection key format is valid Base64 or auth deep-link.",
-                                    style = ExpressiveTypography.bodySmall.copy(fontSize = 11.5.sp),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Primary Action Card: Connect with Telegram
-            LiquidGlassSurface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                containerColor = LiquidGlassDefaults.ElevatedContainerColor,
-                borderBrush = LiquidGlassDefaults.AccentBorderBrush
-            ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    modifier = if (isExpanded) Modifier.width(460.dp) else Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f))
-                                .border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = PeerlessIcons.Compass,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        Column {
-                            Text(
-                                text = "Connect with Telegram",
-                                style = ExpressiveTypography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Recommended • 1-tap seamless session",
-                                style = SpecBadgeTypography.copy(fontSize = 8.5.sp),
-                                color = MaterialTheme.colorScheme.secondary
-                            )
-                        }
+                    if (!isExpanded) {
+                        PeerlessBrandMark(modifier = Modifier.align(Alignment.CenterHorizontally))
                     }
 
-                    Text(
-                        text = "Open Telegram, start a session with /stream, and tap Open Peerless to pair this device instantly.",
-                        style = ExpressiveTypography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Button(
-                        onClick = { uriHandler.openUri("https://t.me") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        shape = SquircleShapeMedium,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondary,
-                            contentColor = Color(0xFF0E1A2E)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Connect Peerless",
+                            style = if (isExpanded) MaterialTheme.typography.headlineLarge
+                            else MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = "🚀 Open Telegram",
-                                style = ExpressiveTypography.labelLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Icon(
-                                imageVector = PeerlessIcons.OpenInNew,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Secondary Action Card: Connection Key
-            LiquidGlassSurface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                containerColor = LiquidGlassDefaults.ElevatedContainerColor,
-                borderBrush = LiquidGlassDefaults.BorderBrush
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-                                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = PeerlessIcons.Key,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-
-                        Column {
-                            Text(
-                                text = "Connection Key",
-                                style = ExpressiveTypography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Paste Base64 payload or auth link",
-                                style = SpecBadgeTypography.copy(fontSize = 8.5.sp),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = connectionKey,
-                        onValueChange = {
-                            connectionKey = it
-                            errorMessage = null
-                        },
-                        placeholder = {
-                            Text(
-                                text = "peerless://auth?data=... or Base64 key",
-                                style = ExpressiveTypography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                            )
-                        },
-                        singleLine = false,
-                        maxLines = 3,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = SquircleShapeSmall,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.4f),
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                        ),
-                        trailingIcon = {
-                            if (connectionKey.isNotBlank()) {
-                                IconButton(onClick = { connectionKey = "" }) {
-                                    Icon(
-                                        imageVector = PeerlessIcons.Close,
-                                        contentDescription = "Clear key",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            }
-                        }
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                val clipText = clipboardManager.getText()?.text
-                                if (!clipText.isNullOrBlank()) {
-                                    connectionKey = clipText.trim()
-                                    errorMessage = null
-                                }
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(48.dp),
-                            shape = SquircleShapeSmall,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.onSurface
-                            )
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = PeerlessIcons.ContentPaste,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text(
-                                    text = "📋 Paste",
-                                    style = ExpressiveTypography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-
-                        Button(
-                            onClick = {
-                                if (connectionKey.isNotBlank()) {
-                                    scope.launch {
-                                        errorMessage = null
-                                        val result = sessionManager.connectWithPayload(connectionKey.trim())
-                                        result.onFailure { err ->
-                                            errorMessage = err.message ?: "Failed to connect with provided key"
-                                        }
-                                    }
-                                }
-                            },
-                            enabled = connectionKey.isNotBlank() && !isLoading,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(48.dp),
-                            shape = SquircleShapeSmall,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                                disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                                disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
-                            )
-                        ) {
-                            if (isLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                            } else {
-                                Text(
-                                    text = "Connect",
-                                    style = ExpressiveTypography.labelLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Expandable Section: Manual Server Configuration
-            LiquidGlassSurface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                containerColor = LiquidGlassDefaults.SubtleContainerColor,
-                borderBrush = LiquidGlassDefaults.BorderBrush
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = { isManualConfigExpanded = !isManualConfigExpanded }
-                            )
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = PeerlessIcons.Settings,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = "Manual Server Configuration",
-                                style = ExpressiveTypography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        Icon(
-                            imageVector = PeerlessIcons.ExpandMore,
-                            contentDescription = if (isManualConfigExpanded) "Collapse" else "Expand",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .size(20.dp)
-                                .rotate(manualExpandRotation)
+                        Text(
+                            text = "Pair this device with your private music server.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
                     AnimatedVisibility(
-                        visible = isManualConfigExpanded,
+                        visible = errorMessage != null,
                         enter = fadeIn() + expandVertically(),
                         exit = fadeOut() + shrinkVertically()
                     ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Text(
-                                text = "Enter streaming daemon endpoint URL and single-use OTP generated via Telegram /stream.",
-                                style = ExpressiveTypography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-
-                            OutlinedTextField(
-                                value = manualServerUrl,
-                                onValueChange = {
-                                    manualServerUrl = it
-                                    errorMessage = null
-                                },
-                                label = { Text("Server URL") },
-                                placeholder = { Text("e.g. http://192.168.1.100:4444") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = SquircleShapeSmall,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                                )
-                            )
-
-                            OutlinedTextField(
-                                value = manualOtpCode,
-                                onValueChange = {
-                                    manualOtpCode = it
-                                    errorMessage = null
-                                },
-                                label = { Text("OTP Code") },
-                                placeholder = { Text("6-character code from /stream") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = SquircleShapeSmall,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                                )
-                            )
-
-                            Button(
-                                onClick = {
-                                    if (manualServerUrl.isNotBlank() && manualOtpCode.isNotBlank()) {
-                                        scope.launch {
-                                            errorMessage = null
-                                            val result = sessionManager.connectManual(
-                                                serverUrl = manualServerUrl.trim(),
-                                                code = manualOtpCode.trim()
-                                            )
-                                            result.onFailure { err ->
-                                                errorMessage = err.message ?: "Manual connection failed"
-                                            }
-                                        }
-                                    }
-                                },
-                                enabled = manualServerUrl.isNotBlank() && manualOtpCode.isNotBlank() && !isLoading,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(46.dp),
-                                shape = SquircleShapeSmall,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
-                                )
+                        errorMessage?.let { error ->
+                            Surface(
+                                shape = MaterialTheme.shapes.large,
+                                color = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
                             ) {
-                                if (isLoading) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(18.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.onPrimary
+                                Row(
+                                    modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Icon(
+                                        PeerlessIcons.Warning,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
                                     )
-                                } else {
                                     Text(
-                                        text = "Connect with Server & Code",
-                                        style = ExpressiveTypography.labelMedium,
-                                        fontWeight = FontWeight.Bold
+                                        error,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.weight(1f)
                                     )
+                                    IconButton(onClick = { errorMessage = null }) {
+                                        Icon(PeerlessIcons.Close, contentDescription = "Dismiss error")
+                                    }
                                 }
                             }
                         }
                     }
+
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.extraLarge,
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        ),
+                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            verticalArrangement = Arrangement.spacedBy(18.dp)
+                        ) {
+                            ConnectionSectionHeader(
+                                icon = PeerlessIcons.Compass,
+                                title = "Connect with Telegram",
+                                supportingText = "Recommended"
+                            )
+                            Text(
+                                text = "In Telegram, send /stream to your Peerless bot, then choose Open Peerless.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Button(
+                                onClick = { uriHandler.openUri("https://t.me") },
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                shape = CircleShape
+                            ) {
+                                Text("Open Telegram")
+                                Spacer(Modifier.width(8.dp))
+                                Icon(
+                                    PeerlessIcons.OpenInNew,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                            ConnectionSectionHeader(
+                                icon = PeerlessIcons.Key,
+                                title = "Use a connection key",
+                                supportingText = "Paste an auth link or Base64 key"
+                            )
+                            OutlinedTextField(
+                                value = connectionKey,
+                                onValueChange = {
+                                    connectionKey = it
+                                    errorMessage = null
+                                },
+                                label = { Text("Connection key") },
+                                placeholder = { Text("peerless://auth?data=…") },
+                                leadingIcon = {
+                                    Icon(PeerlessIcons.Key, contentDescription = null, modifier = Modifier.size(20.dp))
+                                },
+                                trailingIcon = {
+                                    IconButton(
+                                        onClick = {
+                                            val text = clipboardManager.getText()?.text
+                                            if (!text.isNullOrBlank()) {
+                                                connectionKey = text.trim()
+                                                errorMessage = null
+                                            }
+                                        }
+                                    ) {
+                                        Icon(PeerlessIcons.ContentPaste, contentDescription = "Paste connection key")
+                                    }
+                                },
+                                minLines = 1,
+                                maxLines = 3,
+                                shape = MaterialTheme.shapes.large,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            FilledTonalButton(
+                                onClick = {
+                                    scope.launch {
+                                        errorMessage = null
+                                        sessionManager.connectWithPayload(connectionKey.trim()).onFailure { error ->
+                                            errorMessage = error.message ?: "Could not connect with this key"
+                                        }
+                                    }
+                                },
+                                enabled = connectionKey.isNotBlank() && !isLoading,
+                                modifier = Modifier.fillMaxWidth().height(52.dp),
+                                shape = CircleShape
+                            ) {
+                                if (isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                } else {
+                                    Text("Connect with key")
+                                }
+                            }
+                        }
+                    }
+
+                    OutlinedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.outlinedCardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                        )
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            TextButton(
+                                onClick = { isManualConfigExpanded = !isManualConfigExpanded },
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Icon(PeerlessIcons.Settings, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(12.dp))
+                                Text(
+                                    text = "Manual server setup",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    modifier = Modifier.weight(1f),
+                                    textAlign = TextAlign.Start
+                                )
+                                Icon(
+                                    PeerlessIcons.ExpandMore,
+                                    contentDescription = if (isManualConfigExpanded) "Collapse" else "Expand",
+                                    modifier = Modifier.rotate(manualExpandRotation)
+                                )
+                            }
+
+                            AnimatedVisibility(
+                                visible = isManualConfigExpanded,
+                                enter = fadeIn() + expandVertically(),
+                                exit = fadeOut() + shrinkVertically()
+                            ) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth()
+                                        .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
+                                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                                ) {
+                                    Text(
+                                        text = "Enter your server address and the one-time code from Telegram.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    OutlinedTextField(
+                                        value = manualServerUrl,
+                                        onValueChange = {
+                                            manualServerUrl = it
+                                            errorMessage = null
+                                        },
+                                        label = { Text("Server address") },
+                                        placeholder = { Text("https://peerless.example.com") },
+                                        singleLine = true,
+                                        shape = MaterialTheme.shapes.large,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    OutlinedTextField(
+                                        value = manualOtpCode,
+                                        onValueChange = {
+                                            manualOtpCode = it
+                                            errorMessage = null
+                                        },
+                                        label = { Text("One-time code") },
+                                        placeholder = { Text("Code from /stream") },
+                                        singleLine = true,
+                                        shape = MaterialTheme.shapes.large,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    Button(
+                                        onClick = {
+                                            scope.launch {
+                                                errorMessage = null
+                                                sessionManager.connectManual(
+                                                    serverUrl = manualServerUrl.trim(),
+                                                    code = manualOtpCode.trim()
+                                                ).onFailure { error ->
+                                                    errorMessage = error.message ?: "Could not connect to this server"
+                                                }
+                                            }
+                                        },
+                                        enabled = manualServerUrl.isNotBlank() && manualOtpCode.isNotBlank() && !isLoading,
+                                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                                        shape = CircleShape
+                                    ) {
+                                        if (isLoading) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(20.dp),
+                                                strokeWidth = 2.dp,
+                                                color = MaterialTheme.colorScheme.onPrimary
+                                            )
+                                        } else {
+                                            Text("Connect to server")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.Lock,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "Your session token is stored securely on this device.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
+        }
+    }
+}
 
-            // Footer info
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = PeerlessIcons.LosslessWave,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.size(14.dp)
-                )
-                Text(
-                    text = "Zero-Knowledge Token Vault • Bit-Perfect Bitstream",
-                    style = SpecBadgeTypography.copy(fontSize = 9.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                )
+@Composable
+private fun PeerlessBrandMark(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.size(72.dp),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        shadowElevation = 4.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primaryContainer,
+                            MaterialTheme.colorScheme.tertiaryContainer
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(PeerlessIcons.MusicNote, contentDescription = "Peerless", modifier = Modifier.size(34.dp))
+        }
+    }
+}
+
+@Composable
+private fun PeerlessWelcomePanel(modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(28.dp)) {
+        PeerlessBrandMark()
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = "Your music. Your cloud.",
+                style = MaterialTheme.typography.displaySmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "Pair Peerless with Telegram to stream your lossless library privately on every device.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.widthIn(max = 400.dp)
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            WelcomeBenefit(PeerlessIcons.LosslessWave, "Bit-perfect lossless streaming")
+            WelcomeBenefit(PeerlessIcons.Devices, "One library across your devices")
+            WelcomeBenefit(Icons.Rounded.Lock, "Private, token-based access")
+        }
+    }
+}
+
+@Composable
+private fun WelcomeBenefit(icon: ImageVector, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Surface(
+            modifier = Modifier.size(36.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
             }
+        }
+        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+@Composable
+private fun ConnectionSectionHeader(icon: ImageVector, title: String, supportingText: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Surface(
+            modifier = Modifier.size(40.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                supportingText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

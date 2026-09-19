@@ -8,6 +8,16 @@ class AndroidPlatform : Platform {
 
 actual fun getPlatform(): Platform = AndroidPlatform()
 
+actual fun getDeviceDisplayName(): String {
+    val manufacturer = Build.MANUFACTURER.trim()
+    val model = Build.MODEL.trim()
+    return if (model.startsWith(manufacturer, ignoreCase = true)) {
+        model
+    } else {
+        "$manufacturer $model".trim()
+    }.ifBlank { "Android device" }
+}
+
 actual fun getGreetingAndDate(): Pair<String, String> {
     val cal = java.util.Calendar.getInstance()
     val hour = cal.get(java.util.Calendar.HOUR_OF_DAY)

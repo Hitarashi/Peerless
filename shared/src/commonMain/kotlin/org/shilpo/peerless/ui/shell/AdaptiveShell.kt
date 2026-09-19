@@ -54,6 +54,7 @@ import org.shilpo.peerless.ui.SampleLosslessLibrary
 import org.shilpo.peerless.ui.components.*
 import org.shilpo.peerless.ui.navigation.NavigationDestination
 import org.shilpo.peerless.ui.screens.AuthOnboardingScreen
+import org.shilpo.peerless.ui.screens.LastFmLoginScreen
 import org.shilpo.peerless.ui.screens.ProfileScreen
 import org.shilpo.peerless.ui.screens.SearchScreen
 import kotlin.ranges.coerceIn
@@ -70,8 +71,18 @@ fun AdaptiveShell(
 
     var isProfileOpen by remember { mutableStateOf(false) }
 
+    val isLastFmConnected by sessionManager.isLastFmConnected.collectAsState()
+
     if (sessionState is SessionState.Unauthenticated || (sessionState is SessionState.Loading && !hasCredentials)) {
         AuthOnboardingScreen(modifier = modifier.fillMaxSize())
+        return
+    }
+
+    if (!isLastFmConnected) {
+        LastFmLoginScreen(
+            modifier = modifier.fillMaxSize(),
+            onLogin = sessionManager::loginLastFm
+        )
         return
     }
 

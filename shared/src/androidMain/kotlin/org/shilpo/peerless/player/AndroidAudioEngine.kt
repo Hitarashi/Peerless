@@ -2,7 +2,6 @@ package org.shilpo.peerless.player
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
@@ -13,6 +12,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import java.io.ByteArrayOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
 object AndroidAudioContextHolder {
     @Volatile
@@ -57,6 +59,7 @@ class AndroidAudioEngine(
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val mainHandler = Handler(Looper.getMainLooper())
     private var progressJob: Job? = null
+    private var artworkJob: Job? = null
 
     @Volatile
     private var currentTitle: String? = null
@@ -234,6 +237,7 @@ class AndroidAudioEngine(
         artworkUrl: String?
     ) {
         currentTitle = title
+        artworkJob?.cancel()
         mainHandler.post {
             val player = getOrCreatePlayer()
             if (player == null) {
@@ -247,7 +251,6 @@ class AndroidAudioEngine(
             val metadata = MediaMetadata.Builder()
                 .setTitle(title)
                 .setArtist(artist)
-                .setArtworkUri(artworkUrl?.let { Uri.parse(it) })
                 .build()
 
             val mediaItem = MediaItem.Builder()
@@ -259,6 +262,81 @@ class AndroidAudioEngine(
             player.prepare()
             _state.value = AudioEngineState(status = PlaybackStatus.BUFFERING)
             updateSignalPathSnapshot(player.audioFormat)
+
+            if (!artworkUrl.isNullOrBlank()) {
+                android.util.Log.d("AndroidAudioEngine", "Loading artwork bytes for media session")
+                loadMediaSessionArtwork(
+                    player = player,
+                    mediaUri = url,
+                    artworkUrl = artworkUrl,
+                    headers = headers
+                )
+            } else {
+                android.util.Log.w("AndroidAudioEngine", "No artwork URL was provided for media session metadata")
+            }
+        }
+    }
+
+    private fun loadMediaSessionArtwork(
+        player: ExoPlayer,
+        mediaUri: String,
+        artworkUrl: String,
+        headers: Map<String, String>
+    ) {
+        artworkJob = scope.launch(Dispatchers.IO) {
+            val artworkResult = runCatching {
+                val connection = URL(artworkUrl).openConnection() as HttpURLConnection
+                try {
+                    connection.connectTimeout = 5_000
+                    connection.readTimeout = 8_000
+                    connection.setRequestProperty("User-Agent", "Peerless Android")
+                    headers.forEach { (name, value) -> connection.setRequestProperty(name, value) }
+                    connection.inputStream.use { input ->
+                        val output = ByteArrayOutputStream()
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        var totalBytes = 0
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            totalBytes += count
+                            check(totalBytes <= MAX_ARTWORK_BYTES) { "Artwork exceeds media-session limit" }
+                            output.write(buffer, 0, count)
+                        }
+                        output.toByteArray()
+                    }
+                } finally {
+                    connection.disconnect()
+                }
+            }
+            val artworkBytes = artworkResult.getOrElse { error ->
+                android.util.Log.w("AndroidAudioEngine", "Unable to load media artwork", error)
+                return@launch
+            }
+            if (artworkBytes.isEmpty()) {
+                android.util.Log.w("AndroidAudioEngine", "Media artwork response was empty")
+                return@launch
+            }
+
+            withContext(Dispatchers.Main) {
+                val index = player.currentMediaItemIndex
+                val currentItem = player.currentMediaItem ?: run {
+                    android.util.Log.w("AndroidAudioEngine", "Media item disappeared before artwork loaded")
+                    return@withContext
+                }
+                if (currentItem.localConfiguration?.uri?.toString() != mediaUri) {
+                    android.util.Log.d("AndroidAudioEngine", "Discarding artwork for a no longer active track")
+                    return@withContext
+                }
+
+                val metadata = currentItem.mediaMetadata.buildUpon()
+                    .setArtworkData(artworkBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                    .build()
+                player.replaceMediaItem(index, currentItem.buildUpon().setMediaMetadata(metadata).build())
+                android.util.Log.d(
+                    "AndroidAudioEngine",
+                    "Attached ${artworkBytes.size} bytes of artwork to media session"
+                )
+            }
         }
     }
 
@@ -320,6 +398,8 @@ class AndroidAudioEngine(
 
     override fun release() {
         mainHandler.post {
+            artworkJob?.cancel()
+            artworkJob = null
             stopProgressUpdates()
             AndroidMediaSessionHolder.mediaSession?.release()
             AndroidMediaSessionHolder.mediaSession = null
@@ -327,6 +407,10 @@ class AndroidAudioEngine(
             AndroidMediaSessionHolder.player = null
             _state.value = AudioEngineState(status = PlaybackStatus.IDLE)
         }
+    }
+
+    private companion object {
+        const val MAX_ARTWORK_BYTES = 8 * 1024 * 1024
     }
 }
 

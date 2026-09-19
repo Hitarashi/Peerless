@@ -5,6 +5,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.shilpo.peerless.lastfm.LastFmConfig
 import org.shilpo.peerless.model.UserDto
 import org.shilpo.peerless.network.PeerlessApiClient
 import kotlin.time.Duration.Companion.hours
@@ -17,10 +18,16 @@ sealed interface SessionState {
 
 interface SessionManager {
     val sessionState: StateFlow<SessionState>
+    val isLastFmConnected: StateFlow<Boolean>
+    val lastFmUsername: StateFlow<String?>
+    val lastFmConfig: StateFlow<LastFmConfig?>
     fun hasSavedCredentials(): Boolean = false
     suspend fun connectWithPayload(encodedPayload: String): Result<UserDto>
     suspend fun connectManual(serverUrl: String, code: String): Result<UserDto>
     suspend fun checkExistingSession(): Boolean
+    suspend fun refreshLastFmStatus(): Boolean = false
+    suspend fun loginLastFm(username: String, password: String): Result<Unit> = Result.success(Unit)
+    suspend fun disconnectLastFm(): Result<Unit> = Result.success(Unit)
     suspend fun logout()
 }
 
@@ -32,6 +39,15 @@ class RealSessionManager(
 
     private val _sessionState = MutableStateFlow<SessionState>(SessionState.Unauthenticated)
     override val sessionState: StateFlow<SessionState> = _sessionState.asStateFlow()
+
+    private val _isLastFmConnected = MutableStateFlow(false)
+    override val isLastFmConnected: StateFlow<Boolean> = _isLastFmConnected.asStateFlow()
+
+    private val _lastFmUsername = MutableStateFlow<String?>(null)
+    override val lastFmUsername: StateFlow<String?> = _lastFmUsername.asStateFlow()
+
+    private val _lastFmConfig = MutableStateFlow<LastFmConfig?>(null)
+    override val lastFmConfig: StateFlow<LastFmConfig?> = _lastFmConfig.asStateFlow()
 
     override fun hasSavedCredentials(): Boolean {
         return !tokenStorage.tokenFlow.value.isNullOrBlank() && !tokenStorage.serverUrlFlow.value.isNullOrBlank()
@@ -80,6 +96,7 @@ class RealSessionManager(
 
         _sessionState.value = SessionState.Authenticated(user = user, serverUrl = sanitizedUrl)
         startSlidingRefresh()
+        refreshLastFmStatus()
         user
     }.onFailure {
         _sessionState.value = SessionState.Unauthenticated
@@ -104,11 +121,62 @@ class RealSessionManager(
             val user = meResult.getOrThrow().user
             _sessionState.value = SessionState.Authenticated(user = user, serverUrl = sanitizedUrl)
             startSlidingRefresh()
+            refreshLastFmStatus()
             true
         } else {
             logout()
             false
         }
+    }
+
+    override suspend fun refreshLastFmStatus(): Boolean {
+        return try {
+            val result = apiClient.getLastFmStatus()
+            if (result.isSuccess) {
+                val status = result.getOrThrow()
+                _isLastFmConnected.value = status.connected
+                _lastFmUsername.value = status.username
+                if (status.connected && status.session_key != null && status.api_key != null && status.api_secret != null) {
+                    _lastFmConfig.value = LastFmConfig(
+                        apiKey = status.api_key,
+                        apiSecret = status.api_secret,
+                        sessionKey = status.session_key,
+                        username = status.username ?: ""
+                    )
+                } else {
+                    _lastFmConfig.value = null
+                }
+                status.connected
+            } else {
+                _isLastFmConnected.value = false
+                _lastFmUsername.value = null
+                _lastFmConfig.value = null
+                false
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    override suspend fun loginLastFm(username: String, password: String): Result<Unit> = runCatching {
+        val response = apiClient.loginLastFm(username.trim(), password).getOrThrow()
+        _isLastFmConnected.value = response.connected
+        _lastFmUsername.value = response.username
+        if (response.connected && response.session_key != null && response.api_key != null && response.api_secret != null) {
+            _lastFmConfig.value = LastFmConfig(
+                apiKey = response.api_key,
+                apiSecret = response.api_secret,
+                sessionKey = response.session_key,
+                username = response.username ?: ""
+            )
+        }
+    }
+
+    override suspend fun disconnectLastFm(): Result<Unit> = runCatching {
+        apiClient.disconnectLastFm().getOrThrow()
+        _isLastFmConnected.value = false
+        _lastFmUsername.value = null
+        _lastFmConfig.value = null
     }
 
     override suspend fun logout() {
@@ -120,6 +188,9 @@ class RealSessionManager(
 
         tokenStorage.clearAll()
         apiClient.baseUrl = ""
+        _isLastFmConnected.value = false
+        _lastFmUsername.value = null
+        _lastFmConfig.value = null
         _sessionState.value = SessionState.Unauthenticated
     }
 

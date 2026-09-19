@@ -8,6 +8,9 @@ interface TokenStorage {
     val tokenFlow: StateFlow<String?>
     val serverUrlFlow: StateFlow<String?>
 
+    /** Stable for this app installation; intentionally survives sign-out. */
+    fun getOrCreateDeviceId(): String
+
     suspend fun getToken(): String?
     suspend fun saveToken(token: String)
     suspend fun clearToken()
@@ -19,13 +22,16 @@ interface TokenStorage {
 
 class InMemoryTokenStorage(
     initialToken: String? = null,
-    initialServerUrl: String? = null
+    initialServerUrl: String? = null,
+    private val deviceId: String = newDeviceId()
 ) : TokenStorage {
     private val _tokenFlow = MutableStateFlow(initialToken)
     override val tokenFlow: StateFlow<String?> = _tokenFlow.asStateFlow()
 
     private val _serverUrlFlow = MutableStateFlow(initialServerUrl)
     override val serverUrlFlow: StateFlow<String?> = _serverUrlFlow.asStateFlow()
+
+    override fun getOrCreateDeviceId(): String = deviceId
 
     override suspend fun getToken(): String? = _tokenFlow.value
 
@@ -52,5 +58,8 @@ class InMemoryTokenStorage(
         _serverUrlFlow.value = null
     }
 }
+
+internal fun newDeviceId(): String =
+    "device_" + kotlin.random.Random.nextLong().toULong().toString(16)
 
 expect fun createPlatformTokenStorage(): TokenStorage
