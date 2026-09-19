@@ -1,5 +1,6 @@
 package org.shilpo.peerless.ui.screens
 
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -8,22 +9,23 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.DrawableResource
 import org.shilpo.peerless.auth.LocalSessionManager
 import org.shilpo.peerless.auth.SessionState
+import org.shilpo.peerless.readPlainText
 import org.shilpo.peerless.theme.ExpressiveMotion
+import org.shilpo.peerless.ui.components.PeerlessIcon
 import org.shilpo.peerless.ui.components.PeerlessIcons
 
 @Composable
@@ -33,8 +35,7 @@ fun AuthOnboardingScreen(modifier: Modifier = Modifier) {
     val isLoading = sessionState is SessionState.Loading
     val uriHandler = LocalUriHandler.current
 
-    @Suppress("DEPRECATION")
-    val clipboardManager = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
 
     var connectionKey by remember { mutableStateOf("") }
@@ -118,7 +119,7 @@ fun AuthOnboardingScreen(modifier: Modifier = Modifier) {
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    Icon(
+                                    PeerlessIcon(
                                         PeerlessIcons.Warning,
                                         contentDescription = null,
                                         modifier = Modifier.size(20.dp)
@@ -129,7 +130,7 @@ fun AuthOnboardingScreen(modifier: Modifier = Modifier) {
                                         modifier = Modifier.weight(1f)
                                     )
                                     IconButton(onClick = { errorMessage = null }) {
-                                        Icon(PeerlessIcons.Close, contentDescription = "Dismiss error")
+                                        PeerlessIcon(PeerlessIcons.Close, contentDescription = "Dismiss error")
                                     }
                                 }
                             }
@@ -165,7 +166,7 @@ fun AuthOnboardingScreen(modifier: Modifier = Modifier) {
                             ) {
                                 Text("Open Telegram")
                                 Spacer(Modifier.width(8.dp))
-                                Icon(
+                                PeerlessIcon(
                                     PeerlessIcons.OpenInNew,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp)
@@ -188,19 +189,28 @@ fun AuthOnboardingScreen(modifier: Modifier = Modifier) {
                                 label = { Text("Connection key") },
                                 placeholder = { Text("peerless://auth?data=…") },
                                 leadingIcon = {
-                                    Icon(PeerlessIcons.Key, contentDescription = null, modifier = Modifier.size(20.dp))
+                                    PeerlessIcon(
+                                        PeerlessIcons.Key,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 },
                                 trailingIcon = {
                                     IconButton(
                                         onClick = {
-                                            val text = clipboardManager.getText()?.text
-                                            if (!text.isNullOrBlank()) {
-                                                connectionKey = text.trim()
-                                                errorMessage = null
+                                            scope.launch {
+                                                val text = clipboard.readPlainText()
+                                                if (!text.isNullOrBlank()) {
+                                                    connectionKey = text.trim()
+                                                    errorMessage = null
+                                                }
                                             }
                                         }
                                     ) {
-                                        Icon(PeerlessIcons.ContentPaste, contentDescription = "Paste connection key")
+                                        PeerlessIcon(
+                                            PeerlessIcons.ContentPaste,
+                                            contentDescription = "Paste connection key"
+                                        )
                                     }
                                 },
                                 minLines = 1,
@@ -247,7 +257,11 @@ fun AuthOnboardingScreen(modifier: Modifier = Modifier) {
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                             ) {
-                                Icon(PeerlessIcons.Settings, contentDescription = null, modifier = Modifier.size(20.dp))
+                                PeerlessIcon(
+                                    PeerlessIcons.Settings,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp)
+                                )
                                 Spacer(Modifier.width(12.dp))
                                 Text(
                                     text = "Manual server setup",
@@ -255,7 +269,7 @@ fun AuthOnboardingScreen(modifier: Modifier = Modifier) {
                                     modifier = Modifier.weight(1f),
                                     textAlign = TextAlign.Start
                                 )
-                                Icon(
+                                PeerlessIcon(
                                     PeerlessIcons.ExpandMore,
                                     contentDescription = if (isManualConfigExpanded) "Collapse" else "Expand",
                                     modifier = Modifier.rotate(manualExpandRotation)
@@ -337,8 +351,8 @@ fun AuthOnboardingScreen(modifier: Modifier = Modifier) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            Icons.Rounded.Lock,
+                        PeerlessIcon(
+                            PeerlessIcons.Lock,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp)
@@ -377,7 +391,7 @@ private fun PeerlessBrandMark(modifier: Modifier = Modifier) {
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Icon(PeerlessIcons.MusicNote, contentDescription = "Peerless", modifier = Modifier.size(34.dp))
+            PeerlessIcon(PeerlessIcons.MusicNote, contentDescription = "Peerless", modifier = Modifier.size(34.dp))
         }
     }
 }
@@ -402,13 +416,13 @@ private fun PeerlessWelcomePanel(modifier: Modifier = Modifier) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             WelcomeBenefit(PeerlessIcons.LosslessWave, "Bit-perfect lossless streaming")
             WelcomeBenefit(PeerlessIcons.Devices, "One library across your devices")
-            WelcomeBenefit(Icons.Rounded.Lock, "Private, token-based access")
+            WelcomeBenefit(PeerlessIcons.Lock, "Private, token-based access")
         }
     }
 }
 
 @Composable
-private fun WelcomeBenefit(icon: ImageVector, label: String) {
+private fun WelcomeBenefit(icon: DrawableResource, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Surface(
             modifier = Modifier.size(36.dp),
@@ -417,7 +431,7 @@ private fun WelcomeBenefit(icon: ImageVector, label: String) {
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+                PeerlessIcon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
             }
         }
         Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
@@ -425,7 +439,7 @@ private fun WelcomeBenefit(icon: ImageVector, label: String) {
 }
 
 @Composable
-private fun ConnectionSectionHeader(icon: ImageVector, title: String, supportingText: String) {
+private fun ConnectionSectionHeader(icon: DrawableResource, title: String, supportingText: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Surface(
             modifier = Modifier.size(40.dp),
@@ -434,7 +448,7 @@ private fun ConnectionSectionHeader(icon: ImageVector, title: String, supporting
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+                PeerlessIcon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {

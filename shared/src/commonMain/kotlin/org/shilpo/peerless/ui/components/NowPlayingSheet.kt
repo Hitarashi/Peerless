@@ -9,7 +9,10 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.*
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -164,8 +167,8 @@ fun NowPlayingSheet(
                         .clip(CircleShape)
                         .background(colorScheme.surfaceContainer)
                 ) {
-                    Icon(
-                        imageVector = PeerlessIcons.ExpandMore,
+                    PeerlessIcon(
+                        icon = PeerlessIcons.ExpandMore,
                         contentDescription = "Collapse player",
                         tint = colorScheme.onSurface,
                         modifier = Modifier.size(24.dp)
@@ -194,8 +197,8 @@ fun NowPlayingSheet(
                         .clip(CircleShape)
                         .background(colorScheme.surfaceContainer)
                 ) {
-                    Icon(
-                        imageVector = PeerlessIcons.Settings,
+                    PeerlessIcon(
+                        icon = PeerlessIcons.Settings,
                         contentDescription = "Playback settings",
                         tint = colorScheme.onSurface,
                         modifier = Modifier.size(20.dp)
@@ -219,8 +222,8 @@ fun NowPlayingSheet(
                     .border(1.dp, colorScheme.outlineVariant, HeroArtworkShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = PeerlessIcons.MusicNote,
+                PeerlessIcon(
+                    icon = PeerlessIcons.MusicNote,
                     contentDescription = null,
                     tint = colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                     modifier = Modifier.size(72.dp)
@@ -307,8 +310,8 @@ fun NowPlayingSheet(
                         .clip(CircleShape)
                         .background(colorScheme.surfaceContainer)
                 ) {
-                    Icon(
-                        imageVector = if (isFav) PeerlessIcons.Heart else PeerlessIcons.HeartBorder,
+                    PeerlessIcon(
+                        icon = if (isFav) PeerlessIcons.Heart else PeerlessIcons.HeartBorder,
                         contentDescription = if (isFav) "Remove favorite" else "Add favorite",
                         tint = if (isFav) Color(0xFFFF5252) else colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
                         modifier = Modifier.size(18.dp)
@@ -384,8 +387,8 @@ fun NowPlayingSheet(
                     onClick = onToggleShuffle,
                     modifier = Modifier.size(44.dp)
                 ) {
-                    Icon(
-                        imageVector = PeerlessIcons.Shuffle,
+                    PeerlessIcon(
+                        icon = PeerlessIcons.Shuffle,
                         contentDescription = "Shuffle",
                         tint = if (isShuffle) colorScheme.secondary else colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         modifier = Modifier.size(22.dp)
@@ -396,8 +399,8 @@ fun NowPlayingSheet(
                     onClick = onPlayPrevious,
                     modifier = Modifier.size(52.dp)
                 ) {
-                    Icon(
-                        imageVector = PeerlessIcons.SkipPrevious,
+                    PeerlessIcon(
+                        icon = PeerlessIcons.SkipPrevious,
                         contentDescription = "Previous Track",
                         tint = colorScheme.onSurface,
                         modifier = Modifier.size(30.dp)
@@ -428,8 +431,8 @@ fun NowPlayingSheet(
                     onClick = onPlayNext,
                     modifier = Modifier.size(52.dp)
                 ) {
-                    Icon(
-                        imageVector = PeerlessIcons.SkipNext,
+                    PeerlessIcon(
+                        icon = PeerlessIcons.SkipNext,
                         contentDescription = "Next Track",
                         tint = colorScheme.onSurface,
                         modifier = Modifier.size(30.dp)
@@ -445,8 +448,8 @@ fun NowPlayingSheet(
                         if (repeatMode != RepeatMode.OFF) colorScheme.secondary else colorScheme.onSurfaceVariant.copy(
                             alpha = 0.6f
                         )
-                    Icon(
-                        imageVector = repeatIcon,
+                    PeerlessIcon(
+                        icon = repeatIcon,
                         contentDescription = "Repeat",
                         tint = repeatTint,
                         modifier = Modifier.size(22.dp)

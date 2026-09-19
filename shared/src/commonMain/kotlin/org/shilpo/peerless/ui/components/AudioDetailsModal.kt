@@ -4,7 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,8 +70,8 @@ fun AudioDetailsModal(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = PeerlessIcons.SignalPath,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.SignalPath,
                             contentDescription = null,
                             tint = tierColor,
                             modifier = Modifier.size(18.dp)
@@ -94,8 +97,8 @@ fun AudioDetailsModal(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         if (isHiRes) {
-                            Icon(
-                                imageVector = PeerlessIcons.HiRes,
+                            PeerlessIcon(
+                                icon = PeerlessIcons.HiRes,
                                 contentDescription = "Hi-Res Audio",
                                 tint = tierColor,
                                 modifier = Modifier.size(14.dp)
@@ -128,8 +131,8 @@ fun AudioDetailsModal(
                             .background(colorScheme.surfaceContainerLowest),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = PeerlessIcons.MusicNote,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.MusicNote,
                             contentDescription = null,
                             tint = colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                             modifier = Modifier.size(24.dp)
@@ -227,8 +230,8 @@ fun AudioDetailsModal(
                             ),
                             shape = PillShape
                         ) {
-                            Icon(
-                                imageVector = PeerlessIcons.Play,
+                            PeerlessIcon(
+                                icon = PeerlessIcons.Play,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp)
                             )

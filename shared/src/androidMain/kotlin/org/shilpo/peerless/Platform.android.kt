@@ -1,6 +1,7 @@
 package org.shilpo.peerless
 
 import android.os.Build
+import androidx.compose.ui.platform.Clipboard
 
 class AndroidPlatform : Platform {
     override val name: String = "Android ${Build.VERSION.SDK_INT}"
@@ -9,8 +10,8 @@ class AndroidPlatform : Platform {
 actual fun getPlatform(): Platform = AndroidPlatform()
 
 actual fun getDeviceDisplayName(): String {
-    val manufacturer = Build.MANUFACTURER.trim()
-    val model = Build.MODEL.trim()
+    val manufacturer = Build.MANUFACTURER.orEmpty().trim()
+    val model = Build.MODEL.orEmpty().trim()
     return if (model.startsWith(manufacturer, ignoreCase = true)) {
         model
     } else {
@@ -18,15 +19,8 @@ actual fun getDeviceDisplayName(): String {
     }.ifBlank { "Android device" }
 }
 
-actual fun getGreetingAndDate(): Pair<String, String> {
-    val cal = java.util.Calendar.getInstance()
-    val hour = cal.get(java.util.Calendar.HOUR_OF_DAY)
-    val greeting = when {
-        hour < 12 -> "Good morning"
-        hour < 17 -> "Good afternoon"
-        else -> "Good evening"
-    }
-    val sdf = java.text.SimpleDateFormat("EEEE, MMMM d", java.util.Locale.ENGLISH)
-    val date = sdf.format(cal.time)
-    return Pair(greeting, date)
+internal actual suspend fun Clipboard.readPlainText(): String? {
+    val clipData = getClipEntry()?.clipData ?: return null
+    if (clipData.itemCount == 0) return null
+    return clipData.getItemAt(0)?.text?.toString()
 }

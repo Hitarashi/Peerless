@@ -1,6 +1,6 @@
-package org.shilpo.peerless.ui
+package org.shilpo.peerless.ui.screens
 
-import androidx.compose.animation.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,7 +11,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,19 +26,19 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import kotlinx.coroutines.delay
 import org.shilpo.peerless.model.TrackSummaryDto
-import org.shilpo.peerless.model.UncachedTrackDto
 import org.shilpo.peerless.model.toTrack
 import org.shilpo.peerless.network.LocalPeerlessApiClient
-import org.shilpo.peerless.player.LocalPlayerConnection
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
 import org.shilpo.peerless.theme.ExpressiveTypography
 import org.shilpo.peerless.theme.PillShape
 import org.shilpo.peerless.theme.SpecBadgeTypography
 import org.shilpo.peerless.theme.SquircleShapeSmall
-import org.shilpo.peerless.ui.components.*
+import org.shilpo.peerless.ui.components.PeerlessIcon
+import org.shilpo.peerless.ui.components.PeerlessIcons
+import org.shilpo.peerless.ui.components.TrackRow
+import org.shilpo.peerless.ui.components.formatProviderLabel
 
 val SampleLosslessLibrary = listOf(
     TrackSummaryDto(
@@ -153,21 +155,6 @@ val SampleLosslessLibrary = listOf(
     )
 )
 
-fun UncachedTrackDto.toTrackSummary(): TrackSummaryDto = TrackSummaryDto(
-    id = -(kotlin.math.abs(track_id.hashCode()).let { if (it == 0) 1 else it }),
-    provider = provider,
-    track_id = track_id,
-    title = title,
-    artist = artist,
-    album = album,
-    duration = duration,
-    codec = "FLAC",
-    bit_depth = 24,
-    sample_rate = 96000,
-    is_cached = false,
-    artwork_url = artwork_url
-)
-
 @Composable
 fun HomeTopHeader(
     serverConnected: Boolean,
@@ -198,8 +185,8 @@ fun HomeTopHeader(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = PeerlessIcons.MusicNote,
+                PeerlessIcon(
+                    icon = PeerlessIcons.MusicNote,
                     contentDescription = "Peerless",
                     tint = Color.White,
                     modifier = Modifier.size(20.dp)
@@ -228,8 +215,8 @@ fun HomeTopHeader(
                     .clickable(onClick = onToggleStats),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = PeerlessIcons.Compass,
+                PeerlessIcon(
+                    icon = PeerlessIcons.Compass,
                     contentDescription = "Explore & Stats",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
@@ -245,8 +232,8 @@ fun HomeTopHeader(
                     .clickable(onClick = onNavigateToSearch),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = PeerlessIcons.Search,
+                PeerlessIcon(
+                    icon = PeerlessIcons.Search,
                     contentDescription = "Search",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
@@ -262,8 +249,8 @@ fun HomeTopHeader(
                     .clickable(onClick = onOpenSettings),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = PeerlessIcons.Settings,
+                PeerlessIcon(
+                    icon = PeerlessIcons.Settings,
                     contentDescription = "Settings",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
@@ -408,16 +395,16 @@ fun QuickPickCard(
                 val hasHiRes = (track.bit_depth ?: 16) >= 24 || (track.sample_rate ?: 44100) >= 88200
 
                 if (hasApple) {
-                    Icon(
-                        imageVector = PeerlessIcons.AppleLogo,
+                    PeerlessIcon(
+                        icon = PeerlessIcons.AppleLogo,
                         contentDescription = "Apple Music",
                         tint = Color.White.copy(alpha = 0.85f),
                         modifier = Modifier.size(11.dp)
                     )
                 }
                 if (hasQobuz) {
-                    Icon(
-                        imageVector = PeerlessIcons.QobuzLogo,
+                    PeerlessIcon(
+                        icon = PeerlessIcons.QobuzLogo,
                         contentDescription = "Qobuz",
                         tint = Color.White.copy(alpha = 0.85f),
                         modifier = Modifier.height(10.dp).width(25.dp)
@@ -438,16 +425,16 @@ fun QuickPickCard(
                     )
                 }
                 if (hasDolby) {
-                    Icon(
-                        imageVector = PeerlessIcons.DolbyAtmos,
+                    PeerlessIcon(
+                        icon = PeerlessIcons.DolbyAtmos,
                         contentDescription = "Dolby Atmos",
                         tint = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.height(9.dp).width(14.dp)
                     )
                 }
                 if (hasHiRes) {
-                    Icon(
-                        imageVector = PeerlessIcons.HiRes,
+                    PeerlessIcon(
+                        icon = PeerlessIcons.HiRes,
                         contentDescription = "Hi-Res Audio",
                         tint = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.size(13.dp)
@@ -508,8 +495,8 @@ fun LosslessLibrarySectionHeader(
                         contentColor = MaterialTheme.colorScheme.onSurface
                     )
                 ) {
-                    Icon(
-                        imageVector = PeerlessIcons.Play,
+                    PeerlessIcon(
+                        icon = PeerlessIcons.Play,
                         contentDescription = "Play all",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(14.dp)
@@ -530,8 +517,8 @@ fun LosslessLibrarySectionHeader(
                         contentColor = MaterialTheme.colorScheme.onSurface
                     )
                 ) {
-                    Icon(
-                        imageVector = PeerlessIcons.Shuffle,
+                    PeerlessIcon(
+                        icon = PeerlessIcons.Shuffle,
                         contentDescription = "Shuffle",
                         tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(16.dp)
@@ -543,7 +530,7 @@ fun LosslessLibrarySectionHeader(
 }
 
 @Composable
-fun HomeExpressiveContent(
+fun HomeScreenContent(
     playerConnection: PlayerConnection,
     serverConnected: Boolean,
     searchQuery: String,
@@ -630,8 +617,8 @@ fun HomeExpressiveContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = PeerlessIcons.Search,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.Search,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                             modifier = Modifier.size(36.dp)
@@ -668,177 +655,6 @@ fun HomeExpressiveContent(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun HomeScreen(
-    playerConnection: PlayerConnection = LocalPlayerConnection.current,
-    modifier: Modifier = Modifier
-) {
-    val apiClient = LocalPeerlessApiClient.current
-    val currentTrack by playerConnection.currentTrack.collectAsState()
-    val currentTrackDto = currentTrack?.toSummaryDto()
-    val status by playerConnection.status.collectAsState()
-    val playbackInfo by playerConnection.playbackInfo.collectAsState()
-    val canSkipNext by playerConnection.canSkipNext.collectAsState()
-    val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
-    val shuffleMode by playerConnection.shuffleMode.collectAsState()
-    val repeatMode by playerConnection.repeatMode.collectAsState()
-    val positionMs by playerConnection.positionMs.collectAsState()
-    val durationMs by playerConnection.durationMs.collectAsState()
-    val bufferedPositionMs by playerConnection.bufferedPositionMs.collectAsState()
-
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedFilter by remember { mutableStateOf("All") }
-    var isNowPlayingOpen by remember { mutableStateOf(false) }
-    var isSettingsOpen by remember { mutableStateOf(false) }
-
-    var isSearching by remember { mutableStateOf(false) }
-    var serverConnected by remember { mutableStateOf(false) }
-    var serverTracks by remember { mutableStateOf<List<TrackSummaryDto>>(emptyList()) }
-
-    LaunchedEffect(searchQuery, selectedFilter, apiClient.baseUrl) {
-        isSearching = true
-        delay(300)
-
-        val providerParam = when (selectedFilter) {
-            "Apple Music" -> "apple_music"
-            "Qobuz" -> "qobuz"
-            else -> null
-        }
-
-        val result = apiClient.search(
-            query = searchQuery.trim(),
-            provider = providerParam
-        )
-
-        result.onSuccess { response ->
-            serverConnected = true
-            val combined = response.cached + response.live.map { it.toTrackSummary() }
-            serverTracks = combined
-            isSearching = false
-        }.onFailure {
-            serverConnected = false
-            isSearching = false
-        }
-    }
-
-    val activeLibrary = if (serverTracks.isNotEmpty()) serverTracks else SampleLosslessLibrary
-    val displayedTracks = remember(activeLibrary, selectedFilter, searchQuery) {
-        activeLibrary.filter { track ->
-            val matchesFilter = when (selectedFilter) {
-                "Cached" -> track.is_cached
-                "Apple Music" -> track.provider.contains("apple", ignoreCase = true)
-                "Qobuz" -> track.provider.contains("qobuz", ignoreCase = true)
-                else -> true
-            }
-            val matchesQuery = searchQuery.isBlank() || track.title.contains(searchQuery, ignoreCase = true) ||
-                    track.artist.contains(searchQuery, ignoreCase = true) ||
-                    track.album.contains(searchQuery, ignoreCase = true)
-            matchesFilter && matchesQuery
-        }
-    }
-
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.surfaceContainerLowest,
-                        MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.surface
-                    )
-                )
-            )
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-        ) {
-            HomeExpressiveContent(
-                playerConnection = playerConnection,
-                serverConnected = serverConnected,
-                searchQuery = searchQuery,
-                onQueryChange = { searchQuery = it },
-                selectedFilter = selectedFilter,
-                onSelectFilter = { selectedFilter = it },
-                displayedTracks = displayedTracks,
-                allTracks = activeLibrary,
-                onOpenSettings = { isSettingsOpen = true },
-                onNavigateToSearch = { searchQuery = " " },
-                onToggleStats = { isNowPlayingOpen = true },
-                contentBottomPadding = if (currentTrackDto != null) 96.dp else 24.dp
-            )
-        }
-
-        AnimatedVisibility(
-            visible = currentTrackDto != null,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-        ) {
-            currentTrackDto?.let { trackDto ->
-                MiniPlayerBar(
-                    track = trackDto,
-                    playbackInfo = playbackInfo,
-                    status = status,
-                    positionMs = positionMs,
-                    durationMs = durationMs,
-                    artworkUrl = apiClient.getArtworkUrl(trackDto, 200),
-                    onTogglePlayPause = { playerConnection.togglePlayPause() },
-                    onPlayNext = { playerConnection.playNext() },
-                    onPlayPrevious = { playerConnection.playPrevious() },
-                    onOpenNowPlaying = { isNowPlayingOpen = true },
-                    onDismiss = { playerConnection.stopAndDismiss() },
-                    canSkipNext = canSkipNext,
-                    canSkipPrevious = canSkipPrevious
-                )
-            }
-        }
-
-        AnimatedVisibility(
-            visible = isNowPlayingOpen && currentTrackDto != null,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-        ) {
-            currentTrackDto?.let { trackDto ->
-                NowPlayingSheet(
-                    track = trackDto,
-                    playbackInfo = playbackInfo,
-                    status = status,
-                    positionMs = positionMs,
-                    durationMs = durationMs,
-                    bufferedPositionMs = bufferedPositionMs,
-                    artworkUrl = apiClient.getArtworkUrl(trackDto, 600),
-                    serverUrl = apiClient.baseUrl,
-                    onTogglePlayPause = { playerConnection.togglePlayPause() },
-                    onSeekTo = { pos -> playerConnection.seekTo(pos) },
-                    onPlayNext = { playerConnection.playNext() },
-                    onPlayPrevious = { playerConnection.playPrevious() },
-                    onClose = { isNowPlayingOpen = false },
-                    onOpenSettings = { isSettingsOpen = true },
-                    isShuffle = shuffleMode,
-                    onToggleShuffle = { playerConnection.toggleShuffle() },
-                    repeatMode = repeatMode,
-                    onToggleRepeat = { playerConnection.cycleRepeatMode() }
-                )
-            }
-        }
-
-        if (isSettingsOpen) {
-            ServerSettingsDialog(
-                currentServerUrl = apiClient.baseUrl,
-                onSave = { newUrl ->
-                    apiClient.baseUrl = newUrl
-                },
-                onDismiss = { isSettingsOpen = false }
-            )
         }
     }
 }

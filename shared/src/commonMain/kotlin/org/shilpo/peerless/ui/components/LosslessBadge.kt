@@ -6,7 +6,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
@@ -141,16 +140,16 @@ fun LosslessBadge(
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         if (hasApple) {
-            Icon(
-                imageVector = PeerlessIcons.AppleLogo,
+            PeerlessIcon(
+                icon = PeerlessIcons.AppleLogo,
                 contentDescription = "Apple Music",
                 tint = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
                 modifier = Modifier.size(if (compact) 11.dp else 13.dp)
             )
         }
         if (hasQobuz) {
-            Icon(
-                imageVector = PeerlessIcons.QobuzLogo,
+            PeerlessIcon(
+                icon = PeerlessIcons.QobuzLogo,
                 contentDescription = "Qobuz",
                 tint = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
                 modifier = Modifier
@@ -170,8 +169,8 @@ fun LosslessBadge(
             )
         }
         if (hasDolby) {
-            Icon(
-                imageVector = PeerlessIcons.DolbyAtmos,
+            PeerlessIcon(
+                icon = PeerlessIcons.DolbyAtmos,
                 contentDescription = "Dolby Atmos",
                 tint = colorScheme.tertiary,
                 modifier = Modifier
@@ -181,15 +180,15 @@ fun LosslessBadge(
         }
 
         if (tier == LosslessTier.HI_RES_LOSSLESS) {
-            Icon(
-                imageVector = PeerlessIcons.HiRes,
+            PeerlessIcon(
+                icon = PeerlessIcons.HiRes,
                 contentDescription = "Hi-Res Audio",
                 tint = badgeAccentColor,
                 modifier = Modifier.size(if (compact) 13.dp else 16.dp)
             )
         } else {
-            Icon(
-                imageVector = PeerlessIcons.LosslessWave,
+            PeerlessIcon(
+                icon = PeerlessIcons.LosslessWave,
                 contentDescription = "Lossless Audio",
                 tint = badgeAccentColor,
                 modifier = Modifier.size(if (compact) 11.dp else 13.dp)

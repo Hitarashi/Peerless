@@ -229,8 +229,8 @@ fun TrackRow(
                 },
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = PeerlessIcons.MusicNote,
+            PeerlessIcon(
+                icon = PeerlessIcons.MusicNote,
                 contentDescription = null,
                 tint = colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                 modifier = Modifier.size(24.dp)
@@ -334,16 +334,16 @@ fun TrackRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (hasApple) {
-                        Icon(
-                            imageVector = PeerlessIcons.AppleLogo,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.AppleLogo,
                             contentDescription = "Apple Music",
                             tint = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
                             modifier = Modifier.size(12.dp)
                         )
                     }
                     if (hasQobuz) {
-                        Icon(
-                            imageVector = PeerlessIcons.QobuzLogo,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.QobuzLogo,
                             contentDescription = "Qobuz",
                             tint = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
                             modifier = Modifier.height(11.dp).width(28.dp)
@@ -364,16 +364,16 @@ fun TrackRow(
                         )
                     }
                     if (hasDolby) {
-                        Icon(
-                            imageVector = PeerlessIcons.DolbyAtmos,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.DolbyAtmos,
                             contentDescription = "Dolby Atmos",
                             tint = colorScheme.tertiary,
                             modifier = Modifier.height(10.dp).width(15.dp)
                         )
                     }
                     if (hasHiRes) {
-                        Icon(
-                            imageVector = PeerlessIcons.HiRes,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.HiRes,
                             contentDescription = "Hi-Res Audio",
                             tint = colorScheme.tertiary,
                             modifier = Modifier.size(14.dp)
@@ -418,15 +418,15 @@ fun TrackRow(
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         if (source.provider.displayName.contains("apple", ignoreCase = true)) {
-                                            Icon(
-                                                imageVector = PeerlessIcons.AppleLogo,
+                                            PeerlessIcon(
+                                                icon = PeerlessIcons.AppleLogo,
                                                 contentDescription = "Apple Music",
                                                 tint = colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                                                 modifier = Modifier.size(12.dp)
                                             )
                                         } else if (source.provider.displayName.contains("qobuz", ignoreCase = true)) {
-                                            Icon(
-                                                imageVector = PeerlessIcons.QobuzLogo,
+                                            PeerlessIcon(
+                                                icon = PeerlessIcons.QobuzLogo,
                                                 contentDescription = "Qobuz",
                                                 tint = colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                                                 modifier = Modifier.height(11.dp).width(28.dp)
@@ -439,8 +439,8 @@ fun TrackRow(
                                             color = colorScheme.onSurface
                                         )
                                         if (source.codec == Codec.Ec3) {
-                                            Icon(
-                                                imageVector = PeerlessIcons.DolbyAtmos,
+                                            PeerlessIcon(
+                                                icon = PeerlessIcons.DolbyAtmos,
                                                 contentDescription = "Dolby Atmos",
                                                 tint = colorScheme.tertiary,
                                                 modifier = Modifier.height(10.dp).width(15.dp)
@@ -454,8 +454,8 @@ fun TrackRow(
                                             val isSourceHiRes =
                                                 (source.bitDepth ?: 16) >= 24 || (source.sampleRate ?: 44100) >= 88200
                                             if (isSourceHiRes) {
-                                                Icon(
-                                                    imageVector = PeerlessIcons.HiRes,
+                                                PeerlessIcon(
+                                                    icon = PeerlessIcons.HiRes,
                                                     contentDescription = "Hi-Res Audio",
                                                     tint = colorScheme.tertiary,
                                                     modifier = Modifier.size(14.dp)
@@ -478,8 +478,8 @@ fun TrackRow(
                                         }
                                         Spacer(modifier = Modifier.weight(1f))
                                         if (source.isCached) {
-                                            Icon(
-                                                imageVector = PeerlessIcons.CloudDone,
+                                            PeerlessIcon(
+                                                icon = PeerlessIcons.CloudDone,
                                                 contentDescription = "Cached",
                                                 tint = colorScheme.secondary.copy(alpha = 0.85f),
                                                 modifier = Modifier.size(14.dp)
@@ -499,8 +499,8 @@ fun TrackRow(
                                 },
                                 leadingIcon = if (isSelected) {
                                     {
-                                        Icon(
-                                            imageVector = PeerlessIcons.CheckCircle,
+                                        PeerlessIcon(
+                                            icon = PeerlessIcons.CheckCircle,
                                             contentDescription = "Active",
                                             tint = colorScheme.primary,
                                             modifier = Modifier.size(16.dp)
@@ -531,8 +531,8 @@ fun TrackRow(
                 },
                 modifier = Modifier.size(28.dp)
             ) {
-                Icon(
-                    imageVector = if (isFav) PeerlessIcons.Heart else PeerlessIcons.HeartBorder,
+                PeerlessIcon(
+                    icon = if (isFav) PeerlessIcons.Heart else PeerlessIcons.HeartBorder,
                     contentDescription = if (isFav) "Remove from favorites" else "Add to favorites",
                     tint = if (isFav) Color(0xFFFF5252) else colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
                     modifier = Modifier.size(16.dp)
@@ -584,8 +584,8 @@ fun TrackRow(
                 onClick = { showAudioDetails = true },
                 modifier = Modifier.size(28.dp)
             ) {
-                Icon(
-                    imageVector = PeerlessIcons.MoreVert,
+                PeerlessIcon(
+                    icon = PeerlessIcons.MoreVert,
                     contentDescription = "Track options",
                     tint = colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
                     modifier = Modifier.size(16.dp)

@@ -1,5 +1,6 @@
 package org.shilpo.peerless.ui.screens
 
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*
@@ -8,10 +9,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Visibility
-import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.shilpo.peerless.auth.LocalSessionManager
+import org.shilpo.peerless.ui.components.PeerlessIcon
 import org.shilpo.peerless.ui.components.PeerlessIcons
 import kotlin.math.roundToInt
 
@@ -278,7 +276,7 @@ fun LastFmLoginScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    Icon(
+                                    PeerlessIcon(
                                         PeerlessIcons.Warning,
                                         contentDescription = null,
                                         modifier = Modifier.size(20.dp)
@@ -289,7 +287,7 @@ fun LastFmLoginScreen(
                                         modifier = Modifier.weight(1f)
                                     )
                                     IconButton(onClick = { errorMessage = null }) {
-                                        Icon(PeerlessIcons.Close, contentDescription = "Dismiss error")
+                                        PeerlessIcon(PeerlessIcons.Close, contentDescription = "Dismiss error")
                                     }
                                 }
                             }
@@ -318,8 +316,8 @@ fun LastFmLoginScreen(
                                 label = { Text("Username or email") },
                                 placeholder = { Text("Your Last.fm account") },
                                 leadingIcon = {
-                                    Icon(
-                                        imageVector = PeerlessIcons.Person,
+                                    PeerlessIcon(
+                                        icon = PeerlessIcons.Person,
                                         contentDescription = null,
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -327,8 +325,8 @@ fun LastFmLoginScreen(
                                 trailingIcon = {
                                     if (username.isNotBlank()) {
                                         IconButton(onClick = { username = "" }) {
-                                            Icon(
-                                                imageVector = PeerlessIcons.Close,
+                                            PeerlessIcon(
+                                                icon = PeerlessIcons.Close,
                                                 contentDescription = "Clear username",
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -361,16 +359,16 @@ fun LastFmLoginScreen(
                                 placeholder = { Text("Enter your password") },
                                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                                 leadingIcon = {
-                                    Icon(
-                                        imageVector = PeerlessIcons.Key,
+                                    PeerlessIcon(
+                                        icon = PeerlessIcons.Key,
                                         contentDescription = null,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 },
                                 trailingIcon = {
                                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                        Icon(
-                                            imageVector = if (passwordVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                                        PeerlessIcon(
+                                            icon = if (passwordVisible) PeerlessIcons.VisibilityOff else PeerlessIcons.Visibility,
                                             contentDescription = if (passwordVisible) "Hide password" else "Show password",
                                             modifier = Modifier.size(20.dp)
                                         )
@@ -415,8 +413,8 @@ fun LastFmLoginScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = PeerlessIcons.Sparkle,
+                                        PeerlessIcon(
+                                            icon = PeerlessIcons.Sparkle,
                                             contentDescription = null,
                                             modifier = Modifier.size(18.dp)
                                         )
@@ -442,8 +440,8 @@ fun LastFmLoginScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Lock,
+                                PeerlessIcon(
+                                    icon = PeerlessIcons.Lock,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(16.dp)
@@ -467,8 +465,8 @@ fun LastFmLoginScreen(
                         shape = CircleShape,
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
                     ) {
-                        Icon(
-                            imageVector = PeerlessIcons.Logout,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.Logout,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp)
                         )
@@ -544,8 +542,8 @@ private fun LastFmBenefit(label: String) {
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = PeerlessIcons.CheckCircle,
+                PeerlessIcon(
+                    icon = PeerlessIcons.CheckCircle,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )

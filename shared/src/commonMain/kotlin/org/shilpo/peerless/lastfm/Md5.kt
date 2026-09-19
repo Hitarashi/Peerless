@@ -5,11 +5,18 @@ package org.shilpo.peerless.lastfm
  * Used for Last.fm API signature (`api_sig`) generation across JVM, Android, iOS, and Desktop.
  */
 object Md5 {
+    private const val HEX_DIGITS = "0123456789abcdef"
 
     fun hex(input: String): String {
         val bytes = input.encodeToByteArray()
         val digest = digest(bytes)
-        return digest.joinToString("") { "%02x".format(it) }
+        return buildString(digest.size * 2) {
+            digest.forEach { byte ->
+                val unsignedByte = byte.toInt() and 0xFF
+                append(HEX_DIGITS[unsignedByte ushr 4])
+                append(HEX_DIGITS[unsignedByte and 0x0F])
+            }
+        }
     }
 
     fun digest(input: ByteArray): ByteArray {

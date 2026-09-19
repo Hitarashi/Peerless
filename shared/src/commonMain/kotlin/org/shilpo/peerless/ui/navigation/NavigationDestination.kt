@@ -1,13 +1,13 @@
 package org.shilpo.peerless.ui.navigation
 
-import androidx.compose.ui.graphics.vector.ImageVector
+import org.jetbrains.compose.resources.DrawableResource
 import org.shilpo.peerless.ui.components.PeerlessIcons
 
 enum class NavigationDestination(
     val title: String,
     val subtitle: String,
-    val icon: ImageVector,
-    val selectedIcon: ImageVector = icon
+    val icon: DrawableResource,
+    val selectedIcon: DrawableResource = icon
 ) {
     HOME(
         title = "Home",

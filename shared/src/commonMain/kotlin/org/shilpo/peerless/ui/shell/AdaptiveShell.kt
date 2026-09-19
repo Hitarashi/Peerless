@@ -1,17 +1,17 @@
 package org.shilpo.peerless.ui.shell
 
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -20,7 +20,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
@@ -28,7 +27,6 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -39,24 +37,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.shilpo.peerless.auth.LocalSessionManager
 import org.shilpo.peerless.auth.SessionState
-import org.shilpo.peerless.library.LocalFavoritesManager
 import org.shilpo.peerless.model.CanonicalDeduplicator
 import org.shilpo.peerless.model.TrackSummaryDto
-import org.shilpo.peerless.model.toTrack
 import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.LocalPlayerConnection
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
-import org.shilpo.peerless.player.playTrack
-import org.shilpo.peerless.theme.*
-import org.shilpo.peerless.ui.HomeExpressiveContent
-import org.shilpo.peerless.ui.SampleLosslessLibrary
+import org.shilpo.peerless.theme.ExpressiveMotion
+import org.shilpo.peerless.theme.ExpressiveTypography
+import org.shilpo.peerless.theme.LocalWindowWidthSizeClass
+import org.shilpo.peerless.theme.WindowWidthSizeClass
 import org.shilpo.peerless.ui.components.*
 import org.shilpo.peerless.ui.navigation.NavigationDestination
-import org.shilpo.peerless.ui.screens.AuthOnboardingScreen
-import org.shilpo.peerless.ui.screens.LastFmLoginScreen
-import org.shilpo.peerless.ui.screens.ProfileScreen
-import org.shilpo.peerless.ui.screens.SearchScreen
+import org.shilpo.peerless.ui.screens.*
 import kotlin.ranges.coerceIn
 
 @Composable
@@ -1012,8 +1005,8 @@ private fun SupportingPaneContainer(
                             SupportingPaneType.SIGNAL_PATH -> PeerlessIcons.SignalPath
                         }
 
-                        Icon(
-                            imageVector = paneIcon,
+                        PeerlessIcon(
+                            icon = paneIcon,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
@@ -1107,258 +1100,6 @@ private fun SupportingPaneContainer(
 }
 
 @Composable
-private fun QueuePaneContent(
-    playerConnection: PlayerConnection,
-    queueDtos: List<TrackSummaryDto>,
-    currentTrackDto: TrackSummaryDto?,
-    status: PlaybackStatus
-) {
-    val apiClient = LocalPeerlessApiClient.current
-
-    if (queueDtos.isEmpty()) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = PeerlessIcons.Queue,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                    modifier = Modifier.size(36.dp)
-                )
-                Text(
-                    text = "Queue is empty",
-                    style = ExpressiveTypography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            items(items = queueDtos, key = { it.id }) { trackDto ->
-                val isCurrent = currentTrackDto?.id == trackDto.id
-                val isPlaying = isCurrent && status == PlaybackStatus.PLAYING
-
-                TrackRow(
-                    track = trackDto,
-                    artworkUrl = apiClient.getArtworkUrl(trackDto, 120),
-                    isPlaying = isPlaying,
-                    isCurrent = isCurrent,
-                    onTrackClick = {
-                        if (isCurrent) {
-                            playerConnection.togglePlayPause()
-                        } else {
-                            playerConnection.play(it.toTrack(), queueDtos.map { t -> t.toTrack() })
-                        }
-                    },
-                    showArtworkOverlay = false
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun LyricsPaneContent(currentTrack: TrackSummaryDto?) {
-    if (currentTrack == null) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Play a track to view synced lyrics",
-                style = ExpressiveTypography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    } else {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = currentTrack.title,
-                style = ExpressiveTypography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = currentTrack.artist,
-                style = ExpressiveTypography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            val sampleLyrics = listOf(
-                "Ticking away the moments that make up a dull day",
-                "Fritter and waste the hours in an offhand way",
-                "Kicking around on a piece of ground in your hometown",
-                "Waiting for someone or something to show you the way",
-                "Tired of lying in the sunshine, staying home to watch the rain"
-            )
-
-            sampleLyrics.forEachIndexed { index, line ->
-                val isActive = index == 1
-                Text(
-                    text = line,
-                    style = if (isActive) ExpressiveTypography.titleMedium else ExpressiveTypography.bodyLarge,
-                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                    color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                        alpha = 0.5f
-                    ),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SignalPathPaneContent(
-    track: TrackSummaryDto?,
-    playbackInfo: org.shilpo.peerless.model.PlaybackInfo?,
-    serverUrl: String
-) {
-    if (track == null) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "No active audio stream to inspect",
-                style = ExpressiveTypography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    } else {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            SignalPathStageCard(
-                stageNumber = "1",
-                stageName = "SOURCE ORIGIN",
-                primaryInfo = if (track.is_cached) "Telegram Dump Channel (Instant)" else "${track.provider.uppercase()} Mirror",
-                secondaryInfo = "Endpoint: $serverUrl • HMAC Signed Ticket",
-                accentColor = MaterialTheme.colorScheme.secondary
-            )
-
-            val codec = playbackInfo?.codec ?: track.codec
-            val bitDepth = playbackInfo?.bit_depth ?: track.bit_depth
-            val sampleRate = playbackInfo?.sample_rate ?: track.sample_rate
-            SignalPathStageCard(
-                stageNumber = "2",
-                stageName = "CONTAINER & CODEC",
-                primaryInfo = "${codec.uppercase()} Lossless",
-                secondaryInfo = "${bitDepth ?: 24}-Bit • ${((sampleRate ?: 96000) / 1000.0)} kHz • 2.0 Stereo",
-                accentColor = MaterialTheme.colorScheme.tertiary
-            )
-
-            SignalPathStageCard(
-                stageNumber = "3",
-                stageName = "PLATFORM DECODER",
-                primaryInfo = "Native Multiplatform Audio Engine",
-                secondaryInfo = "Bit-perfect PCM Uncompressed Buffer",
-                accentColor = MaterialTheme.colorScheme.primary
-            )
-
-            SignalPathStageCard(
-                stageNumber = "4",
-                stageName = "STREAM PIPE / CACHE",
-                primaryInfo = "HTTP Chunk Buffer (Chunked Transfer)",
-                secondaryInfo = "Latency: <120ms • Gapless Engine Active",
-                accentColor = MaterialTheme.colorScheme.secondary
-            )
-
-            SignalPathStageCard(
-                stageNumber = "5",
-                stageName = "OUTPUT & SINK",
-                primaryInfo = "Hardware Audio Sink",
-                secondaryInfo = "High-Res Direct Path • No Resampling",
-                accentColor = MaterialTheme.colorScheme.tertiary
-            )
-        }
-    }
-}
-
-@Composable
-private fun SignalPathStageCard(
-    stageNumber: String,
-    stageName: String,
-    primaryInfo: String,
-    secondaryInfo: String,
-    accentColor: Color
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(SquircleShapeSmall)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), SquircleShapeSmall)
-            .padding(12.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(accentColor.copy(alpha = 0.2f))
-                    .border(1.dp, accentColor, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = stageNumber,
-                    style = SpecBadgeTypography.copy(fontSize = 11.sp),
-                    fontWeight = FontWeight.Bold,
-                    color = accentColor
-                )
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stageName,
-                    style = SpecBadgeTypography.copy(fontSize = 8.5.sp),
-                    color = accentColor,
-                    letterSpacing = 1.sp
-                )
-                Text(
-                    text = primaryInfo,
-                    style = ExpressiveTypography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = secondaryInfo,
-                    style = ExpressiveTypography.bodySmall.copy(fontSize = 10.5.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun DestinationContent(
     destination: NavigationDestination,
     onSelectDestination: (NavigationDestination) -> Unit,
@@ -1381,10 +1122,8 @@ private fun DestinationContent(
 ) {
     when (destination) {
         NavigationDestination.HOME -> {
-            HomeDestinationView(
+            HomeScreenContent(
                 playerConnection = playerConnection,
-                currentTrackDto = currentTrackDto,
-                status = status,
                 serverConnected = serverConnected,
                 searchQuery = searchQuery,
                 onQueryChange = onQueryChange,
@@ -1401,7 +1140,7 @@ private fun DestinationContent(
         }
 
         NavigationDestination.SEARCH -> {
-            SearchDestinationView(
+            SearchScreen(
                 playerConnection = playerConnection,
                 onOpenSettings = onOpenSettings,
                 contentBottomPadding = contentBottomPadding,
@@ -1410,7 +1149,7 @@ private fun DestinationContent(
         }
 
         NavigationDestination.LIBRARY -> {
-            LibraryDestinationView(
+            LibraryScreen(
                 playerConnection = playerConnection,
                 currentTrackDto = currentTrackDto,
                 status = status,
@@ -1420,375 +1159,12 @@ private fun DestinationContent(
         }
 
         NavigationDestination.SETTINGS -> {
-            SettingsDestinationView(
-                playerConnection = playerConnection,
+            SettingsScreen(
                 serverConnected = serverConnected,
                 onOpenSettingsDialog = onOpenSettings,
                 onOpenProfile = onOpenProfile,
                 contentBottomPadding = contentBottomPadding
             )
-        }
-    }
-}
-
-@Composable
-private fun HomeDestinationView(
-    playerConnection: PlayerConnection,
-    currentTrackDto: TrackSummaryDto?,
-    status: PlaybackStatus,
-    serverConnected: Boolean,
-    searchQuery: String,
-    onQueryChange: (String) -> Unit,
-    selectedFilter: String,
-    onSelectFilter: (String) -> Unit,
-    displayedTracks: List<TrackSummaryDto>,
-    allTracks: List<TrackSummaryDto>,
-    onOpenSettings: () -> Unit,
-    onNavigateToSearch: () -> Unit,
-    onToggleStats: () -> Unit,
-    contentBottomPadding: Dp,
-    onRipClick: ((TrackSummaryDto) -> Unit)? = null
-) {
-    HomeExpressiveContent(
-        playerConnection = playerConnection,
-        serverConnected = serverConnected,
-        searchQuery = searchQuery,
-        onQueryChange = onQueryChange,
-        selectedFilter = selectedFilter,
-        onSelectFilter = onSelectFilter,
-        displayedTracks = displayedTracks,
-        allTracks = allTracks,
-        onOpenSettings = onOpenSettings,
-        onNavigateToSearch = onNavigateToSearch,
-        onToggleStats = onToggleStats,
-        contentBottomPadding = contentBottomPadding,
-        onRipClick = onRipClick
-    )
-}
-
-@Composable
-private fun SearchDestinationView(
-    playerConnection: PlayerConnection,
-    onOpenSettings: () -> Unit,
-    contentBottomPadding: Dp,
-    onRipClick: ((TrackSummaryDto) -> Unit)? = null
-) {
-    SearchScreen(
-        playerConnection = playerConnection,
-        onOpenSettings = onOpenSettings,
-        contentBottomPadding = contentBottomPadding,
-        onRipClick = onRipClick
-    )
-}
-
-@Composable
-private fun LibraryDestinationView(
-    playerConnection: PlayerConnection,
-    currentTrackDto: TrackSummaryDto?,
-    status: PlaybackStatus,
-    allTracks: List<TrackSummaryDto>,
-    contentBottomPadding: Dp
-) {
-    val apiClient = LocalPeerlessApiClient.current
-    val favoritesManager = LocalFavoritesManager.current
-
-    val favorites by (favoritesManager?.favorites
-        ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptyList()) }).collectAsState()
-    val isFavoritesLoading by (favoritesManager?.isLoading
-        ?: remember { kotlinx.coroutines.flow.MutableStateFlow(false) }).collectAsState()
-
-    var selectedTab by remember { mutableStateOf("Favorites") }
-    val tabs = listOf("Favorites", "Cached Downloads", "All Catalog")
-
-    LaunchedEffect(Unit) {
-        favoritesManager?.refreshFavorites()
-    }
-
-    val cachedOnly = remember(allTracks) { allTracks.filter { it.is_cached } }
-    val rawTracks = when (selectedTab) {
-        "Favorites" -> favorites
-        "Cached Downloads" -> cachedOnly
-        else -> allTracks
-    }
-    val tracksToShow = remember(rawTracks, apiClient.baseUrl) {
-        CanonicalDeduplicator.deduplicateTracks(rawTracks, apiClient.baseUrl).map { it.toSummaryDto() }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(top = 12.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            tabs.forEach { tab ->
-                val isSelected = tab == selectedTab
-                Box(
-                    modifier = Modifier
-                        .clip(PillShape)
-                        .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer)
-                        .clickable { selectedTab = tab }
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = if (tab == "Favorites" && favorites.isNotEmpty()) "Favorites (${favorites.size})" else tab,
-                        style = ExpressiveTypography.labelMedium,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
-        if (selectedTab == "Favorites" && favorites.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(bottom = contentBottomPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isFavoritesLoading) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(32.dp)
-                    )
-                } else {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.padding(horizontal = 32.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = PeerlessIcons.Heart,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-
-                        Text(
-                            text = "No Favorite Tracks Yet",
-                            style = ExpressiveTypography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-
-                        Text(
-                            text = "Tap the heart icon on any track in Search or Home to bookmark it in your personal high-fidelity library.",
-                            style = ExpressiveTypography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(
-                    start = 12.dp,
-                    end = 12.dp,
-                    top = 4.dp,
-                    bottom = contentBottomPadding
-                ),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                items(tracksToShow, key = { it.id }) { track ->
-                    val isCurrent = currentTrackDto?.id == track.id
-                    val isPlaying = isCurrent &&
-                            status == PlaybackStatus.PLAYING
-
-                    TrackRow(
-                        track = track,
-                        artworkUrl = apiClient.getArtworkUrl(track, 200),
-                        isPlaying = isPlaying,
-                        isCurrent = isCurrent,
-                        onTrackClick = { clicked ->
-                            if (isCurrent) {
-                                playerConnection.togglePlayPause()
-                            } else {
-                                playerConnection.playTrack(clicked, tracksToShow)
-                            }
-                        },
-                        isFavorite = favoritesManager?.isFavorite(track.id),
-                        onToggleFavorite = { clicked ->
-                            favoritesManager?.toggleFavorite(clicked)
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SettingsDestinationView(
-    playerConnection: PlayerConnection,
-    serverConnected: Boolean,
-    onOpenSettingsDialog: () -> Unit,
-    onOpenProfile: () -> Unit,
-    contentBottomPadding: Dp
-) {
-    val apiClient = LocalPeerlessApiClient.current
-    val serverUrl = apiClient.baseUrl
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp)
-            .padding(bottom = contentBottomPadding),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            text = "Settings & Configuration",
-            style = ExpressiveTypography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        // Telegram Account & Telemetry Card
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(SquircleShapeMedium)
-                .background(MaterialTheme.colorScheme.surfaceContainer)
-                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), SquircleShapeMedium)
-                .clickable { onOpenProfile() }
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.tertiary
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = PeerlessIcons.Person,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = "Telegram Account & Telemetry",
-                            style = ExpressiveTypography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "View active device sessions, daemon metrics, and logout",
-                            style = ExpressiveTypography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Icon(
-                    imageVector = PeerlessIcons.OpenInNew,
-                    contentDescription = "Open profile",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(SquircleShapeMedium)
-                .background(MaterialTheme.colorScheme.surfaceContainer)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, SquircleShapeMedium)
-                .clickable { onOpenSettingsDialog() }
-                .padding(16.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Streaming Daemon",
-                        style = ExpressiveTypography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = if (serverConnected) "ONLINE" else "DISCONNECTED",
-                        style = SpecBadgeTypography,
-                        color = if (serverConnected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary
-                    )
-                }
-
-                Text(
-                    text = if (serverUrl.isNotBlank()) "Endpoint: $serverUrl" else "Endpoint: Unconfigured",
-                    style = ExpressiveTypography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Text(
-                    text = "Verified Session & HMAC Ticket Auth Active",
-                    style = ExpressiveTypography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(SquircleShapeMedium)
-                .background(MaterialTheme.colorScheme.surfaceContainer)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, SquircleShapeMedium)
-                .padding(16.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "Audio Engine Capabilities",
-                    style = ExpressiveTypography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "• Hi-Res PCM 24-bit / 192kHz output\n• FLAC & Apple Lossless (ALAC) gapless playback\n• Poweramp Signal Path Real-Time Inspector",
-                    style = ExpressiveTypography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
     }
 }

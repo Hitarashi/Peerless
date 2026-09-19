@@ -1,5 +1,13 @@
 package org.shilpo.peerless
 
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.asAwtTransferable
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.awt.datatransfer.DataFlavor
+import java.awt.datatransfer.UnsupportedFlavorException
+import java.io.IOException
 import java.net.InetAddress
 
 class JVMPlatform : Platform {
@@ -12,15 +20,18 @@ actual fun getDeviceDisplayName(): String = runCatching {
     InetAddress.getLocalHost().hostName
 }.getOrNull()?.takeIf { it.isNotBlank() } ?: "This computer"
 
-actual fun getGreetingAndDate(): Pair<String, String> {
-    val now = java.time.LocalDateTime.now()
-    val hour = now.hour
-    val greeting = when {
-        hour < 12 -> "Good morning"
-        hour < 17 -> "Good afternoon"
-        else -> "Good evening"
+@OptIn(ExperimentalComposeUiApi::class)
+internal actual suspend fun Clipboard.readPlainText(): String? {
+    val transferable = getClipEntry()?.asAwtTransferable ?: return null
+    if (!transferable.isDataFlavorSupported(DataFlavor.stringFlavor)) return null
+
+    return withContext(Dispatchers.IO) {
+        try {
+            transferable.getTransferData(DataFlavor.stringFlavor) as? String
+        } catch (_: UnsupportedFlavorException) {
+            null
+        } catch (_: IOException) {
+            null
+        }
     }
-    val formatter = java.time.format.DateTimeFormatter.ofPattern("EEEE, MMMM d", java.util.Locale.ENGLISH)
-    val date = now.format(formatter)
-    return Pair(greeting, date)
 }

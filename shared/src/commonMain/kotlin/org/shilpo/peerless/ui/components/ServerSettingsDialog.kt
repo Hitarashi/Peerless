@@ -57,8 +57,8 @@ fun ServerSettingsDialog(
                         )
                     }
 
-                    Icon(
-                        imageVector = PeerlessIcons.Settings,
+                    PeerlessIcon(
+                        icon = PeerlessIcons.Settings,
                         contentDescription = null,
                         tint = colorScheme.primary,
                         modifier = Modifier.size(24.dp)

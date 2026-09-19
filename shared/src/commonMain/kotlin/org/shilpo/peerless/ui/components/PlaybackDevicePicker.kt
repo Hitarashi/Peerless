@@ -46,8 +46,8 @@ fun PlaybackDeviceIndicator(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Icon(
-                imageVector = PeerlessIcons.Devices,
+            PeerlessIcon(
+                icon = PeerlessIcons.Devices,
                 contentDescription = null,
                 tint = contentColor,
                 modifier = Modifier.size(15.dp)
@@ -68,8 +68,8 @@ fun PlaybackDeviceIndicator(
             modifier = modifier,
             colors = IconButtonDefaults.iconButtonColors(contentColor = contentColor)
         ) {
-            Icon(
-                imageVector = PeerlessIcons.Devices,
+            PeerlessIcon(
+                icon = PeerlessIcons.Devices,
                 contentDescription = label,
                 modifier = Modifier.size(21.dp)
             )
@@ -143,7 +143,7 @@ private fun DeviceRow(
                 contentColor = if (isActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(PeerlessIcons.Devices, contentDescription = null, modifier = Modifier.size(22.dp))
+                    PeerlessIcon(PeerlessIcons.Devices, contentDescription = null, modifier = Modifier.size(22.dp))
                 }
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -163,7 +163,7 @@ private fun DeviceRow(
                 )
             }
             if (isActive) {
-                Icon(
+                PeerlessIcon(
                     PeerlessIcons.CheckCircle,
                     contentDescription = "Active playback device",
                     tint = MaterialTheme.colorScheme.primary

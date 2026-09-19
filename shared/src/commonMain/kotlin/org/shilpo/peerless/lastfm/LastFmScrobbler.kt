@@ -15,6 +15,7 @@ import org.shilpo.peerless.network.createDefaultPeerlessHttpClient
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
 import kotlin.math.min
+import kotlin.time.Clock
 
 @Serializable
 data class LastFmConfig(
@@ -37,7 +38,8 @@ private data class LastFmErrorResponse(
  */
 class LastFmScrobbler(
     private val httpClient: HttpClient = createDefaultPeerlessHttpClient(),
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
+    private val clock: Clock = Clock.System
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
     private val baseUrl = "https://ws.audioscrobbler.com/2.0/"
@@ -49,7 +51,6 @@ class LastFmScrobbler(
 
     private var trackingJob: Job? = null
     private var lastScrobbledTrackId: Int? = null
-    private var lastNowPlayingTrackId: Int? = null
     private var trackStartTimestamp: Long = 0L
     private var accumulatedPlayedMs: Long = 0L
     private var lastRecordedPositionMs: Long = 0L
@@ -65,7 +66,7 @@ class LastFmScrobbler(
      * MD5(sorted_key_value_pairs + api_secret)
      */
     fun calculateApiSig(params: Map<String, String>, secret: String): String {
-        val sortedPairs = params.toSortedMap()
+        val sortedPairs = params.entries.sortedBy { it.key }
         val concatenated = buildString {
             for ((k, v) in sortedPairs) {
                 if (k != "format" && k != "callback") {
@@ -160,10 +161,9 @@ class LastFmScrobbler(
                 if (currentTrack?.id != previousTrack?.id) {
                     previousTrack = currentTrack
                     lastScrobbledTrackId = null
-                    lastNowPlayingTrackId = null
                     accumulatedPlayedMs = 0L
                     lastRecordedPositionMs = 0L
-                    trackStartTimestamp = System.currentTimeMillis() / 1000L
+                    trackStartTimestamp = clock.now().toEpochMilliseconds() / 1000L
 
                     if (currentTrack != null && isConfigured() && isSelfActivePlaybackDevice) {
                         launch {
@@ -174,7 +174,6 @@ class LastFmScrobbler(
                                 album = currentTrack.album,
                                 durationSeconds = durationSec
                             )
-                            lastNowPlayingTrackId = currentTrack.id
                         }
                     }
                 }

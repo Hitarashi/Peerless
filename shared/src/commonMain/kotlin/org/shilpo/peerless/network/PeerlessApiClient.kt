@@ -132,7 +132,6 @@ open class PeerlessApiClient(
         return "$baseUrl/api/v1/stream?ticket=$ticket"
     }
 
-    fun getStreamUrl(trackId: Int, ticket: String? = null): String = resolveStreamUrl(trackId, ticket)
 
     fun getArtworkUrl(track: TrackSummaryDto, size: Int = 600): String {
         if (!track.artwork_url.isNullOrBlank()) {
@@ -214,9 +213,8 @@ open class PeerlessApiClient(
                     return@execute
                 }
                 val channel: ByteReadChannel = response.body()
-                @Suppress("DEPRECATION")
-                while (!channel.isClosedForRead) {
-                    val line = channel.readUTF8Line() ?: break
+                while (true) {
+                    val line = channel.readLine(lineEnding = LineEnding.Lenient) ?: break
                     val trimmed = line.trim()
                     if (trimmed.isEmpty() || trimmed.startsWith(":") || trimmed.contains(
                             "keep-alive",
@@ -417,4 +415,3 @@ open class PeerlessApiClient(
 val LocalPeerlessApiClient = staticCompositionLocalOf<PeerlessApiClient> {
     error("No PeerlessApiClient provided")
 }
-

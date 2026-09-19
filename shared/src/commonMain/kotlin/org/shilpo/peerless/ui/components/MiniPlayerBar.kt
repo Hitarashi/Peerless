@@ -204,8 +204,8 @@ fun MiniPlayerBar(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = PeerlessIcons.SkipNext,
+                PeerlessIcon(
+                    icon = PeerlessIcons.SkipNext,
                     contentDescription = "Next Track",
                     tint = cueColor.copy(alpha = nextAlpha),
                     modifier = Modifier.size(24.dp)
@@ -237,8 +237,8 @@ fun MiniPlayerBar(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = PeerlessIcons.SkipPrevious,
+                PeerlessIcon(
+                    icon = PeerlessIcons.SkipPrevious,
                     contentDescription = "Previous Track",
                     tint = cueColor.copy(alpha = prevAlpha),
                     modifier = Modifier.size(24.dp)
@@ -420,8 +420,8 @@ fun MiniPlayerBar(
                                 shape = CircleShape
                             )
                     ) {
-                        Icon(
-                            imageVector = PeerlessIcons.MusicNote,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.MusicNote,
                             contentDescription = null,
                             tint = Color.White.copy(alpha = 0.45f),
                             modifier = Modifier.size(artworkSize * 0.5f)
@@ -488,8 +488,8 @@ fun MiniPlayerBar(
                             contentColor = Color.White
                         )
                     ) {
-                        Icon(
-                            imageVector = PeerlessIcons.SkipPrevious,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.SkipPrevious,
                             contentDescription = "Previous Track",
                             tint = Color.White,
                             modifier = Modifier.size(20.dp)
@@ -521,8 +521,8 @@ fun MiniPlayerBar(
                             contentColor = Color.White
                         )
                     ) {
-                        Icon(
-                            imageVector = PeerlessIcons.SkipNext,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.SkipNext,
                             contentDescription = "Next Track",
                             tint = Color.White,
                             modifier = Modifier.size(20.dp)

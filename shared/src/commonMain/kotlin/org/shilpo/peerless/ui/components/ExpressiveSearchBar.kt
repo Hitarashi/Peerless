@@ -87,8 +87,8 @@ fun ExpressiveSearchBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = PeerlessIcons.Search,
+                PeerlessIcon(
+                    icon = PeerlessIcons.Search,
                     contentDescription = "Search",
                     tint = if (isSearching) colorScheme.secondary else colorScheme.primary,
                     modifier = Modifier.size(20.dp)
@@ -172,8 +172,8 @@ fun ExpressiveSearchBar(
                     onClick = onClearQuery,
                     modifier = Modifier.size(32.dp)
                 ) {
-                    Icon(
-                        imageVector = PeerlessIcons.Close,
+                    PeerlessIcon(
+                        icon = PeerlessIcons.Close,
                         contentDescription = "Clear search",
                         tint = colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
@@ -190,8 +190,8 @@ fun ExpressiveSearchBar(
                     onClick = onOpenSettings,
                     modifier = Modifier.size(36.dp)
                 ) {
-                    Icon(
-                        imageVector = PeerlessIcons.Settings,
+                    PeerlessIcon(
+                        icon = PeerlessIcons.Settings,
                         contentDescription = "Server Settings",
                         tint = if (serverUrl.isNotBlank()) colorScheme.primary else colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
@@ -234,8 +234,8 @@ fun ExpressiveSearchBar(
                     leadingIcon = when (filter) {
                         SearchFilter.CACHED -> {
                             {
-                                Icon(
-                                    imageVector = PeerlessIcons.CloudDone,
+                                PeerlessIcon(
+                                    icon = PeerlessIcons.CloudDone,
                                     contentDescription = null,
                                     tint = if (isSelected) colorScheme.secondary else colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(14.dp)
@@ -245,8 +245,8 @@ fun ExpressiveSearchBar(
 
                         SearchFilter.QOBUZ -> {
                             {
-                                Icon(
-                                    imageVector = PeerlessIcons.LosslessWave,
+                                PeerlessIcon(
+                                    icon = PeerlessIcons.LosslessWave,
                                     contentDescription = null,
                                     tint = if (isSelected) colorScheme.tertiary else colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(13.dp)
@@ -256,8 +256,8 @@ fun ExpressiveSearchBar(
 
                         SearchFilter.APPLE_MUSIC -> {
                             {
-                                Icon(
-                                    imageVector = PeerlessIcons.MusicNote,
+                                PeerlessIcon(
+                                    icon = PeerlessIcons.MusicNote,
                                     contentDescription = null,
                                     tint = if (isSelected) colorScheme.primary else colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(13.dp)
@@ -267,8 +267,8 @@ fun ExpressiveSearchBar(
 
                         SearchFilter.TRACKS, SearchFilter.ALBUMS, SearchFilter.ARTISTS -> {
                             {
-                                Icon(
-                                    imageVector = when (filter) {
+                                PeerlessIcon(
+                                    icon = when (filter) {
                                         SearchFilter.ALBUMS -> PeerlessIcons.Library
                                         SearchFilter.ARTISTS -> PeerlessIcons.Home
                                         else -> PeerlessIcons.MusicNote

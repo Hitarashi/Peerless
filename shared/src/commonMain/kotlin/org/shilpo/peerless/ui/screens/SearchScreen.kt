@@ -1,12 +1,12 @@
 package org.shilpo.peerless.ui.screens
 
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -23,14 +23,15 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.DrawableResource
 import org.shilpo.peerless.lastfm.LastFmClient
 import org.shilpo.peerless.model.*
 import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
 import org.shilpo.peerless.theme.*
-import org.shilpo.peerless.ui.SampleLosslessLibrary
 import org.shilpo.peerless.ui.components.ExpressiveSearchBar
+import org.shilpo.peerless.ui.components.PeerlessIcon
 import org.shilpo.peerless.ui.components.PeerlessIcons
 import org.shilpo.peerless.ui.components.TrackRow
 
@@ -353,8 +354,8 @@ private fun ZeroStateDiscovery(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = PeerlessIcons.LosslessWave,
+                    PeerlessIcon(
+                        icon = PeerlessIcons.LosslessWave,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.size(16.dp)
@@ -416,8 +417,8 @@ private fun ZeroStateDiscovery(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = PeerlessIcons.MusicNote,
+                    PeerlessIcon(
+                        icon = PeerlessIcons.MusicNote,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.size(16.dp)
@@ -471,8 +472,8 @@ private fun ZeroStateDiscovery(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(
-                            imageVector = PeerlessIcons.CloudDone,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.CloudDone,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.size(15.dp)
@@ -758,8 +759,8 @@ private fun SearchResultsContent(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Icon(
-                                imageVector = PeerlessIcons.Search,
+                            PeerlessIcon(
+                                icon = PeerlessIcons.Search,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                                 modifier = Modifier.size(44.dp)
@@ -936,7 +937,7 @@ private fun SectionHeader(
     title: String,
     subtitle: String,
     badgeColor: Color,
-    badgeIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    badgeIcon: DrawableResource,
     countText: String,
     modifier: Modifier = Modifier
 ) {
@@ -967,8 +968,8 @@ private fun SectionHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Icon(
-                    imageVector = badgeIcon,
+                PeerlessIcon(
+                    icon = badgeIcon,
                     contentDescription = null,
                     tint = badgeColor,
                     modifier = Modifier.size(11.dp)

@@ -12,7 +12,10 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -144,8 +147,8 @@ fun PersistentBottomPlayer(
                             modifier = Modifier.fillMaxSize()
                         )
                     } else {
-                        Icon(
-                            imageVector = PeerlessIcons.MusicNote,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.MusicNote,
                             contentDescription = null,
                             tint = colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                             modifier = Modifier.size(24.dp)
@@ -219,16 +222,16 @@ fun PersistentBottomPlayer(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     if (hasApple) {
-                                        Icon(
-                                            imageVector = PeerlessIcons.AppleLogo,
+                                        PeerlessIcon(
+                                            icon = PeerlessIcons.AppleLogo,
                                             contentDescription = "Apple Music",
                                             tint = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
                                             modifier = Modifier.size(12.dp)
                                         )
                                     }
                                     if (hasQobuz) {
-                                        Icon(
-                                            imageVector = PeerlessIcons.QobuzLogo,
+                                        PeerlessIcon(
+                                            icon = PeerlessIcons.QobuzLogo,
                                             contentDescription = "Qobuz",
                                             tint = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
                                             modifier = Modifier.height(11.dp).width(28.dp)
@@ -249,16 +252,16 @@ fun PersistentBottomPlayer(
                                         )
                                     }
                                     if (hasDolby) {
-                                        Icon(
-                                            imageVector = PeerlessIcons.DolbyAtmos,
+                                        PeerlessIcon(
+                                            icon = PeerlessIcons.DolbyAtmos,
                                             contentDescription = "Dolby Atmos",
                                             tint = colorScheme.tertiary,
                                             modifier = Modifier.height(10.dp).width(15.dp)
                                         )
                                     }
                                     if (hasHiRes) {
-                                        Icon(
-                                            imageVector = PeerlessIcons.HiRes,
+                                        PeerlessIcon(
+                                            icon = PeerlessIcons.HiRes,
                                             contentDescription = "Hi-Res Audio",
                                             tint = colorScheme.tertiary,
                                             modifier = Modifier.size(14.dp)
@@ -286,8 +289,8 @@ fun PersistentBottomPlayer(
                         onClick = onToggleShuffle,
                         modifier = Modifier.size(32.dp)
                     ) {
-                        Icon(
-                            imageVector = PeerlessIcons.Shuffle,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.Shuffle,
                             contentDescription = "Shuffle",
                             tint = if (isShuffle) colorScheme.secondary else colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             modifier = Modifier.size(18.dp)
@@ -298,8 +301,8 @@ fun PersistentBottomPlayer(
                         onClick = onPlayPrevious,
                         modifier = Modifier.size(36.dp)
                     ) {
-                        Icon(
-                            imageVector = PeerlessIcons.SkipPrevious,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.SkipPrevious,
                             contentDescription = "Previous Track",
                             tint = colorScheme.onSurface,
                             modifier = Modifier.size(22.dp)
@@ -330,8 +333,8 @@ fun PersistentBottomPlayer(
                         onClick = onPlayNext,
                         modifier = Modifier.size(36.dp)
                     ) {
-                        Icon(
-                            imageVector = PeerlessIcons.SkipNext,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.SkipNext,
                             contentDescription = "Next Track",
                             tint = colorScheme.onSurface,
                             modifier = Modifier.size(22.dp)
@@ -342,8 +345,8 @@ fun PersistentBottomPlayer(
                         onClick = onToggleRepeat,
                         modifier = Modifier.size(32.dp)
                     ) {
-                        Icon(
-                            imageVector = PeerlessIcons.Repeat,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.Repeat,
                             contentDescription = "Repeat",
                             tint = if (isRepeat) colorScheme.secondary else colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             modifier = Modifier.size(18.dp)

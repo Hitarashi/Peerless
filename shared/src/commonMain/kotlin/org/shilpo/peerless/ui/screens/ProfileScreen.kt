@@ -1,5 +1,6 @@
 package org.shilpo.peerless.ui.screens
 
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -16,6 +17,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.DrawableResource
 import org.shilpo.peerless.auth.LocalSessionManager
 import org.shilpo.peerless.auth.SessionState
 import org.shilpo.peerless.model.MeResponse
@@ -23,6 +25,7 @@ import org.shilpo.peerless.model.ServerHealthDto
 import org.shilpo.peerless.model.SessionDto
 import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.theme.*
+import org.shilpo.peerless.ui.components.PeerlessIcon
 import org.shilpo.peerless.ui.components.PeerlessIcons
 
 private fun formatUptime(uptimeSeconds: Long): String {
@@ -134,8 +137,8 @@ fun ProfileScreen(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = PeerlessIcons.Person,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.Person,
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(18.dp)
@@ -158,8 +161,8 @@ fun ProfileScreen(
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surfaceContainer)
                 ) {
-                    Icon(
-                        imageVector = PeerlessIcons.Close,
+                    PeerlessIcon(
+                        icon = PeerlessIcons.Close,
                         contentDescription = "Close Profile",
                         tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(18.dp)
@@ -250,8 +253,8 @@ fun ProfileScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = PeerlessIcons.CheckCircle,
+                                    PeerlessIcon(
+                                        icon = PeerlessIcons.CheckCircle,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.secondary,
                                         modifier = Modifier.size(10.dp)
@@ -317,8 +320,8 @@ fun ProfileScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(
-                                    imageVector = PeerlessIcons.Speed,
+                                PeerlessIcon(
+                                    icon = PeerlessIcons.Speed,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.secondary,
                                     modifier = Modifier.size(20.dp)
@@ -378,8 +381,8 @@ fun ProfileScreen(
                                     onClick = refreshTelemetry,
                                     modifier = Modifier.size(28.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = PeerlessIcons.Compass,
+                                    PeerlessIcon(
+                                        icon = PeerlessIcons.Compass,
                                         contentDescription = "Refresh telemetry",
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(16.dp)
@@ -449,8 +452,8 @@ fun ProfileScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(
-                                    imageVector = PeerlessIcons.Devices,
+                                PeerlessIcon(
+                                    icon = PeerlessIcons.Devices,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(18.dp)
@@ -523,8 +526,8 @@ fun ProfileScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = PeerlessIcons.Warning,
+                            PeerlessIcon(
+                                icon = PeerlessIcons.Warning,
                                 contentDescription = null,
                                 tint = Color(0xFFEF5350),
                                 modifier = Modifier.size(18.dp)
@@ -559,8 +562,8 @@ fun ProfileScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(
-                                    imageVector = PeerlessIcons.Logout,
+                                PeerlessIcon(
+                                    icon = PeerlessIcons.Logout,
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -587,8 +590,8 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = PeerlessIcons.Warning,
+                        PeerlessIcon(
+                            icon = PeerlessIcons.Warning,
                             contentDescription = null,
                             tint = Color(0xFFEF5350)
                         )
@@ -647,7 +650,7 @@ private fun TelemetryMetricCard(
     title: String,
     value: String,
     subtitle: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: DrawableResource,
     accentColor: Color,
     modifier: Modifier = Modifier
 ) {
@@ -663,8 +666,8 @@ private fun TelemetryMetricCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Icon(
-                    imageVector = icon,
+                PeerlessIcon(
+                    icon = icon,
                     contentDescription = null,
                     tint = accentColor,
                     modifier = Modifier.size(14.dp)
@@ -721,8 +724,8 @@ private fun SessionRowItem(
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = PeerlessIcons.Devices,
+                PeerlessIcon(
+                    icon = PeerlessIcons.Devices,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(16.dp)
