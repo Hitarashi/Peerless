@@ -30,6 +30,7 @@ object PeerlessIcons {
     val MusicNote: DrawableResource get() = Res.drawable.peerless_music_note
     val LosslessWave: DrawableResource get() = Res.drawable.peerless_graphic_eq
     val CloudDone: DrawableResource get() = Res.drawable.peerless_cloud_done
+    val Download: DrawableResource get() = Res.drawable.peerless_download
     val Home: DrawableResource get() = Res.drawable.peerless_explore
     val HomeFilled: DrawableResource get() = Res.drawable.peerless_explore_filled
     val Library: DrawableResource get() = Res.drawable.peerless_library_music

@@ -134,6 +134,19 @@ open class PeerlessApiClient(
 
 
     fun getArtworkUrl(track: TrackSummaryDto, size: Int = 600): String {
+        if (track.id > 0) {
+            return getArtworkUrl(track.id, size)
+        }
+        val provider = track.provider.lowercase()
+        if (track.track_id.isNotBlank() && (provider == "apple" || provider == "qobuz")) {
+            return URLBuilder(
+                "$baseUrl/api/v1/assets/providers/$provider/tracks/${track.track_id.encodeURLPathPart()}/artwork"
+            ).apply {
+                parameters.append("size", size.toString())
+                parameters.append("title", track.title)
+                parameters.append("artist", track.artist)
+            }.buildString()
+        }
         if (!track.artwork_url.isNullOrBlank()) {
             val regex = Regex("""\d+x\d+bb""")
             return if (track.artwork_url.contains(regex)) {

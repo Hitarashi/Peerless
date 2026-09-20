@@ -226,7 +226,8 @@ data class CanonicalTrack(
             bit_depth = s?.bitDepth,
             sample_rate = s?.sampleRate,
             is_cached = s?.isCached ?: isCached,
-            artwork_url = artworkUrl
+            artwork_url = artworkUrl,
+            isrc = isrc
         )
     }
 

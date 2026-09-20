@@ -3,7 +3,6 @@ package org.shilpo.peerless.ui.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -94,7 +93,7 @@ fun SupportingPaneQuickSwitcherPill(
         }
     }
 
-    val slotSizeDp = 28.dp
+    val slotSizeDp = 36.dp
     val slotGapDp = 2.dp
     val slotSizePx = with(density) { slotSizeDp.toPx() }
     val slotGapPx = with(density) { slotGapDp.toPx() }
@@ -104,7 +103,6 @@ fun SupportingPaneQuickSwitcherPill(
         modifier = modifier
             .clip(CircleShape)
             .background(colorScheme.surfaceContainerHigh.copy(alpha = 0.75f))
-            .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.35f), CircleShape)
             .padding(2.dp)
     ) {
         // Shilpo Elastic Stretching Pill Indicator
@@ -181,7 +179,7 @@ fun SupportingPaneQuickSwitcherPill(
                         LyricsMorphIcon(
                             selected = isSelected,
                             tint = iconTint,
-                            size = 15.dp,
+                            size = 18.dp,
                             contentDescription = type.title
                         )
                     } else {
@@ -189,7 +187,7 @@ fun SupportingPaneQuickSwitcherPill(
                             icon = icon,
                             contentDescription = type.title,
                             tint = iconTint,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }

@@ -402,4 +402,42 @@ class SharedCommonTest {
         assertEquals(1, deduplicated.size)
         assertEquals(2, deduplicated[0].sources.size)
     }
+
+    @Test
+    fun testCanonicalDeduplicatorMergesCachedVersionsByIsrc() {
+        val tracks = listOf(
+            TrackSummaryDto(
+                id = 492,
+                provider = "apple",
+                track_id = "1740701537",
+                title = "HEARTBREAK CITY (feat. Mooroo, Talhah Yunus & Jani)",
+                artist = "Umair",
+                album = "ROCKSTAR WITHOUT A GUITAR",
+                duration = 200,
+                codec = "alac",
+                is_cached = true,
+                isrc = "AEA182400060"
+            ),
+            TrackSummaryDto(
+                id = 28744,
+                provider = "qobuz",
+                track_id = "264126443",
+                title = "HEARTBREAK CITY",
+                artist = "UMAIR",
+                album = "ROCKSTAR WITHOUT A GUITAR",
+                duration = 200,
+                codec = "flac",
+                is_cached = true,
+                isrc = "AEA182400060"
+            )
+        )
+
+        val canonicalTracks = CanonicalDeduplicator.deduplicateTracks(tracks)
+
+        assertEquals(1, canonicalTracks.size)
+        assertEquals(
+            setOf(Provider.Apple, Provider.Qobuz),
+            canonicalTracks.single().sources.map { it.provider }.toSet()
+        )
+    }
 }

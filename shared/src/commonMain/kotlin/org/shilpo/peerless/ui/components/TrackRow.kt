@@ -205,7 +205,7 @@ fun TrackRow(
             )
             .padding(
                 horizontal = if (embedded) 8.dp else 10.dp,
-                vertical = if (embedded) 6.dp else 8.dp
+                vertical = 6.dp
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -277,7 +277,7 @@ fun TrackRow(
 
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -304,8 +304,8 @@ fun TrackRow(
 
             Text(
                 text = "${track.artist} • ${track.album}",
-                style = ExpressiveTypography.bodySmall,
-                color = colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                style = ExpressiveTypography.bodySmall.copy(fontSize = 13.sp),
+                color = colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -546,7 +546,7 @@ fun TrackRow(
                 Text(
                     text = formatDuration(track.duration),
                     style = ExpressiveTypography.labelSmall.copy(fontSize = 11.sp),
-                    color = if (isPlaying) colorScheme.primary else colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    color = if (isPlaying) colorScheme.primary else colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     softWrap = false
                 )

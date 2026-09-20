@@ -193,6 +193,7 @@ object CanonicalDeduplicator {
                     album = cached.album,
                     durationSeconds = cached.duration,
                     artworkUrl = artworkUrl,
+                    isrc = cached.isrc,
                     sources = listOf(source)
                 )
             )

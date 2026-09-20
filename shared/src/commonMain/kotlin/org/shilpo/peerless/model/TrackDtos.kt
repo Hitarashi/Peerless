@@ -15,7 +15,8 @@ data class TrackSummaryDto(
     val bit_depth: Int? = null,
     val sample_rate: Int? = null,
     val is_cached: Boolean = true,
-    val artwork_url: String? = null
+    val artwork_url: String? = null,
+    val isrc: String? = null
 )
 
 @Serializable

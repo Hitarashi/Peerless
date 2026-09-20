@@ -11,9 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,19 +24,22 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import org.shilpo.peerless.auth.LocalSessionManager
+import org.shilpo.peerless.config.AppConfig
+import org.shilpo.peerless.home.HomeFeedItem
+import org.shilpo.peerless.home.HomeFeedRepository
+import org.shilpo.peerless.home.HomeFeedState
+import org.shilpo.peerless.lastfm.LastFmClient
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.model.toTrack
 import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
 import org.shilpo.peerless.theme.ExpressiveTypography
-import org.shilpo.peerless.theme.PillShape
-import org.shilpo.peerless.theme.SpecBadgeTypography
 import org.shilpo.peerless.theme.SquircleShapeSmall
 import org.shilpo.peerless.ui.components.PeerlessIcon
 import org.shilpo.peerless.ui.components.PeerlessIcons
 import org.shilpo.peerless.ui.components.TrackRow
-import org.shilpo.peerless.ui.components.formatProviderLabel
 
 val SampleLosslessLibrary = listOf(
     TrackSummaryDto(
@@ -263,58 +264,72 @@ fun HomeTopHeader(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuickPicksCarousel(
-    tracks: List<TrackSummaryDto>,
+    picks: List<HomeFeedItem>,
     currentTrackId: Int?,
     isPlaying: Boolean,
     onTrackClick: (TrackSummaryDto) -> Unit,
+    onRipClick: ((TrackSummaryDto) -> Unit)?,
     getArtworkUrl: (TrackSummaryDto) -> String,
     modifier: Modifier = Modifier
 ) {
-    if (tracks.isEmpty()) return
+    if (picks.isEmpty()) return
 
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(
-            text = "Quick picks",
-            style = ExpressiveTypography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 20.dp)
-        )
-
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val heroHeight = when {
-                maxWidth >= 840.dp -> 380.dp
-                maxWidth >= 600.dp -> 356.dp
-                else -> 332.dp
+            val visibleCardCapacity = when {
+                maxWidth >= 1_100.dp -> 3
+                maxWidth >= 640.dp -> 2
+                else -> 1
             }
-            val heroMaxWidth = (maxWidth - 48.dp)
+            val fullCardsVisible = minOf(picks.size, visibleCardCapacity)
+            val hasPeekItem = picks.size > fullCardsVisible
+            val itemSpacing = 10.dp
+            val horizontalInset = 16.dp
+            val peekWidth = if (hasPeekItem) 56.dp else 0.dp
+            val gapCount = if (hasPeekItem) fullCardsVisible else (fullCardsVisible - 1).coerceAtLeast(0)
+            val availableHeroWidth = maxWidth - horizontalInset * 2 - itemSpacing * gapCount - peekWidth
+            val heroMaxWidth = (availableHeroWidth.value / fullCardsVisible).dp
                 .coerceAtLeast(232.dp)
                 .coerceAtMost(440.dp)
+            val heroHeight = (heroMaxWidth * 0.9f).coerceIn(220.dp, 380.dp)
 
-            val carouselState = rememberCarouselState { tracks.size }
+            val carouselState = rememberCarouselState { picks.size }
 
-            HorizontalMultiBrowseCarousel(
-                state = carouselState,
-                preferredItemWidth = heroMaxWidth,
-                itemSpacing = 10.dp,
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(heroHeight)
-            ) { index ->
-                val track = tracks[index]
-                val isCurrentPlaying = currentTrackId == track.id && isPlaying
-
-                QuickPickCard(
-                    track = track,
-                    artworkUrl = getArtworkUrl(track),
-                    isPlaying = isCurrentPlaying,
-                    onClick = { onTrackClick(track) },
-                    modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge)
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Quick picks",
+                    style = ExpressiveTypography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 20.dp)
                 )
+                HorizontalMultiBrowseCarousel(
+                    state = carouselState,
+                    preferredItemWidth = heroMaxWidth,
+                    itemSpacing = itemSpacing,
+                    contentPadding = PaddingValues(horizontal = horizontalInset),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(heroHeight)
+                ) { index ->
+                    val pick = picks[index]
+                    val track = pick.track
+                    val isCurrentPlaying = currentTrackId == track.id && isPlaying
+
+                    QuickPickCard(
+                        track = track,
+                        artworkUrl = getArtworkUrl(track),
+                        isPlaying = isCurrentPlaying,
+                        onClick = {
+                            if (track.is_cached) onTrackClick(track) else onRipClick?.invoke(track)
+                        },
+                        canActivate = track.is_cached || onRipClick != null,
+                        modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge)
+                    )
+                }
             }
         }
     }
@@ -326,12 +341,20 @@ fun QuickPickCard(
     artworkUrl: String,
     isPlaying: Boolean,
     onClick: () -> Unit,
+    canActivate: Boolean,
     modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                    )
+                )
+            )
             .border(
                 1.dp,
                 if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant.copy(
@@ -339,8 +362,17 @@ fun QuickPickCard(
                 ),
                 MaterialTheme.shapes.extraLarge
             )
-            .clickable(onClick = onClick)
+            .clickable(enabled = canActivate, onClick = onClick)
     ) {
+        PeerlessIcon(
+            icon = PeerlessIcons.MusicNote,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(44.dp)
+        )
+
         AsyncImage(
             model = artworkUrl,
             contentDescription = "${track.title} cover",
@@ -354,8 +386,8 @@ fun QuickPickCard(
                 .background(
                     Brush.verticalGradient(
                         0f to Color.Transparent,
-                        0.48f to Color.Black.copy(alpha = 0.08f),
-                        1f to Color.Black.copy(alpha = 0.84f)
+                        0.48f to MaterialTheme.colorScheme.scrim.copy(alpha = 0.08f),
+                        1f to MaterialTheme.colorScheme.scrim.copy(alpha = 0.88f)
                     )
                 )
         )
@@ -363,92 +395,62 @@ fun QuickPickCard(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(12.dp),
+                .padding(start = 12.dp, top = 12.dp, end = 64.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Text(
                 text = track.title,
                 style = ExpressiveTypography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.inverseOnSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
 
             Text(
                 text = track.artist,
-                style = ExpressiveTypography.bodySmall.copy(fontSize = 11.sp),
-                color = Color.White.copy(alpha = 0.75f),
+                style = ExpressiveTypography.bodySmall.copy(fontSize = 12.sp),
+                color = MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.88f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                val hasApple = track.provider.contains("apple", ignoreCase = true)
-                val hasQobuz = track.provider.contains("qobuz", ignoreCase = true)
-                val hasDolby = track.codec.contains("ec-3", ignoreCase = true) ||
-                        track.codec.contains("ec3", ignoreCase = true) ||
-                        track.codec.contains("atmos", ignoreCase = true)
-                val hasHiRes = (track.bit_depth ?: 16) >= 24 || (track.sample_rate ?: 44100) >= 88200
+        }
 
-                if (hasApple) {
-                    PeerlessIcon(
-                        icon = PeerlessIcons.AppleLogo,
-                        contentDescription = "Apple Music",
-                        tint = Color.White.copy(alpha = 0.85f),
-                        modifier = Modifier.size(11.dp)
-                    )
-                }
-                if (hasQobuz) {
-                    PeerlessIcon(
-                        icon = PeerlessIcons.QobuzLogo,
-                        contentDescription = "Qobuz",
-                        tint = Color.White.copy(alpha = 0.85f),
-                        modifier = Modifier.height(10.dp).width(25.dp)
-                    )
-                }
-                if (!hasApple && !hasQobuz && track.provider.isNotBlank()) {
-                    Text(
-                        text = formatProviderLabel(track.provider),
-                        style = SpecBadgeTypography.copy(
-                            fontSize = 8.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.3.sp
-                        ),
-                        color = Color.White.copy(alpha = 0.8f),
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                if (hasDolby) {
-                    PeerlessIcon(
-                        icon = PeerlessIcons.DolbyAtmos,
-                        contentDescription = "Dolby Atmos",
-                        tint = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.height(9.dp).width(14.dp)
-                    )
-                }
-                if (hasHiRes) {
-                    PeerlessIcon(
-                        icon = PeerlessIcons.HiRes,
-                        contentDescription = "Hi-Res Audio",
-                        tint = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.size(13.dp)
-                    )
-                }
-            }
+        FilledIconButton(
+            onClick = onClick,
+            enabled = canActivate,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(12.dp)
+                .size(44.dp),
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        ) {
+            PeerlessIcon(
+                icon = when {
+                    isPlaying -> PeerlessIcons.LosslessWave
+                    track.is_cached -> PeerlessIcons.Play
+                    else -> PeerlessIcons.Download
+                },
+                contentDescription = when {
+                    isPlaying -> "Now playing ${track.title}"
+                    track.is_cached -> "Play ${track.title}"
+                    else -> "Rip ${track.title}"
+                },
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun LosslessLibrarySectionHeader(
-    trackCount: Int,
+fun SearchResultsSectionHeader(
+    resultCount: Int,
     onShuffle: () -> Unit,
     onPlayAll: () -> Unit,
     modifier: Modifier = Modifier
@@ -460,30 +462,21 @@ fun LosslessLibrarySectionHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        Column(
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Text(
-                text = "Lossless Library",
+                text = "Search results",
                 style = ExpressiveTypography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
-
-            Box(
-                modifier = Modifier
-                    .clip(PillShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), PillShape)
-                    .padding(horizontal = 8.dp, vertical = 2.dp)
-            ) {
-                Text(
-                    text = "$trackCount tracks",
-                    style = SpecBadgeTypography.copy(fontSize = 9.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                text = "$resultCount tracks",
+                style = ExpressiveTypography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         SplitButtonLayout(
@@ -530,6 +523,72 @@ fun LosslessLibrarySectionHeader(
 }
 
 @Composable
+private fun HomeFeedSectionHeader(title: String) {
+    Text(
+        text = title,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 2.dp),
+        style = ExpressiveTypography.titleLarge,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurface
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun HomeFeedLoading() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(96.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        LoadingIndicator()
+    }
+}
+
+@Composable
+private fun HomeFeedMessage(
+    message: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.large
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 16.dp, end = 10.dp, top = 12.dp, bottom = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            PeerlessIcon(
+                icon = PeerlessIcons.Sparkle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+            Text(
+                text = message,
+                style = ExpressiveTypography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            if (actionLabel != null && onAction != null) {
+                TextButton(onClick = onAction) {
+                    Text(actionLabel)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun HomeScreenContent(
     playerConnection: PlayerConnection,
     serverConnected: Boolean,
@@ -550,11 +609,47 @@ fun HomeScreenContent(
     val currentTrackDto = currentTrack?.toSummaryDto()
     val status by playerConnection.status.collectAsState()
     val apiClient = LocalPeerlessApiClient.current
+    val sessionManager = LocalSessionManager.current
+    val lastFmUsername by sessionManager.lastFmUsername.collectAsState()
+    val lastFmConfig by sessionManager.lastFmConfig.collectAsState()
+    val lastFmClient = remember(apiClient, lastFmConfig?.apiKey) {
+        LastFmClient(
+            apiKey = lastFmConfig?.apiKey ?: AppConfig.DEFAULT_LASTFM_API_KEY,
+            httpClient = apiClient.httpClient,
+            enableFallback = false
+        )
+    }
+    val homeFeedRepository = remember(lastFmClient, apiClient) {
+        HomeFeedRepository(lastFmClient, apiClient)
+    }
+    var homeFeed by remember(lastFmUsername) {
+        mutableStateOf(HomeFeedState(isLoading = !lastFmUsername.isNullOrBlank()))
+    }
+    var homeFeedRefreshKey by remember { mutableStateOf(0) }
+
+    LaunchedEffect(
+        homeFeedRepository,
+        lastFmUsername,
+        apiClient.baseUrl,
+        searchQuery.isBlank(),
+        homeFeedRefreshKey,
+        allTracks
+    ) {
+        if (searchQuery.isNotBlank()) return@LaunchedEffect
+        val username = lastFmUsername
+        if (username.isNullOrBlank()) {
+            homeFeed = HomeFeedState()
+            return@LaunchedEffect
+        }
+
+        homeFeed = homeFeed.copy(isLoading = true, hasError = false)
+        homeFeed = homeFeedRepository.load(username, allTracks)
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = contentBottomPadding),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item(key = "top_header") {
             HomeTopHeader(
@@ -566,93 +661,169 @@ fun HomeScreenContent(
         }
 
         if (searchQuery.isBlank()) {
-
-            if (allTracks.isNotEmpty()) {
+            if (homeFeed.quickPicks.isNotEmpty()) {
                 item(key = "quick_picks") {
                     QuickPicksCarousel(
-                        tracks = allTracks.take(6),
+                        picks = homeFeed.quickPicks,
                         currentTrackId = currentTrackDto?.id,
                         isPlaying = status == PlaybackStatus.PLAYING,
                         onTrackClick = { clicked ->
                             if (currentTrackDto?.id == clicked.id) {
                                 playerConnection.togglePlayPause()
                             } else {
-                                playerConnection.play(clicked.toTrack(), allTracks.map { it.toTrack() })
+                                playerConnection.play(
+                                    clicked.toTrack(),
+                                    homeFeed.quickPicks.map { it.track.toTrack() }
+                                )
                             }
                         },
+                        onRipClick = onRipClick,
                         getArtworkUrl = { track ->
                             apiClient.getArtworkUrl(track, 300)
                         }
                     )
                 }
             }
-        }
 
-        item(key = "library_header") {
-            LosslessLibrarySectionHeader(
-                trackCount = displayedTracks.size,
-                onShuffle = {
-                    if (displayedTracks.isNotEmpty()) {
-                        val shuffled = displayedTracks.shuffled()
-                        playerConnection.play(shuffled.first().toTrack(), shuffled.map { it.toTrack() })
-                    }
-                },
-                onPlayAll = {
-                    if (displayedTracks.isNotEmpty()) {
-                        playerConnection.play(displayedTracks.first().toTrack(), displayedTracks.map { it.toTrack() })
+            if (homeFeed.isLoading && homeFeed.quickPicks.isEmpty()) {
+                item(key = "home_feed_loading") { HomeFeedLoading() }
+            } else if (homeFeed.hasError) {
+                item(key = "home_feed_error") {
+                    HomeFeedMessage(
+                        message = "Your Last.fm listening feed could not be loaded.",
+                        actionLabel = "Retry",
+                        onAction = { homeFeedRefreshKey += 1 }
+                    )
+                }
+            } else if (homeFeed.quickPicks.isEmpty() && homeFeed.recentTracks.isEmpty()) {
+                item(key = "home_feed_empty") {
+                    HomeFeedMessage(
+                        message = "Your Last.fm activity will appear here when Peerless finds matching tracks."
+                    )
+                }
+            }
+
+            if (homeFeed.recentTracks.isNotEmpty()) {
+                item(key = "listen_again_header") {
+                    HomeFeedSectionHeader(title = "Listen again")
+                }
+                items(
+                    items = homeFeed.recentTracks,
+                    key = { "recent_${it.track.provider}_${it.track.track_id}" }
+                ) { item ->
+                    val track = item.track
+                    Box(modifier = Modifier.padding(horizontal = 12.dp)) {
+                        TrackRow(
+                            track = track,
+                            artworkUrl = apiClient.getArtworkUrl(track, 200),
+                            isPlaying = currentTrackDto?.id == track.id && status == PlaybackStatus.PLAYING,
+                            canonicalTrack = item.canonicalTrack,
+                            onTrackClick = { clicked ->
+                                if (currentTrackDto?.id == clicked.id) {
+                                    playerConnection.togglePlayPause()
+                                } else {
+                                    playerConnection.play(
+                                        clicked.toTrack(),
+                                        homeFeed.recentTracks.map { it.track.toTrack() }
+                                    )
+                                }
+                            },
+                            onRipClick = onRipClick
+                        )
                     }
                 }
-            )
+            }
+
+            if (homeFeed.newDiscoveries.isNotEmpty()) {
+                item(key = "related_tracks_header") {
+                    HomeFeedSectionHeader(title = "New discoveries")
+                }
+                items(
+                    items = homeFeed.newDiscoveries,
+                    key = { "related_${it.track.provider}_${it.track.track_id}" }
+                ) { item ->
+                    val track = item.track
+                    Box(modifier = Modifier.padding(horizontal = 12.dp)) {
+                        TrackRow(
+                            track = track,
+                            artworkUrl = apiClient.getArtworkUrl(track, 200),
+                            isPlaying = currentTrackDto?.id == track.id && status == PlaybackStatus.PLAYING,
+                            canonicalTrack = item.canonicalTrack,
+                            onTrackClick = { clicked ->
+                                if (currentTrackDto?.id == clicked.id) {
+                                    playerConnection.togglePlayPause()
+                                } else {
+                                    playerConnection.play(
+                                        clicked.toTrack(),
+                                        homeFeed.newDiscoveries.map { it.track.toTrack() }
+                                    )
+                                }
+                            },
+                            onRipClick = onRipClick
+                        )
+                    }
+                }
+            }
         }
 
-        if (displayedTracks.isEmpty()) {
-            item(key = "empty_state") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+        if (searchQuery.isNotBlank()) {
+            item(key = "search_results_header") {
+                SearchResultsSectionHeader(
+                    resultCount = displayedTracks.size,
+                    onShuffle = {
+                        if (displayedTracks.isNotEmpty()) {
+                            val shuffled = displayedTracks.shuffled()
+                            playerConnection.play(shuffled.first().toTrack(), shuffled.map { it.toTrack() })
+                        }
+                    },
+                    onPlayAll = {
+                        if (displayedTracks.isNotEmpty()) {
+                            playerConnection.play(
+                                displayedTracks.first().toTrack(),
+                                displayedTracks.map { it.toTrack() })
+                        }
+                    }
+                )
+            }
+
+            if (displayedTracks.isEmpty()) {
+                item(key = "empty_search_state") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 24.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        PeerlessIcon(
-                            icon = PeerlessIcons.Search,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                            modifier = Modifier.size(36.dp)
-                        )
                         Text(
-                            text = "No matching lossless tracks found",
+                            text = "No matching tracks found",
                             style = ExpressiveTypography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
-            }
-        } else {
-            items(
-                items = displayedTracks,
-                key = { it.id }
-            ) { track ->
-                val isPlaying = currentTrackDto?.id == track.id &&
-                        status == PlaybackStatus.PLAYING
+            } else {
+                items(
+                    items = displayedTracks,
+                    key = { it.id }
+                ) { track ->
+                    val isPlaying = currentTrackDto?.id == track.id &&
+                            status == PlaybackStatus.PLAYING
 
-                Box(modifier = Modifier.padding(horizontal = 12.dp)) {
-                    TrackRow(
-                        track = track,
-                        artworkUrl = apiClient.getArtworkUrl(track, 200),
-                        isPlaying = isPlaying,
-                        onTrackClick = { clicked ->
-                            if (currentTrackDto?.id == clicked.id) {
-                                playerConnection.togglePlayPause()
-                            } else {
-                                playerConnection.play(clicked.toTrack(), displayedTracks.map { it.toTrack() })
-                            }
-                        },
-                        onRipClick = onRipClick
-                    )
+                    Box(modifier = Modifier.padding(horizontal = 12.dp)) {
+                        TrackRow(
+                            track = track,
+                            artworkUrl = apiClient.getArtworkUrl(track, 200),
+                            isPlaying = isPlaying,
+                            onTrackClick = { clicked ->
+                                if (currentTrackDto?.id == clicked.id) {
+                                    playerConnection.togglePlayPause()
+                                } else {
+                                    playerConnection.play(clicked.toTrack(), displayedTracks.map { it.toTrack() })
+                                }
+                            },
+                            onRipClick = onRipClick
+                        )
+                    }
                 }
             }
         }

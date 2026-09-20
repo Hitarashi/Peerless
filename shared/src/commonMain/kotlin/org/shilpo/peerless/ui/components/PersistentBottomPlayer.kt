@@ -107,7 +107,7 @@ fun PersistentBottomPlayer(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(80.dp)
+            .height(96.dp)
             .clip(containerShape)
             .background(colorScheme.surfaceContainerLow)
     ) {
@@ -115,7 +115,7 @@ fun PersistentBottomPlayer(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 6.dp),
+                .padding(horizontal = 20.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -450,7 +450,7 @@ private fun ExpressiveWavySeekBar(
     ) {
         Text(
             text = elapsedText,
-            style = SpecBadgeTypography.copy(fontSize = 10.sp),
+            style = SpecBadgeTypography.copy(fontSize = 11.sp),
             color = colorScheme.onSurfaceVariant
         )
 
@@ -472,20 +472,19 @@ private fun ExpressiveWavySeekBar(
             thumbColor = colorScheme.primary,
             isPlaying = isPlaying,
             isVisible = true,
-            strokeWidth = 3.5.dp,
-            thumbRadius = 5.dp,
+            strokeWidth = 5.dp,
+            thumbRadius = 8.dp,
             idleGap = 3.5.dp,
-            thumbLineHeightWhenInteracting = 18.dp,
+            thumbLineHeightWhenInteracting = 24.dp,
             modifier = Modifier
                 .weight(1f)
-                .height(24.dp)
+                .height(40.dp)
         )
 
         Text(
             text = totalText,
-            style = SpecBadgeTypography.copy(fontSize = 10.sp),
+            style = SpecBadgeTypography.copy(fontSize = 11.sp),
             color = colorScheme.onSurfaceVariant
         )
     }
 }
-

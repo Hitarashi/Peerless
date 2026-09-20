@@ -9,6 +9,7 @@ import org.shilpo.peerless.config.AppConfig
 import org.shilpo.peerless.model.LastFmArtist
 import org.shilpo.peerless.model.LastFmTag
 import org.shilpo.peerless.model.LastFmTrackInfo
+import org.shilpo.peerless.model.LastFmUserTrack
 import org.shilpo.peerless.network.createDefaultPeerlessHttpClient
 
 class LastFmClient(
@@ -118,6 +119,74 @@ class LastFmClient(
         }
     }
 
+    suspend fun getRecentTracks(username: String, limit: Int = 20): Result<List<LastFmUserTrack>> =
+        getUserTracks(method = "user.getrecenttracks", username = username, limit = limit)
+
+    suspend fun getTopTracks(
+        username: String,
+        limit: Int = 20,
+        period: String = "overall"
+    ): Result<List<LastFmUserTrack>> = getUserTracks(
+        method = "user.gettoptracks",
+        username = username,
+        limit = limit,
+        period = period
+    )
+
+    private suspend fun getUserTracks(
+        method: String,
+        username: String,
+        limit: Int,
+        period: String? = null
+    ): Result<List<LastFmUserTrack>> = runCatching {
+        val response = httpClient.get(baseUrl) {
+            parameter("method", method)
+            parameter("user", username)
+            parameter("limit", limit.coerceIn(1, 50))
+            if (period != null) parameter("period", period)
+            parameter("api_key", apiKey)
+            parameter("format", "json")
+            parameter("autocorrect", "1")
+        }
+        if (!response.status.isSuccess()) {
+            error("Last.fm listening history request failed with HTTP ${response.status}")
+        }
+
+        val root = json.parseToJsonElement(response.bodyAsText()).jsonObject
+        if (root.containsKey("error")) {
+            val message = root["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown Last.fm error"
+            error("Last.fm API error: $message")
+        }
+
+        val container = root[if (method == "user.getrecenttracks") "recenttracks" else "toptracks"]
+            ?.jsonObject
+        val tracks = when (val trackElement = container?.get("track")) {
+            is JsonArray -> trackElement
+            is JsonObject -> listOf(trackElement)
+            else -> emptyList()
+        }
+        tracks.mapNotNull { element ->
+            (element as? JsonObject)?.let(::parseUserTrack)
+        }
+    }
+
+    private fun parseUserTrack(trackObject: JsonObject): LastFmUserTrack? {
+        val title = trackObject["name"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+        val artist = when (val artistElement = trackObject["artist"]) {
+            is JsonObject -> (artistElement["name"] ?: artistElement["#text"])
+                ?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+
+            else -> artistElement?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+        }
+        if (title.isBlank() || artist.isBlank()) return null
+
+        return LastFmUserTrack(
+            title = title,
+            artist = artist,
+            playCount = trackObject["playcount"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 0L
+        )
+    }
+
     private fun parseArtist(artistObj: JsonObject, requestedArtist: String): LastFmArtist {
         val name = artistObj["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: requestedArtist
         val rawBio = artistObj["bio"]?.jsonObject?.get("summary")?.jsonPrimitive?.contentOrNull
@@ -144,14 +213,11 @@ class LastFmClient(
             else -> {}
         }
 
-        val imageUrl = parseImageUrl(artistObj["image"])
-
         return LastFmArtist(
             name = name,
             bioSummary = bioSummary,
             tags = tags,
-            similarArtists = similarList,
-            imageUrl = imageUrl
+            similarArtists = similarList
         )
     }
 
@@ -211,25 +277,6 @@ class LastFmClient(
         return tags
     }
 
-    private fun parseImageUrl(imageElem: JsonElement?): String? {
-        if (imageElem !is JsonArray || imageElem.isEmpty()) return null
-        val preferredSizes = listOf("mega", "extralarge", "large", "medium", "small")
-        val imagesBySize = mutableMapOf<String, String>()
-        for (img in imageElem) {
-            if (img is JsonObject) {
-                val size = img["size"]?.jsonPrimitive?.contentOrNull ?: ""
-                val url = img["#text"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (url.isNotBlank()) {
-                    imagesBySize[size] = url
-                }
-            }
-        }
-        for (size in preferredSizes) {
-            imagesBySize[size]?.let { return it }
-        }
-        return imagesBySize.values.lastOrNull()
-    }
-
     private fun cleanBio(raw: String?): String? {
         if (raw.isNullOrBlank()) return null
         return raw
@@ -255,8 +302,7 @@ class LastFmClient(
                         LastFmTag("Ambient", 75),
                         LastFmTag("Synthpop", 70)
                     ),
-                    similarArtists = listOf("Chvrches", "Air", "MGMT", "The Naked and Famous"),
-                    imageUrl = null
+                    similarArtists = listOf("Chvrches", "Air", "MGMT", "The Naked and Famous")
                 )
 
                 lower.contains("daft punk") -> LastFmArtist(
@@ -268,8 +314,7 @@ class LastFmClient(
                         LastFmTag("Dance", 85),
                         LastFmTag("French Touch", 80)
                     ),
-                    similarArtists = listOf("Justice", "Kavinsky", "Cassius", "Breakbot"),
-                    imageUrl = null
+                    similarArtists = listOf("Justice", "Kavinsky", "Cassius", "Breakbot")
                 )
 
                 lower.contains("taylor swift") -> LastFmArtist(
@@ -281,8 +326,7 @@ class LastFmClient(
                         LastFmTag("Indie Folk", 75),
                         LastFmTag("Singer-Songwriter", 70)
                     ),
-                    similarArtists = listOf("Lorde", "Phoebe Bridgers", "Olivia Rodrigo", "Gracie Abrams"),
-                    imageUrl = null
+                    similarArtists = listOf("Lorde", "Phoebe Bridgers", "Olivia Rodrigo", "Gracie Abrams")
                 )
 
                 else -> {
@@ -296,8 +340,7 @@ class LastFmClient(
                             LastFmTag("Indie", 70),
                             LastFmTag("Hi-Res", 60)
                         ),
-                        similarArtists = listOf("Similar Artist 1", "Similar Artist 2"),
-                        imageUrl = null
+                        similarArtists = listOf("Similar Artist 1", "Similar Artist 2")
                     )
                 }
             }
