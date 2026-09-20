@@ -1,11 +1,19 @@
 package org.shilpo.peerless
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.tooling.preview.Preview
 import org.shilpo.peerless.auth.DeepLinkHandler
 import org.shilpo.peerless.auth.LocalSessionManager
 import org.shilpo.peerless.auth.RealSessionManager
 import org.shilpo.peerless.auth.createPlatformTokenStorage
+import org.shilpo.peerless.config.AppConfig
+import org.shilpo.peerless.home.HomeFeedRepository
+import org.shilpo.peerless.lastfm.LastFmClient
 import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.network.PeerlessApiClient
 import org.shilpo.peerless.player.LocalPlayerConnection
@@ -25,11 +33,22 @@ fun App() {
     val sessionManager = remember(apiClient, tokenStorage) {
         RealSessionManager(apiClient = apiClient, tokenStorage = tokenStorage)
     }
+    val lastFmConfig by sessionManager.lastFmConfig.collectAsState()
     val syncManager = remember(tokenStorage) { PlaybackSyncManager(tokenStorage = tokenStorage) }
     val playerConnection = remember(apiClient, syncManager) {
         RealPlayerConnection(apiClient = apiClient).apply {
             attachSync(syncManager)
         }
+    }
+    val homeFeedRepository = remember(apiClient, lastFmConfig?.apiKey) {
+        HomeFeedRepository(
+            lastFmClient = LastFmClient(
+                apiKey = lastFmConfig?.apiKey ?: AppConfig.DEFAULT_LASTFM_API_KEY,
+                httpClient = apiClient.httpClient,
+                enableFallback = false
+            ),
+            apiClient = apiClient
+        )
     }
     val favoritesManager = remember(apiClient) {
         org.shilpo.peerless.library.RealFavoritesManager(apiClient = apiClient)
@@ -42,6 +61,10 @@ fun App() {
 
     LaunchedEffect(playerConnection, syncManager) {
         playerConnection.attachSync(syncManager)
+    }
+
+    LaunchedEffect(playerConnection, homeFeedRepository) {
+        playerConnection.configureRadioRecommendations(homeFeedRepository)
     }
 
     LaunchedEffect(playerConnection) {
@@ -105,6 +128,7 @@ fun App() {
             LocalPlaybackSyncManager provides syncManager,
             LocalPeerlessApiClient provides apiClient,
             LocalSessionManager provides sessionManager,
+            org.shilpo.peerless.home.LocalHomeFeedRepository provides homeFeedRepository,
             org.shilpo.peerless.library.LocalFavoritesManager provides favoritesManager
         ) {
             AdaptiveShell()

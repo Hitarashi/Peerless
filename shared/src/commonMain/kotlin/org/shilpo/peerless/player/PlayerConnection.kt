@@ -29,6 +29,10 @@ interface PlayerConnection {
     val currentBufferedPositionMs: Long get() = bufferedPositionMs.value
 
     fun play(track: Track, queue: List<Track> = emptyList())
+    fun playFromContext(track: Track, queue: List<Track>) = play(track, queue)
+    fun playQueueItem(index: Int)
+    fun startRadio(track: Track)
+    fun configureRadioRecommendations(provider: TrackRecommendationProvider?) {}
     fun play()
     fun pause()
     fun togglePlayPause()

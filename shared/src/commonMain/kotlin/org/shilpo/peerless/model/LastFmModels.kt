@@ -26,5 +26,14 @@ data class LastFmTrackInfo(
 data class LastFmUserTrack(
     val title: String,
     val artist: String,
-    val playCount: Long = 0L
+    val playCount: Long = 0L,
+    val timestampEpochSeconds: Long? = null
+)
+
+@Serializable
+data class LastFmSimilarTrack(
+    val title: String,
+    val artist: String,
+    val match: Double = 0.0,
+    val mbid: String? = null
 )

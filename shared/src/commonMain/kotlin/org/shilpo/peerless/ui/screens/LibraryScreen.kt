@@ -3,14 +3,28 @@ package org.shilpo.peerless.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import org.shilpo.peerless.library.LocalFavoritesManager
 import org.shilpo.peerless.model.CanonicalDeduplicator
 import org.shilpo.peerless.model.TrackSummaryDto
+import org.shilpo.peerless.model.toTrack
 import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
@@ -61,7 +76,8 @@ fun LibraryScreen(
         else -> allTracks
     }
     val tracksToShow = remember(rawTracks, apiClient.baseUrl) {
-        CanonicalDeduplicator.deduplicateTracks(rawTracks, apiClient.baseUrl).map { it.toSummaryDto() }
+        CanonicalDeduplicator.deduplicateTracks(rawTracks, apiClient.baseUrl)
+            .map { it.toSummaryDto() }
     }
 
     Column(
@@ -174,6 +190,15 @@ fun LibraryScreen(
                                 playerConnection.playTrack(clicked, tracksToShow)
                             }
                         },
+                        onPlayNext = if (track.is_cached) {
+                            { clicked -> playerConnection.playNextInQueue(clicked.toTrack()) }
+                        } else null,
+                        onAddToQueue = if (track.is_cached) {
+                            { clicked -> playerConnection.addToQueue(clicked.toTrack()) }
+                        } else null,
+                        onStartRadio = if (track.is_cached) {
+                            { clicked -> playerConnection.startRadio(clicked.toTrack()) }
+                        } else null,
                         isFavorite = favoritesManager?.isFavorite(track.id),
                         onToggleFavorite = { clicked ->
                             favoritesManager?.toggleFavorite(clicked)

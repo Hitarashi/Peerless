@@ -1,12 +1,20 @@
 package org.shilpo.peerless.lastfm
 
-import io.ktor.client.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import kotlinx.serialization.json.*
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.request.parameter
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.isSuccess
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.shilpo.peerless.config.AppConfig
 import org.shilpo.peerless.model.LastFmArtist
+import org.shilpo.peerless.model.LastFmSimilarTrack
 import org.shilpo.peerless.model.LastFmTag
 import org.shilpo.peerless.model.LastFmTrackInfo
 import org.shilpo.peerless.model.LastFmUserTrack
@@ -133,6 +141,55 @@ class LastFmClient(
         period = period
     )
 
+    suspend fun getSimilarTracks(
+        artist: String,
+        track: String,
+        limit: Int = 20
+    ): Result<List<LastFmSimilarTrack>> = runCatching {
+        val response = httpClient.get(baseUrl) {
+            parameter("method", "track.getsimilar")
+            parameter("artist", artist)
+            parameter("track", track)
+            parameter("limit", limit.coerceIn(1, 50))
+            parameter("api_key", apiKey)
+            parameter("format", "json")
+            parameter("autocorrect", "1")
+        }
+        if (!response.status.isSuccess()) {
+            error("Last.fm similar tracks request failed with HTTP ${response.status}")
+        }
+
+        val root = json.parseToJsonElement(response.bodyAsText()).jsonObject
+        if (root.containsKey("error")) {
+            val message = root["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown Last.fm error"
+            error("Last.fm API error: $message")
+        }
+
+        val elements = when (val tracks = root["similartracks"]?.jsonObject?.get("track")) {
+            is JsonArray -> tracks
+            is JsonObject -> listOf(tracks)
+            else -> emptyList()
+        }
+        elements.mapNotNull { element ->
+            val trackObject = element as? JsonObject ?: return@mapNotNull null
+            val title = trackObject["name"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+            val artist = when (val artistElement = trackObject["artist"]) {
+                is JsonObject -> (artistElement["name"] ?: artistElement["#text"])
+                    ?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+
+                else -> artistElement?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+            }
+            if (title.isBlank() || artist.isBlank()) return@mapNotNull null
+
+            LastFmSimilarTrack(
+                title = title,
+                artist = artist,
+                match = trackObject["match"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull() ?: 0.0,
+                mbid = trackObject["mbid"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+            )
+        }
+    }
+
     private suspend fun getUserTracks(
         method: String,
         username: String,
@@ -183,12 +240,16 @@ class LastFmClient(
         return LastFmUserTrack(
             title = title,
             artist = artist,
-            playCount = trackObject["playcount"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 0L
+            playCount = trackObject["playcount"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+                ?: 0L,
+            timestampEpochSeconds = trackObject["date"]?.jsonObject
+                ?.get("uts")?.jsonPrimitive?.contentOrNull?.toLongOrNull()
         )
     }
 
     private fun parseArtist(artistObj: JsonObject, requestedArtist: String): LastFmArtist {
-        val name = artistObj["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: requestedArtist
+        val name = artistObj["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+            ?: requestedArtist
         val rawBio = artistObj["bio"]?.jsonObject?.get("summary")?.jsonPrimitive?.contentOrNull
         val bioSummary = cleanBio(rawBio)
         val tags = parseTags(artistObj["tags"])
@@ -198,16 +259,18 @@ class LastFmClient(
         when (val similarArtist = similarObj?.get("artist")) {
             is JsonArray -> {
                 for (elem in similarArtist) {
-                    elem.jsonObject["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }?.let {
-                        similarList.add(it)
-                    }
+                    elem.jsonObject["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                        ?.let {
+                            similarList.add(it)
+                        }
                 }
             }
 
             is JsonObject -> {
-                similarArtist["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }?.let {
-                    similarList.add(it)
-                }
+                similarArtist["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                    ?.let {
+                        similarList.add(it)
+                    }
             }
 
             else -> {}
@@ -221,13 +284,19 @@ class LastFmClient(
         )
     }
 
-    private fun parseTrackInfo(trackObj: JsonObject, requestedArtist: String, requestedTrack: String): LastFmTrackInfo {
-        val title = trackObj["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: requestedTrack
+    private fun parseTrackInfo(
+        trackObj: JsonObject,
+        requestedArtist: String,
+        requestedTrack: String
+    ): LastFmTrackInfo {
+        val title = trackObj["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+            ?: requestedTrack
         val artistName = when (val artistElem = trackObj["artist"]) {
             is JsonObject -> artistElem["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
                 ?: requestedArtist
 
-            else -> artistElem?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: requestedArtist
+            else -> artistElem?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                ?: requestedArtist
         }
         val rawWiki = trackObj["wiki"]?.jsonObject?.get("summary")?.jsonPrimitive?.contentOrNull
         val wikiSummary = cleanBio(rawWiki)
@@ -326,7 +395,12 @@ class LastFmClient(
                         LastFmTag("Indie Folk", 75),
                         LastFmTag("Singer-Songwriter", 70)
                     ),
-                    similarArtists = listOf("Lorde", "Phoebe Bridgers", "Olivia Rodrigo", "Gracie Abrams")
+                    similarArtists = listOf(
+                        "Lorde",
+                        "Phoebe Bridgers",
+                        "Olivia Rodrigo",
+                        "Gracie Abrams"
+                    )
                 )
 
                 else -> {

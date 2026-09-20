@@ -1,15 +1,34 @@
 package org.shilpo.peerless.ui.screens
 
 
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,11 +44,24 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.DrawableResource
 import org.shilpo.peerless.lastfm.LastFmClient
-import org.shilpo.peerless.model.*
+import org.shilpo.peerless.model.CanonicalDeduplicator
+import org.shilpo.peerless.model.CanonicalTrack
+import org.shilpo.peerless.model.LastFmArtist
+import org.shilpo.peerless.model.LastFmTag
+import org.shilpo.peerless.model.SearchFilter
+import org.shilpo.peerless.model.TrackSummaryDto
+import org.shilpo.peerless.model.UncachedTrackDto
+import org.shilpo.peerless.model.toTrack
 import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
-import org.shilpo.peerless.theme.*
+import org.shilpo.peerless.theme.ExpressiveTypography
+import org.shilpo.peerless.theme.LiquidGlassSurface
+import org.shilpo.peerless.theme.LosslessPurple
+import org.shilpo.peerless.theme.PillShape
+import org.shilpo.peerless.theme.SpecBadgeTypography
+import org.shilpo.peerless.theme.SquircleShapeLarge
+import org.shilpo.peerless.theme.SquircleShapeMedium
 import org.shilpo.peerless.ui.components.ExpressiveSearchBar
 import org.shilpo.peerless.ui.components.PeerlessIcon
 import org.shilpo.peerless.ui.components.PeerlessIcons
@@ -191,7 +223,13 @@ fun SearchScreen(
                             )
                         }
 
-                        SearchFilter.QOBUZ -> response.live.filter { it.provider.contains("qobuz", ignoreCase = true) }
+                        SearchFilter.QOBUZ -> response.live.filter {
+                            it.provider.contains(
+                                "qobuz",
+                                ignoreCase = true
+                            )
+                        }
+
                         SearchFilter.TRACKS -> response.live.filter {
                             it.title.contains(
                                 trimmedQuery,
@@ -229,11 +267,27 @@ fun SearchScreen(
                                 it.album.contains(trimmedQuery, ignoreCase = true)
                         val matchesFilter = when (selectedFilter) {
                             SearchFilter.CACHED -> it.is_cached
-                            SearchFilter.APPLE_MUSIC -> it.provider.contains("apple", ignoreCase = true)
+                            SearchFilter.APPLE_MUSIC -> it.provider.contains(
+                                "apple",
+                                ignoreCase = true
+                            )
+
                             SearchFilter.QOBUZ -> it.provider.contains("qobuz", ignoreCase = true)
-                            SearchFilter.TRACKS -> it.title.contains(trimmedQuery, ignoreCase = true)
-                            SearchFilter.ALBUMS -> it.album.contains(trimmedQuery, ignoreCase = true)
-                            SearchFilter.ARTISTS -> it.artist.contains(trimmedQuery, ignoreCase = true)
+                            SearchFilter.TRACKS -> it.title.contains(
+                                trimmedQuery,
+                                ignoreCase = true
+                            )
+
+                            SearchFilter.ALBUMS -> it.album.contains(
+                                trimmedQuery,
+                                ignoreCase = true
+                            )
+
+                            SearchFilter.ARTISTS -> it.artist.contains(
+                                trimmedQuery,
+                                ignoreCase = true
+                            )
+
                             else -> true
                         }
                         matchesQuery && matchesFilter
@@ -518,9 +572,14 @@ private fun ZeroStateDiscovery(
                     if (currentTrackDto?.id == it.id) {
                         playerConnection.togglePlayPause()
                     } else {
-                        playerConnection.play(it.toTrack(), cachedSampleTracks.map { t -> t.toTrack() })
+                        playerConnection.play(
+                            it.toTrack(),
+                            cachedSampleTracks.map { t -> t.toTrack() })
                     }
-                }
+                },
+                onPlayNext = { playerConnection.playNextInQueue(track.toTrack()) },
+                onAddToQueue = { playerConnection.addToQueue(track.toTrack()) },
+                onStartRadio = { playerConnection.startRadio(track.toTrack()) }
             )
         }
     }
@@ -663,7 +722,8 @@ private fun SearchResultsContent(
                     artworkUrl = canonical.artworkUrl ?: apiClient.getArtworkUrl(trackDto, 200),
                     isPlaying = isPlaying,
                     onTrackClick = { clickedCanonical ->
-                        val playSource = clickedCanonical.immediatePlaySource() ?: clickedCanonical.bestSource
+                        val playSource =
+                            clickedCanonical.immediatePlaySource() ?: clickedCanonical.bestSource
                         val playTrack = clickedCanonical.toTrack(playSource)
                         if (currentTrackDto?.id == playTrack.id) {
                             playerConnection.togglePlayPause()
@@ -685,7 +745,16 @@ private fun SearchResultsContent(
                         val playTrack = canonical.toTrack(source)
                         playerConnection.play(playTrack, cachedTracks.map { it.toTrack() })
                     },
-                    onRipClick = onRipClick
+                    onRipClick = onRipClick,
+                    onPlayNext = if (trackDto.is_cached) {
+                        { clicked -> playerConnection.playNextInQueue(clicked.toTrack()) }
+                    } else null,
+                    onAddToQueue = if (trackDto.is_cached) {
+                        { clicked -> playerConnection.addToQueue(clicked.toTrack()) }
+                    } else null,
+                    onStartRadio = if (trackDto.is_cached) {
+                        { clicked -> playerConnection.startRadio(clicked.toTrack()) }
+                    } else null
                 )
             }
         }
@@ -712,7 +781,8 @@ private fun SearchResultsContent(
                     artworkUrl = canonical.artworkUrl ?: apiClient.getArtworkUrl(trackDto, 200),
                     isPlaying = isPlaying,
                     onTrackClick = { clickedCanonical ->
-                        val playSource = clickedCanonical.immediatePlaySource() ?: clickedCanonical.bestSource
+                        val playSource =
+                            clickedCanonical.immediatePlaySource() ?: clickedCanonical.bestSource
                         val playTrack = clickedCanonical.toTrack(playSource)
                         if (currentTrackDto?.id == playTrack.id) {
                             playerConnection.togglePlayPause()
@@ -875,7 +945,11 @@ fun ArtistSpotlightCard(
                             modifier = Modifier
                                 .clip(PillShape)
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
-                                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), PillShape)
+                                .border(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                                    PillShape
+                                )
                                 .clickable { onSelectTag(tag.name) }
                                 .padding(horizontal = 10.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -921,7 +995,11 @@ fun ArtistSpotlightCard(
                             modifier = Modifier
                                 .clip(PillShape)
                                 .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.10f))
-                                .border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.30f), PillShape)
+                                .border(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.secondary.copy(alpha = 0.30f),
+                                    PillShape
+                                )
                                 .clickable { onSelectArtist(simArtist) }
                                 .padding(horizontal = 8.dp, vertical = 3.dp)
                         )

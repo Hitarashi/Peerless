@@ -4,14 +4,47 @@ package org.shilpo.peerless.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.*
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SplitButtonDefaults
+import androidx.compose.material3.SplitButtonLayout
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,11 +58,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import org.shilpo.peerless.auth.LocalSessionManager
-import org.shilpo.peerless.config.AppConfig
 import org.shilpo.peerless.home.HomeFeedItem
-import org.shilpo.peerless.home.HomeFeedRepository
 import org.shilpo.peerless.home.HomeFeedState
-import org.shilpo.peerless.lastfm.LastFmClient
+import org.shilpo.peerless.home.LocalHomeFeedRepository
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.model.toTrack
 import org.shilpo.peerless.network.LocalPeerlessApiClient
@@ -181,7 +212,10 @@ fun HomeTopHeader(
                     .clip(SquircleShapeSmall)
                     .background(
                         Brush.linearGradient(
-                            listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
+                            listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.tertiary
+                            )
                         )
                     ),
                 contentAlignment = Alignment.Center
@@ -212,7 +246,11 @@ fun HomeTopHeader(
                     .size(40.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), CircleShape)
+                    .border(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                        CircleShape
+                    )
                     .clickable(onClick = onToggleStats),
                 contentAlignment = Alignment.Center
             ) {
@@ -229,7 +267,11 @@ fun HomeTopHeader(
                     .size(40.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), CircleShape)
+                    .border(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                        CircleShape
+                    )
                     .clickable(onClick = onNavigateToSearch),
                 contentAlignment = Alignment.Center
             ) {
@@ -246,7 +288,11 @@ fun HomeTopHeader(
                     .size(40.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), CircleShape)
+                    .border(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                        CircleShape
+                    )
                     .clickable(onClick = onOpenSettings),
                 contentAlignment = Alignment.Center
             ) {
@@ -268,6 +314,9 @@ fun QuickPicksCarousel(
     currentTrackId: Int?,
     isPlaying: Boolean,
     onTrackClick: (TrackSummaryDto) -> Unit,
+    onPlayNext: ((TrackSummaryDto) -> Unit)? = null,
+    onAddToQueue: ((TrackSummaryDto) -> Unit)? = null,
+    onStartRadio: ((TrackSummaryDto) -> Unit)? = null,
     onRipClick: ((TrackSummaryDto) -> Unit)?,
     getArtworkUrl: (TrackSummaryDto) -> String,
     modifier: Modifier = Modifier
@@ -289,8 +338,10 @@ fun QuickPicksCarousel(
             val itemSpacing = 10.dp
             val horizontalInset = 16.dp
             val peekWidth = if (hasPeekItem) 56.dp else 0.dp
-            val gapCount = if (hasPeekItem) fullCardsVisible else (fullCardsVisible - 1).coerceAtLeast(0)
-            val availableHeroWidth = maxWidth - horizontalInset * 2 - itemSpacing * gapCount - peekWidth
+            val gapCount =
+                if (hasPeekItem) fullCardsVisible else (fullCardsVisible - 1).coerceAtLeast(0)
+            val availableHeroWidth =
+                maxWidth - horizontalInset * 2 - itemSpacing * gapCount - peekWidth
             val heroMaxWidth = (availableHeroWidth.value / fullCardsVisible).dp
                 .coerceAtLeast(232.dp)
                 .coerceAtMost(440.dp)
@@ -326,6 +377,15 @@ fun QuickPicksCarousel(
                         onClick = {
                             if (track.is_cached) onTrackClick(track) else onRipClick?.invoke(track)
                         },
+                        onPlayNext = onPlayNext?.takeIf { track.is_cached }?.let { action ->
+                            { action(track) }
+                        },
+                        onAddToQueue = onAddToQueue?.takeIf { track.is_cached }?.let { action ->
+                            { action(track) }
+                        },
+                        onStartRadio = onStartRadio?.takeIf { track.is_cached }?.let { action ->
+                            { action(track) }
+                        },
                         canActivate = track.is_cached || onRipClick != null,
                         modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge)
                     )
@@ -341,9 +401,13 @@ fun QuickPickCard(
     artworkUrl: String,
     isPlaying: Boolean,
     onClick: () -> Unit,
+    onPlayNext: (() -> Unit)? = null,
+    onAddToQueue: (() -> Unit)? = null,
+    onStartRadio: (() -> Unit)? = null,
     canActivate: Boolean,
     modifier: Modifier = Modifier
 ) {
+    var showTrackMenu by remember(track.id) { mutableStateOf(false) }
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -415,6 +479,41 @@ fun QuickPickCard(
                 overflow = TextOverflow.Ellipsis
             )
 
+        }
+
+        if (onPlayNext != null || onAddToQueue != null || onStartRadio != null) {
+            Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                IconButton(onClick = { showTrackMenu = true }) {
+                    PeerlessIcon(
+                        icon = PeerlessIcons.MoreVert,
+                        contentDescription = "${track.title} options",
+                        tint = MaterialTheme.colorScheme.inverseOnSurface
+                    )
+                }
+                DropdownMenu(
+                    expanded = showTrackMenu,
+                    onDismissRequest = { showTrackMenu = false }
+                ) {
+                    onPlayNext?.let { action ->
+                        DropdownMenuItem(
+                            text = { Text("Play next") },
+                            onClick = { showTrackMenu = false; action() }
+                        )
+                    }
+                    onAddToQueue?.let { action ->
+                        DropdownMenuItem(
+                            text = { Text("Add to queue") },
+                            onClick = { showTrackMenu = false; action() }
+                        )
+                    }
+                    onStartRadio?.let { action ->
+                        DropdownMenuItem(
+                            text = { Text("Start radio") },
+                            onClick = { showTrackMenu = false; action() }
+                        )
+                    }
+                }
+            }
         }
 
         FilledIconButton(
@@ -611,17 +710,13 @@ fun HomeScreenContent(
     val apiClient = LocalPeerlessApiClient.current
     val sessionManager = LocalSessionManager.current
     val lastFmUsername by sessionManager.lastFmUsername.collectAsState()
-    val lastFmConfig by sessionManager.lastFmConfig.collectAsState()
-    val lastFmClient = remember(apiClient, lastFmConfig?.apiKey) {
-        LastFmClient(
-            apiKey = lastFmConfig?.apiKey ?: AppConfig.DEFAULT_LASTFM_API_KEY,
-            httpClient = apiClient.httpClient,
-            enableFallback = false
-        )
+    val homeFeedRepository = LocalHomeFeedRepository.current
+    val libraryCatalogRevision = remember(allTracks) {
+        allTracks.map {
+            "${it.id}|${it.provider}|${it.track_id}|${it.is_cached}|${it.isrc.orEmpty()}"
+        }.sorted()
     }
-    val homeFeedRepository = remember(lastFmClient, apiClient) {
-        HomeFeedRepository(lastFmClient, apiClient)
-    }
+    val latestLibraryTracks by rememberUpdatedState(allTracks)
     var homeFeed by remember(lastFmUsername) {
         mutableStateOf(HomeFeedState(isLoading = !lastFmUsername.isNullOrBlank()))
     }
@@ -633,7 +728,7 @@ fun HomeScreenContent(
         apiClient.baseUrl,
         searchQuery.isBlank(),
         homeFeedRefreshKey,
-        allTracks
+        libraryCatalogRevision
     ) {
         if (searchQuery.isNotBlank()) return@LaunchedEffect
         val username = lastFmUsername
@@ -643,7 +738,7 @@ fun HomeScreenContent(
         }
 
         homeFeed = homeFeed.copy(isLoading = true, hasError = false)
-        homeFeed = homeFeedRepository.load(username, allTracks)
+        homeFeed = homeFeedRepository.load(username, latestLibraryTracks)
     }
 
     LazyColumn(
@@ -668,15 +763,14 @@ fun HomeScreenContent(
                         currentTrackId = currentTrackDto?.id,
                         isPlaying = status == PlaybackStatus.PLAYING,
                         onTrackClick = { clicked ->
-                            if (currentTrackDto?.id == clicked.id) {
-                                playerConnection.togglePlayPause()
-                            } else {
-                                playerConnection.play(
-                                    clicked.toTrack(),
-                                    homeFeed.quickPicks.map { it.track.toTrack() }
-                                )
-                            }
+                            playerConnection.playFromContext(
+                                clicked.toTrack(),
+                                homeFeed.quickPicks.map { it.track.toTrack() }
+                            )
                         },
+                        onPlayNext = { clicked -> playerConnection.playNextInQueue(clicked.toTrack()) },
+                        onAddToQueue = { clicked -> playerConnection.addToQueue(clicked.toTrack()) },
+                        onStartRadio = { clicked -> playerConnection.startRadio(clicked.toTrack()) },
                         onRipClick = onRipClick,
                         getArtworkUrl = { track ->
                             apiClient.getArtworkUrl(track, 300)
@@ -695,7 +789,11 @@ fun HomeScreenContent(
                         onAction = { homeFeedRefreshKey += 1 }
                     )
                 }
-            } else if (homeFeed.quickPicks.isEmpty() && homeFeed.recentTracks.isEmpty()) {
+            } else if (
+                homeFeed.quickPicks.isEmpty() &&
+                homeFeed.recentTracks.isEmpty() &&
+                homeFeed.similarToTaste.isEmpty()
+            ) {
                 item(key = "home_feed_empty") {
                     HomeFeedMessage(
                         message = "Your Last.fm activity will appear here when Peerless finds matching tracks."
@@ -719,27 +817,32 @@ fun HomeScreenContent(
                             isPlaying = currentTrackDto?.id == track.id && status == PlaybackStatus.PLAYING,
                             canonicalTrack = item.canonicalTrack,
                             onTrackClick = { clicked ->
-                                if (currentTrackDto?.id == clicked.id) {
-                                    playerConnection.togglePlayPause()
-                                } else {
-                                    playerConnection.play(
-                                        clicked.toTrack(),
-                                        homeFeed.recentTracks.map { it.track.toTrack() }
-                                    )
-                                }
+                                playerConnection.playFromContext(
+                                    clicked.toTrack(),
+                                    homeFeed.recentTracks.map { it.track.toTrack() }
+                                )
                             },
+                            onPlayNext = if (track.is_cached) {
+                                { clicked -> playerConnection.playNextInQueue(clicked.toTrack()) }
+                            } else null,
+                            onAddToQueue = if (track.is_cached) {
+                                { clicked -> playerConnection.addToQueue(clicked.toTrack()) }
+                            } else null,
+                            onStartRadio = if (track.is_cached) {
+                                { clicked -> playerConnection.startRadio(clicked.toTrack()) }
+                            } else null,
                             onRipClick = onRipClick
                         )
                     }
                 }
             }
 
-            if (homeFeed.newDiscoveries.isNotEmpty()) {
+            if (homeFeed.similarToTaste.isNotEmpty()) {
                 item(key = "related_tracks_header") {
-                    HomeFeedSectionHeader(title = "New discoveries")
+                    HomeFeedSectionHeader(title = "Similar to your taste")
                 }
                 items(
-                    items = homeFeed.newDiscoveries,
+                    items = homeFeed.similarToTaste,
                     key = { "related_${it.track.provider}_${it.track.track_id}" }
                 ) { item ->
                     val track = item.track
@@ -750,15 +853,20 @@ fun HomeScreenContent(
                             isPlaying = currentTrackDto?.id == track.id && status == PlaybackStatus.PLAYING,
                             canonicalTrack = item.canonicalTrack,
                             onTrackClick = { clicked ->
-                                if (currentTrackDto?.id == clicked.id) {
-                                    playerConnection.togglePlayPause()
-                                } else {
-                                    playerConnection.play(
-                                        clicked.toTrack(),
-                                        homeFeed.newDiscoveries.map { it.track.toTrack() }
-                                    )
-                                }
+                                playerConnection.playFromContext(
+                                    clicked.toTrack(),
+                                    homeFeed.similarToTaste.map { it.track.toTrack() }
+                                )
                             },
+                            onPlayNext = if (track.is_cached) {
+                                { clicked -> playerConnection.playNextInQueue(clicked.toTrack()) }
+                            } else null,
+                            onAddToQueue = if (track.is_cached) {
+                                { clicked -> playerConnection.addToQueue(clicked.toTrack()) }
+                            } else null,
+                            onStartRadio = if (track.is_cached) {
+                                { clicked -> playerConnection.startRadio(clicked.toTrack()) }
+                            } else null,
                             onRipClick = onRipClick
                         )
                     }
@@ -773,7 +881,9 @@ fun HomeScreenContent(
                     onShuffle = {
                         if (displayedTracks.isNotEmpty()) {
                             val shuffled = displayedTracks.shuffled()
-                            playerConnection.play(shuffled.first().toTrack(), shuffled.map { it.toTrack() })
+                            playerConnection.play(
+                                shuffled.first().toTrack(),
+                                shuffled.map { it.toTrack() })
                         }
                     },
                     onPlayAll = {
@@ -818,7 +928,9 @@ fun HomeScreenContent(
                                 if (currentTrackDto?.id == clicked.id) {
                                     playerConnection.togglePlayPause()
                                 } else {
-                                    playerConnection.play(clicked.toTrack(), displayedTracks.map { it.toTrack() })
+                                    playerConnection.play(
+                                        clicked.toTrack(),
+                                        displayedTracks.map { it.toTrack() })
                                 }
                             },
                             onRipClick = onRipClick

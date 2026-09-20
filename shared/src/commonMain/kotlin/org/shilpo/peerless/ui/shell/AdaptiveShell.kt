@@ -1,21 +1,63 @@
 package org.shilpo.peerless.ui.shell
 
 
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.WideNavigationRail
+import androidx.compose.material3.WideNavigationRailDefaults
+import androidx.compose.material3.WideNavigationRailItem
+import androidx.compose.material3.WideNavigationRailItemDefaults
+import androidx.compose.material3.WideNavigationRailValue
+import androidx.compose.material3.rememberWideNavigationRailState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,10 +89,32 @@ import org.shilpo.peerless.theme.ExpressiveMotion
 import org.shilpo.peerless.theme.ExpressiveTypography
 import org.shilpo.peerless.theme.LocalWindowWidthSizeClass
 import org.shilpo.peerless.theme.WindowWidthSizeClass
-import org.shilpo.peerless.ui.components.*
+import org.shilpo.peerless.ui.components.FloatingNavigationToolbar
+import org.shilpo.peerless.ui.components.HomeMorphIcon
+import org.shilpo.peerless.ui.components.LibraryMorphIcon
+import org.shilpo.peerless.ui.components.MiniPlayerBar
+import org.shilpo.peerless.ui.components.MiniPlayerBottomSpacing
+import org.shilpo.peerless.ui.components.NavToggleMorphIcon
+import org.shilpo.peerless.ui.components.NavigationBarBottomPadding
+import org.shilpo.peerless.ui.components.NavigationBarHorizontalPadding
+import org.shilpo.peerless.ui.components.NavigationBarMaxWidth
+import org.shilpo.peerless.ui.components.NowPlayingSheet
+import org.shilpo.peerless.ui.components.PeerlessIcon
+import org.shilpo.peerless.ui.components.PeerlessIcons
+import org.shilpo.peerless.ui.components.PersistentBottomPlayer
+import org.shilpo.peerless.ui.components.SearchMorphIcon
+import org.shilpo.peerless.ui.components.ServerSettingsDialog
+import org.shilpo.peerless.ui.components.SettingsMorphIcon
+import org.shilpo.peerless.ui.components.SupportingPaneQuickSwitcherPill
 import org.shilpo.peerless.ui.navigation.NavigationDestination
-import org.shilpo.peerless.ui.screens.*
-import kotlin.ranges.coerceIn
+import org.shilpo.peerless.ui.screens.AuthOnboardingScreen
+import org.shilpo.peerless.ui.screens.HomeScreenContent
+import org.shilpo.peerless.ui.screens.LastFmLoginScreen
+import org.shilpo.peerless.ui.screens.LibraryScreen
+import org.shilpo.peerless.ui.screens.ProfileScreen
+import org.shilpo.peerless.ui.screens.SampleLosslessLibrary
+import org.shilpo.peerless.ui.screens.SearchScreen
+import org.shilpo.peerless.ui.screens.SettingsScreen
 
 @Composable
 fun AdaptiveShell(
@@ -140,7 +204,8 @@ fun AdaptiveShell(
         if (serverTracks.isNotEmpty()) {
             serverTracks
         } else {
-            CanonicalDeduplicator.deduplicateTracks(SampleLosslessLibrary, apiClient.baseUrl).map { it.toSummaryDto() }
+            CanonicalDeduplicator.deduplicateTracks(SampleLosslessLibrary, apiClient.baseUrl)
+                .map { it.toSummaryDto() }
         }
     }
     val displayedTracks = remember(activeLibrary, selectedFilter, searchQuery) {
@@ -246,13 +311,16 @@ fun AdaptiveShell(
                             onSelectDestination = { currentDestination = it },
                             activeSupportingPane = activeSupportingPane,
                             onToggleSupportingPane = { pane ->
-                                activeSupportingPane = if (activeSupportingPane == pane) null else pane
+                                activeSupportingPane =
+                                    if (activeSupportingPane == pane) null else pane
                             },
                             onSelectSupportingPane = { pane ->
                                 activeSupportingPane = pane
                             },
                             supportingPaneWidth = supportingPaneWidth,
-                            onSupportingPaneWidthChange = { supportingPaneWidth = it.coerceIn(280.dp, 560.dp) },
+                            onSupportingPaneWidthChange = {
+                                supportingPaneWidth = it.coerceIn(280.dp, 560.dp)
+                            },
                             playerConnection = playerConnection,
                             currentTrackDto = currentTrackDto,
                             status = status,
@@ -292,7 +360,10 @@ fun AdaptiveShell(
                     ) + fadeIn(),
                     exit = slideOutVertically(
                         targetOffsetY = { it },
-                        animationSpec = tween(300, easing = ExpressiveMotion.EmphasizedAccelerateEasing)
+                        animationSpec = tween(
+                            300,
+                            easing = ExpressiveMotion.EmphasizedAccelerateEasing
+                        )
                     ) + fadeOut()
                 ) {
                     currentTrackDto?.let { trackDto ->
@@ -327,7 +398,10 @@ fun AdaptiveShell(
                     ) + fadeIn(),
                     exit = slideOutVertically(
                         targetOffsetY = { it },
-                        animationSpec = tween(300, easing = ExpressiveMotion.EmphasizedAccelerateEasing)
+                        animationSpec = tween(
+                            300,
+                            easing = ExpressiveMotion.EmphasizedAccelerateEasing
+                        )
                     ) + fadeOut()
                 ) {
                     ProfileScreen(
@@ -1075,7 +1149,6 @@ private fun SupportingPaneContainer(
                         QueuePaneContent(
                             playerConnection = playerConnection,
                             queueDtos = queueDtos,
-                            currentTrackDto = currentTrackDto,
                             status = status
                         )
                     }

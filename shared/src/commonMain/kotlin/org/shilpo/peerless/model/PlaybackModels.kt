@@ -90,5 +90,31 @@ data class PlaybackStateSnapshot(
     val positionMs: Long,
     val shuffleMode: Boolean = false,
     val repeatMode: RepeatMode = RepeatMode.OFF,
-    val isPlaying: Boolean = false
+    val isPlaying: Boolean = false,
+    val queueEntries: List<QueueEntry> = emptyList(),
+    val originalQueueEntries: List<QueueEntry> = emptyList(),
+    val radioSession: RadioSessionSnapshot? = null
+)
+
+@Serializable
+enum class QueueEntrySource {
+    CONTEXT,
+    MANUAL,
+    RADIO_SEED,
+    RADIO_GENERATED
+}
+
+@Serializable
+data class QueueEntry(
+    val entryId: Long,
+    val track: Track,
+    val source: QueueEntrySource = QueueEntrySource.CONTEXT
+)
+
+@Serializable
+data class RadioSessionSnapshot(
+    val sessionId: Long = 0L,
+    val seed: Track,
+    val seedHistory: List<Track> = emptyList(),
+    val seenTrackKeys: List<String> = emptyList()
 )

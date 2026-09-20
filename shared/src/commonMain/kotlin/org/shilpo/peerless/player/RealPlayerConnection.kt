@@ -1,10 +1,34 @@
 package org.shilpo.peerless.player
 
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
-import kotlinx.serialization.json.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.put
 import org.shilpo.peerless.model.PlaybackInfo
 import org.shilpo.peerless.model.PlaybackStateSnapshot
+import org.shilpo.peerless.model.QueueEntry
+import org.shilpo.peerless.model.QueueEntrySource
+import org.shilpo.peerless.model.RadioSessionSnapshot
 import org.shilpo.peerless.model.RepeatMode
 import org.shilpo.peerless.model.Track
 import org.shilpo.peerless.network.PeerlessApiClient
@@ -35,7 +59,15 @@ class RealPlayerConnection(
     private val _isPlaying = MutableStateFlow(false)
     override val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
-    private val originalQueue = mutableListOf<Track>()
+    private var originalQueue: List<QueueEntry> = emptyList()
+
+    private val _queueEntries = MutableStateFlow<List<QueueEntry>>(emptyList())
+    private var nextQueueEntryId = 1L
+    private var radioSession: RadioSessionSnapshot? = null
+    private var nextRadioSessionId = 1L
+    private var radioRecommendationProvider: TrackRecommendationProvider? = null
+    private var radioRefillJob: Job? = null
+    private val radioRefillMutex = kotlinx.coroutines.sync.Mutex()
 
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
     override val queue: StateFlow<List<Track>> = _queue.asStateFlow()
@@ -76,6 +108,53 @@ class RealPlayerConnection(
     override val currentBufferedPositionMs: Long
         get() = _bufferedPositionMs.value
 
+    private fun newQueueEntries(
+        tracks: List<Track>,
+        source: QueueEntrySource = QueueEntrySource.CONTEXT
+    ): List<QueueEntry> = tracks.map { track ->
+        QueueEntry(entryId = nextQueueEntryId++, track = track, source = source)
+    }
+
+    private fun setVisibleQueue(entries: List<QueueEntry>) {
+        _queueEntries.value = entries
+        _queue.value = entries.map { it.track }
+    }
+
+    private fun currentQueueEntry(): QueueEntry? =
+        _queueEntries.value.getOrNull(_currentIndex.value)
+
+    private fun playbackSnapshot(): PlaybackStateSnapshot = PlaybackStateSnapshot(
+        queue = _queue.value,
+        currentIndex = _currentIndex.value,
+        positionMs = _positionMs.value,
+        shuffleMode = _shuffleMode.value,
+        repeatMode = _repeatMode.value,
+        isPlaying = _isPlaying.value,
+        queueEntries = _queueEntries.value,
+        originalQueueEntries = originalQueue,
+        radioSession = radioSession
+    )
+
+    private fun restoreQueueState(snapshot: PlaybackStateSnapshot) {
+        val visibleEntries = snapshot.queueEntries
+            .takeIf { it.size == snapshot.queue.size }
+            ?: newQueueEntries(snapshot.queue)
+        val naturalEntries = snapshot.originalQueueEntries
+            .takeIf { it.isNotEmpty() }
+            ?: visibleEntries
+        originalQueue = naturalEntries
+        setVisibleQueue(visibleEntries)
+        nextQueueEntryId = (visibleEntries + naturalEntries).maxOfOrNull { it.entryId }
+            ?.plus(1L) ?: nextQueueEntryId
+        radioSession = snapshot.radioSession
+        nextRadioSessionId = maxOf(nextRadioSessionId, (radioSession?.sessionId ?: 0L) + 1L)
+    }
+
+    override fun configureRadioRecommendations(provider: TrackRecommendationProvider?) {
+        radioRecommendationProvider = provider
+        if (provider != null) scheduleRadioRefill()
+    }
+
     private var loadJob: Job? = null
     private var preloadJob: Job? = null
     private var saveDebounceJob: Job? = null
@@ -98,7 +177,7 @@ class RealPlayerConnection(
                 if (snapshot != null && !sync.isSelfActiveDevice.value) {
                     val remoteTrack = snapshot.queue.getOrNull(snapshot.currentIndex)
                     _currentTrack.value = remoteTrack
-                    _queue.value = snapshot.queue
+                    restoreQueueState(snapshot)
                     _currentIndex.value = snapshot.currentIndex
                     _positionMs.value = snapshot.positionMs
                     _durationMs.value = remoteTrack?.durationMs ?: 0L
@@ -137,6 +216,52 @@ class RealPlayerConnection(
                                 if (snapshot.positionMs > 0L) seekTo(snapshot.positionMs)
                             }
                         }
+
+                        "play_context" -> {
+                            val snapshot = cmd.data?.let {
+                                runCatching { Json.decodeFromJsonElement<PlaybackStateSnapshot>(it) }
+                                    .getOrNull()
+                            }
+                            val track = snapshot?.queue?.getOrNull(snapshot.currentIndex)
+                            if (snapshot != null && track != null) {
+                                playFromContext(track, snapshot.queue)
+                            }
+                        }
+
+                        "select_queue_item" -> {
+                            val index = cmd.data?.jsonPrimitive?.intOrNull ?: return@collect
+                            playQueueItem(index)
+                        }
+
+                        "start_radio" -> {
+                            val track = cmd.data?.let {
+                                runCatching { Json.decodeFromJsonElement<Track>(it) }.getOrNull()
+                            } ?: return@collect
+                            startRadio(track)
+                        }
+
+                        "queue_add", "queue_play_next" -> {
+                            val track = cmd.data?.let {
+                                runCatching { Json.decodeFromJsonElement<Track>(it) }.getOrNull()
+                            } ?: return@collect
+                            if (cmd.action == "queue_add") addToQueue(track) else playNextInQueue(
+                                track
+                            )
+                        }
+
+                        "queue_move" -> {
+                            val data = cmd.data as? JsonObject ?: return@collect
+                            val from = data["from"]?.jsonPrimitive?.intOrNull ?: return@collect
+                            val to = data["to"]?.jsonPrimitive?.intOrNull ?: return@collect
+                            moveInQueue(from, to)
+                        }
+
+                        "queue_remove" -> {
+                            val index = cmd.data?.jsonPrimitive?.intOrNull ?: return@collect
+                            removeAt(index)
+                        }
+
+                        "queue_clear" -> clearQueue()
                     }
                 }
             }
@@ -147,6 +272,7 @@ class RealPlayerConnection(
             sync.isSelfActiveDevice
                 .drop(1)
                 .collect { isActive ->
+                    if (!isActive) radioRefillJob?.cancel()
                     if (isActive && _isPlaying.value && audioEngine.state.value.status != PlaybackStatus.PLAYING) {
                         val track = _currentTrack.value ?: return@collect
                         val resumePosition = _positionMs.value
@@ -161,6 +287,7 @@ class RealPlayerConnection(
                             audioEngine.seekTo(resumePosition)
                         }
                     }
+                    if (isActive) scheduleRadioRefill()
                 }
         }
     }
@@ -169,16 +296,7 @@ class RealPlayerConnection(
         val sync = syncManager ?: return
         if (sync.isSelfActiveDevice.value) {
             scope.launch {
-                sync.reportState(
-                    PlaybackStateSnapshot(
-                        queue = _queue.value,
-                        currentIndex = _currentIndex.value,
-                        positionMs = _positionMs.value,
-                        shuffleMode = _shuffleMode.value,
-                        repeatMode = _repeatMode.value,
-                        isPlaying = _isPlaying.value
-                    )
-                )
+                sync.reportState(playbackSnapshot())
             }
         }
     }
@@ -212,7 +330,8 @@ class RealPlayerConnection(
                 } else if (engBuffered > 0L) {
                     _bufferedPositionMs.value = maxOf(engBuffered, engState.positionMs)
                 } else if (engState.positionMs > 0L) {
-                    _bufferedPositionMs.value = maxOf(_bufferedPositionMs.value, engState.positionMs)
+                    _bufferedPositionMs.value =
+                        maxOf(_bufferedPositionMs.value, engState.positionMs)
                 }
 
                 if (engState.status == PlaybackStatus.COMPLETED) {
@@ -289,14 +408,17 @@ class RealPlayerConnection(
         val nextIdx = getNextIndex()
         if (nextIdx != null) {
             _currentIndex.value = nextIdx
-            val track = q[nextIdx]
+            val entry = _queueEntries.value[nextIdx]
+            val track = entry.track
             _currentTrack.value = track
+            recordRadioSeed(entry)
             _positionMs.value = 0L
             _durationMs.value = track.durationMs
             updateSkipFlags()
             preloadNextTrack()
             scheduleSave()
             notifySyncState()
+            scheduleRadioRefill()
         }
     }
 
@@ -304,20 +426,13 @@ class RealPlayerConnection(
         val snapshot = storage.loadState() ?: return
         if (snapshot.queue.isEmpty()) return
 
-        originalQueue.clear()
-        originalQueue.addAll(snapshot.queue)
+        restoreQueueState(snapshot)
 
         _shuffleMode.value = snapshot.shuffleMode
         _repeatMode.value = snapshot.repeatMode
 
-        if (snapshot.shuffleMode) {
-            val shuffled = snapshot.queue.shuffled()
-            _queue.value = shuffled
-            _currentIndex.value = snapshot.currentIndex.coerceIn(0, (shuffled.size - 1).coerceAtLeast(0))
-        } else {
-            _queue.value = snapshot.queue
-            _currentIndex.value = snapshot.currentIndex.coerceIn(0, (snapshot.queue.size - 1).coerceAtLeast(0))
-        }
+        _currentIndex.value =
+            snapshot.currentIndex.coerceIn(0, (_queue.value.size - 1).coerceAtLeast(0))
 
         val track = _queue.value.getOrNull(_currentIndex.value)
         _currentTrack.value = track
@@ -346,6 +461,7 @@ class RealPlayerConnection(
                 }
             }
         }
+        scheduleRadioRefill()
     }
 
     private fun handlePlaybackCompleted() {
@@ -357,64 +473,223 @@ class RealPlayerConnection(
         }
     }
 
-    override fun play(track: Track, queue: List<Track>) {
+    override fun play(track: Track, queue: List<Track>) = replaceQueueContext(
+        track = track,
+        queue = queue,
+        toggleIfCurrent = true
+    )
+
+    override fun playFromContext(track: Track, queue: List<Track>) = replaceQueueContext(
+        track = track,
+        queue = queue,
+        toggleIfCurrent = false
+    )
+
+    private fun replaceQueueContext(track: Track, queue: List<Track>, toggleIfCurrent: Boolean) {
+        val effectiveQueue = queue.ifEmpty { listOf(track) }
+        val selectedIndex = effectiveQueue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
+        val entries = effectiveQueue.map { queuedTrack ->
+            QueueEntry(
+                entryId = nextQueueEntryId++,
+                track = queuedTrack,
+                source = QueueEntrySource.CONTEXT
+            )
+        }
         if (syncManager?.isSelfActiveDevice?.value == false) {
-            val effectiveQueue = queue.ifEmpty { listOf(track) }
-            val selectedIndex = effectiveQueue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
             val snapshot = PlaybackStateSnapshot(
                 queue = effectiveQueue,
                 currentIndex = selectedIndex,
                 positionMs = 0L,
                 shuffleMode = _shuffleMode.value,
                 repeatMode = _repeatMode.value,
-                isPlaying = true
+                isPlaying = true,
+                queueEntries = entries,
+                originalQueueEntries = entries
             )
             scope.launch {
                 syncManager?.sendCommand(
-                    "select_track",
+                    if (toggleIfCurrent) "select_track" else "play_context",
                     Json.encodeToJsonElement(snapshot)
                 )
             }
             return
         }
-        if (_currentTrack.value?.id == track.id && (_status.value == PlaybackStatus.PLAYING || _status.value == PlaybackStatus.PAUSED)) {
+        val isCurrentTrack = _currentTrack.value?.id == track.id
+        if (toggleIfCurrent && isCurrentTrack &&
+            (_status.value == PlaybackStatus.PLAYING || _status.value == PlaybackStatus.PAUSED)
+        ) {
             togglePlayPause()
             return
         }
-        if (queue.isNotEmpty()) {
-            originalQueue.clear()
-            originalQueue.addAll(queue)
-            if (_shuffleMode.value) {
-                val others = queue.filter { it.id != track.id }.shuffled()
-                _queue.value = listOf(track) + others
-                _currentIndex.value = 0
-            } else {
-                _queue.value = queue
-                val idx = queue.indexOfFirst { it.id == track.id }
-                _currentIndex.value = if (idx >= 0) idx else 0
-            }
+        val keepCurrentPlayback =
+            !toggleIfCurrent && isCurrentTrack && _status.value == PlaybackStatus.PLAYING
+
+        radioRefillJob?.cancel()
+        radioSession = null
+        originalQueue = entries
+        if (_shuffleMode.value) {
+            val selected = entries[selectedIndex]
+            setVisibleQueue(listOf(selected) + entries.filterIndexed { index, _ -> index != selectedIndex }
+                .shuffled())
+            _currentIndex.value = 0
         } else {
-            if (originalQueue.none { it.id == track.id }) {
-                originalQueue.add(track)
-            }
-            if (_queue.value.none { it.id == track.id }) {
-                _queue.update { it + track }
-            }
-            val idx = _queue.value.indexOfFirst { it.id == track.id }
-            _currentIndex.value = if (idx >= 0) idx else 0
+            setVisibleQueue(entries)
+            _currentIndex.value = selectedIndex
         }
 
         _currentTrack.value = track
         updateSkipFlags()
-        startLoadingTrack(track)
+        if (keepCurrentPlayback) {
+            notifySyncState()
+        } else {
+            startLoadingTrack(track)
+        }
         scheduleSave()
     }
+
+    override fun playQueueItem(index: Int) {
+        if (syncManager?.isSelfActiveDevice?.value == false) {
+            scope.launch { syncManager?.sendCommand("select_queue_item", JsonPrimitive(index)) }
+            return
+        }
+        if (index !in _queueEntries.value.indices) return
+        if (index == _currentIndex.value) {
+            togglePlayPause()
+            return
+        }
+        val entry = _queueEntries.value[index]
+        _currentIndex.value = index
+        _currentTrack.value = entry.track
+        recordRadioSeed(entry)
+        updateSkipFlags()
+        startLoadingTrack(entry.track)
+        scheduleSave()
+        scheduleRadioRefill()
+    }
+
+    override fun startRadio(track: Track) {
+        if (syncManager?.isSelfActiveDevice?.value == false) {
+            scope.launch {
+                syncManager?.sendCommand("start_radio", Json.encodeToJsonElement(track))
+            }
+            return
+        }
+
+        val keepCurrentPlayback =
+            _currentTrack.value?.id == track.id && _status.value == PlaybackStatus.PLAYING
+        radioRefillJob?.cancel()
+        val seedEntry = QueueEntry(
+            entryId = nextQueueEntryId++,
+            track = track,
+            source = QueueEntrySource.RADIO_SEED
+        )
+        originalQueue = listOf(seedEntry)
+        setVisibleQueue(originalQueue)
+        _currentIndex.value = 0
+        radioSession = RadioSessionSnapshot(
+            sessionId = nextRadioSessionId++,
+            seed = track,
+            seenTrackKeys = listOf(recommendationTrackKey(track))
+        )
+        _currentTrack.value = track
+        updateSkipFlags()
+        if (keepCurrentPlayback) {
+            notifySyncState()
+        } else {
+            startLoadingTrack(track)
+        }
+        scheduleSave()
+        scheduleRadioRefill()
+    }
+
+    private fun recordRadioSeed(entry: QueueEntry) {
+        if (entry.source != QueueEntrySource.RADIO_GENERATED) return
+        val session = radioSession ?: return
+        radioSession = session.copy(
+            seedHistory = (session.seedHistory.filterNot { it.id == entry.track.id } + entry.track)
+                .takeLast(RADIO_SEED_HISTORY_LIMIT)
+        )
+    }
+
+    private fun scheduleRadioRefill() {
+        if (syncManager?.isSelfActiveDevice?.value == false) return
+        if (radioSession == null || radioRecommendationProvider == null) return
+        if (remainingRadioTracks() >= RADIO_LOW_WATER_MARK) return
+        if (radioRefillJob?.isActive == true) return
+
+        radioRefillJob = scope.launch {
+            radioRefillMutex.withLock {
+                val session = radioSession ?: return@withLock
+                val provider = radioRecommendationProvider ?: return@withLock
+                if (remainingRadioTracks() >= RADIO_LOW_WATER_MARK) return@withLock
+
+                val currentIsRadioGenerated =
+                    currentQueueEntry()?.source == QueueEntrySource.RADIO_GENERATED
+                val seed = if (currentIsRadioGenerated) {
+                    _currentTrack.value ?: session.seedHistory.lastOrNull() ?: session.seed
+                } else {
+                    session.seedHistory.lastOrNull() ?: session.seed
+                }
+                val excludedKeys = buildSet {
+                    addAll(session.seenTrackKeys)
+                    _queueEntries.value.forEach { add(recommendationTrackKey(it.track)) }
+                }
+                val recommendations = try {
+                    provider.recommend(seed, excludedKeys, RADIO_BATCH_SIZE)
+                        .distinctBy(::recommendationTrackKey)
+                        .filterNot { recommendationTrackKey(it) in excludedKeys }
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Throwable) {
+                    emptyList()
+                }
+                if (syncManager?.isSelfActiveDevice?.value == false) return@withLock
+                val currentSession = radioSession
+                    ?.takeIf { it.sessionId == session.sessionId }
+                    ?: return@withLock
+                val currentExcludedKeys = buildSet {
+                    addAll(currentSession.seenTrackKeys)
+                    _queueEntries.value.forEach { add(recommendationTrackKey(it.track)) }
+                }
+                val freshRecommendations = recommendations
+                    .filterNot { recommendationTrackKey(it) in currentExcludedKeys }
+                if (freshRecommendations.isEmpty()) return@withLock
+
+                val additions = freshRecommendations.map { track ->
+                    QueueEntry(
+                        entryId = nextQueueEntryId++,
+                        track = track,
+                        source = QueueEntrySource.RADIO_GENERATED
+                    )
+                }
+                originalQueue = originalQueue + additions
+                val visibleQueue =
+                    _queueEntries.value + if (_shuffleMode.value) additions.shuffled() else additions
+                setVisibleQueue(visibleQueue)
+                radioSession = currentSession.copy(
+                    seenTrackKeys = (currentSession.seenTrackKeys + freshRecommendations.map(::recommendationTrackKey))
+                        .distinct()
+                        .takeLast(RADIO_SEEN_HISTORY_LIMIT)
+                )
+                updateSkipFlags()
+                preloadNextTrack()
+                scheduleSave()
+            }
+        }
+    }
+
+    private fun remainingRadioTracks(): Int = _queueEntries.value
+        .withIndex()
+        .count { (index, entry) ->
+            index > _currentIndex.value && entry.source == QueueEntrySource.RADIO_GENERATED
+        }
 
     private fun startLoadingTrack(track: Track) {
         _status.value = PlaybackStatus.BUFFERING
         _positionMs.value = 0L
         _durationMs.value = track.durationMs
-        _bufferedPositionMs.value = if (track.isCached && track.durationMs > 0L) track.durationMs else 0L
+        _bufferedPositionMs.value =
+            if (track.isCached && track.durationMs > 0L) track.durationMs else 0L
         notifySyncState()
         loadJob?.cancel()
         preloadJob?.cancel()
@@ -457,7 +732,10 @@ class RealPlayerConnection(
     private suspend fun resolveStreamUrl(track: Track): String {
         val ticketResult = apiClient.getPlaybackInfo(track.id)
         val playbackInfo = ticketResult.getOrNull() ?: return ""
-        return if (playbackInfo.stream_url.startsWith("http://") || playbackInfo.stream_url.startsWith("https://")) {
+        return if (playbackInfo.stream_url.startsWith("http://") || playbackInfo.stream_url.startsWith(
+                "https://"
+            )
+        ) {
             playbackInfo.stream_url
         } else {
             "${apiClient.baseUrl}${playbackInfo.stream_url}"
@@ -540,11 +818,14 @@ class RealPlayerConnection(
         val nextIdx = getNextIndex()
         if (nextIdx != null) {
             _currentIndex.value = nextIdx
-            val track = q[nextIdx]
+            val entry = _queueEntries.value[nextIdx]
+            val track = entry.track
             _currentTrack.value = track
+            recordRadioSeed(entry)
             updateSkipFlags()
             startLoadingTrack(track)
             scheduleSave()
+            scheduleRadioRefill()
         } else {
             if (autoTriggered) {
                 _status.value = PlaybackStatus.IDLE
@@ -590,11 +871,14 @@ class RealPlayerConnection(
 
         if (prevIdx != null) {
             _currentIndex.value = prevIdx
-            val track = q[prevIdx]
+            val entry = _queueEntries.value[prevIdx]
+            val track = entry.track
             _currentTrack.value = track
+            recordRadioSeed(entry)
             updateSkipFlags()
             startLoadingTrack(track)
             scheduleSave()
+            scheduleRadioRefill()
         } else {
             audioEngine.seekTo(0L)
             _positionMs.value = 0L
@@ -632,23 +916,32 @@ class RealPlayerConnection(
         if (_shuffleMode.value == enabled) return
         _shuffleMode.value = enabled
 
-        val current = _currentTrack.value
+        val currentEntryId = currentQueueEntry()?.entryId
         if (enabled) {
-            val list = originalQueue.toMutableList()
-            if (current != null) {
-                list.remove(current)
-                list.shuffle()
-                list.add(0, current)
-                _queue.value = list
+            val entries = originalQueue
+            val currentEntry = entries.firstOrNull { it.entryId == currentEntryId }
+            if (currentEntry != null && radioSession != null) {
+                val remaining = entries.filterNot { it.entryId == currentEntry.entryId }
+                val contextAndManual = remaining
+                    .filterNot { it.source == QueueEntrySource.RADIO_GENERATED }
+                    .shuffled()
+                val generated = remaining
+                    .filter { it.source == QueueEntrySource.RADIO_GENERATED }
+                    .shuffled()
+                setVisibleQueue(listOf(currentEntry) + contextAndManual + generated)
+                _currentIndex.value = 0
+            } else if (currentEntry != null) {
+                val shuffled = entries.filterNot { it.entryId == currentEntry.entryId }.shuffled()
+                setVisibleQueue(listOf(currentEntry) + shuffled)
                 _currentIndex.value = 0
             } else {
-                list.shuffle()
-                _queue.value = list
+                setVisibleQueue(entries.shuffled())
                 _currentIndex.value = 0
             }
         } else {
-            _queue.value = originalQueue.toList()
-            val idx = if (current != null) originalQueue.indexOfFirst { it.id == current.id } else 0
+            setVisibleQueue(originalQueue)
+            val idx =
+                if (currentEntryId != null) originalQueue.indexOfFirst { it.entryId == currentEntryId } else 0
             _currentIndex.value = if (idx >= 0) idx else 0
         }
         updateSkipFlags()
@@ -677,33 +970,76 @@ class RealPlayerConnection(
     }
 
     override fun addToQueue(track: Track) {
-        originalQueue.add(track)
-        _queue.update { it + track }
+        if (syncManager?.isSelfActiveDevice?.value == false) {
+            scope.launch { syncManager?.sendCommand("queue_add", Json.encodeToJsonElement(track)) }
+            return
+        }
+
+        val entry = QueueEntry(nextQueueEntryId++, track, QueueEntrySource.MANUAL)
+        val naturalInsertIndex =
+            originalQueue.indexOfFirst { it.source == QueueEntrySource.RADIO_GENERATED }
+                .takeIf { it >= 0 } ?: originalQueue.size
+        originalQueue = originalQueue.toMutableList().apply { add(naturalInsertIndex, entry) }
+        val visible = _queueEntries.value.toMutableList()
+        val visibleInsertIndex =
+            visible.indexOfFirst { it.source == QueueEntrySource.RADIO_GENERATED }
+                .takeIf { it >= 0 } ?: visible.size
+        visible.add(visibleInsertIndex, entry)
+        setVisibleQueue(visible)
         updateSkipFlags()
         preloadNextTrack()
         scheduleSave()
+        scheduleRadioRefill()
     }
 
     override fun playNextInQueue(track: Track) {
-        val insertIdx = (_currentIndex.value + 1).coerceIn(0, _queue.value.size)
-        originalQueue.add(insertIdx.coerceIn(0, originalQueue.size), track)
+        if (syncManager?.isSelfActiveDevice?.value == false) {
+            scope.launch {
+                syncManager?.sendCommand(
+                    "queue_play_next",
+                    Json.encodeToJsonElement(track)
+                )
+            }
+            return
+        }
 
-        val updated = _queue.value.toMutableList()
-        updated.add(insertIdx, track)
-        _queue.value = updated
+        val entry = QueueEntry(nextQueueEntryId++, track, QueueEntrySource.MANUAL)
+        val visibleInsertIndex = (_currentIndex.value + 1).coerceIn(0, _queueEntries.value.size)
+        val visible = _queueEntries.value.toMutableList().apply { add(visibleInsertIndex, entry) }
+        setVisibleQueue(visible)
+
+        val currentEntryId = visible.getOrNull(_currentIndex.value)?.entryId
+        val naturalCurrentIndex = originalQueue.indexOfFirst { it.entryId == currentEntryId }
+        val naturalInsertIndex =
+            if (naturalCurrentIndex >= 0) naturalCurrentIndex + 1 else originalQueue.size
+        originalQueue = originalQueue.toMutableList().apply { add(naturalInsertIndex, entry) }
 
         updateSkipFlags()
         preloadNextTrack()
         scheduleSave()
+        scheduleRadioRefill()
     }
 
     override fun moveInQueue(fromIndex: Int, toIndex: Int) {
-        val q = _queue.value.toMutableList()
+        if (syncManager?.isSelfActiveDevice?.value == false) {
+            scope.launch {
+                syncManager?.sendCommand(
+                    "queue_move",
+                    buildJsonObject {
+                        put("from", fromIndex)
+                        put("to", toIndex)
+                    }
+                )
+            }
+            return
+        }
+        val q = _queueEntries.value.toMutableList()
         if (fromIndex !in q.indices || toIndex !in q.indices) return
 
         val moved = q.removeAt(fromIndex)
         q.add(toIndex, moved)
-        _queue.value = q
+        setVisibleQueue(q)
+        originalQueue = q
 
         val cur = _currentIndex.value
         if (cur == fromIndex) {
@@ -717,15 +1053,20 @@ class RealPlayerConnection(
         updateSkipFlags()
         preloadNextTrack()
         scheduleSave()
+        scheduleRadioRefill()
     }
 
     override fun removeAt(index: Int) {
-        val q = _queue.value.toMutableList()
+        if (syncManager?.isSelfActiveDevice?.value == false) {
+            scope.launch { syncManager?.sendCommand("queue_remove", JsonPrimitive(index)) }
+            return
+        }
+        val q = _queueEntries.value.toMutableList()
         if (index !in q.indices) return
 
         val removed = q.removeAt(index)
-        originalQueue.removeAll { it.id == removed.id }
-        _queue.value = q
+        originalQueue = originalQueue.filterNot { it.entryId == removed.entryId }
+        setVisibleQueue(q)
 
         val cur = _currentIndex.value
         if (q.isEmpty()) {
@@ -733,8 +1074,10 @@ class RealPlayerConnection(
         } else if (index == cur) {
             val newIdx = cur.coerceIn(0, q.size - 1)
             _currentIndex.value = newIdx
-            val nextTrack = q[newIdx]
+            val nextEntry = q[newIdx]
+            val nextTrack = nextEntry.track
             _currentTrack.value = nextTrack
+            recordRadioSeed(nextEntry)
             startLoadingTrack(nextTrack)
         } else if (index < cur) {
             _currentIndex.value = cur - 1
@@ -743,16 +1086,36 @@ class RealPlayerConnection(
         updateSkipFlags()
         preloadNextTrack()
         scheduleSave()
+        scheduleRadioRefill()
     }
 
     override fun clearQueue() {
-        originalQueue.clear()
-        _queue.value = emptyList()
-        _currentIndex.value = -1
-        stopAndDismiss()
+        if (syncManager?.isSelfActiveDevice?.value == false) {
+            scope.launch { syncManager?.sendCommand("queue_clear") }
+            return
+        }
+        radioRefillJob?.cancel()
+        radioSession = null
+        val currentEntry = currentQueueEntry()
+        if (currentEntry == null) {
+            originalQueue = emptyList()
+            setVisibleQueue(emptyList())
+            _currentIndex.value = -1
+            stopAndDismiss()
+            return
+        }
+
+        originalQueue = listOf(currentEntry)
+        setVisibleQueue(originalQueue)
+        _currentIndex.value = 0
+        updateSkipFlags()
+        preloadNextTrack()
+        scheduleSave()
     }
 
     override fun stopAndDismiss() {
+        radioRefillJob?.cancel()
+        radioSession = null
         stopTicker()
         loadJob?.cancel()
         preloadJob?.cancel()
@@ -796,16 +1159,16 @@ class RealPlayerConnection(
         saveDebounceJob = scope.launch {
             delay(500)
             val track = _currentTrack.value ?: return@launch
-            val snapshot = PlaybackStateSnapshot(
-                queue = _queue.value,
-                currentIndex = _currentIndex.value,
-                positionMs = currentPositionMs,
-                shuffleMode = _shuffleMode.value,
-                repeatMode = _repeatMode.value,
-                isPlaying = _isPlaying.value
-            )
+            val snapshot = playbackSnapshot().copy(positionMs = currentPositionMs)
             storage.saveState(snapshot)
             notifySyncState()
         }
+    }
+
+    private companion object {
+        const val RADIO_SEED_HISTORY_LIMIT = 6
+        const val RADIO_LOW_WATER_MARK = 4
+        const val RADIO_BATCH_SIZE = 8
+        const val RADIO_SEEN_HISTORY_LIMIT = 500
     }
 }

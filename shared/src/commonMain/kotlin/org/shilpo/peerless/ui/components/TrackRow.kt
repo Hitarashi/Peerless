@@ -1,14 +1,47 @@
 package org.shilpo.peerless.ui.components
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.*
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -123,6 +156,12 @@ fun TrackRow(
     canonicalTrack: CanonicalTrack? = null,
     onSelectSource: ((TrackSource) -> Unit)? = null,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null,
+    onPlayNext: ((TrackSummaryDto) -> Unit)? = null,
+    onAddToQueue: ((TrackSummaryDto) -> Unit)? = null,
+    onStartRadio: ((TrackSummaryDto) -> Unit)? = null,
+    onRemoveFromQueue: (() -> Unit)? = null,
+    onMoveQueueItemUp: (() -> Unit)? = null,
+    onMoveQueueItemDown: (() -> Unit)? = null,
     isFavorite: Boolean? = null,
     onToggleFavorite: ((TrackSummaryDto) -> Unit)? = null,
     isCurrent: Boolean = isPlaying,
@@ -138,26 +177,31 @@ fun TrackRow(
     var selectedSource by remember(canonicalTrack) {
         mutableStateOf(canonicalTrack?.immediatePlaySource() ?: canonicalTrack?.bestSource)
     }
-    val activeSource = selectedSource ?: canonicalTrack?.immediatePlaySource() ?: canonicalTrack?.bestSource
+    val activeSource =
+        selectedSource ?: canonicalTrack?.immediatePlaySource() ?: canonicalTrack?.bestSource
 
     val displayCodec = activeSource?.codec?.raw ?: track.codec
     val displayProvider = activeSource?.provider?.displayName ?: track.provider
     val isTrackCached = activeSource?.isCached ?: track.is_cached
 
-    val hasApple = effectiveSources.any { it.provider.displayName.contains("apple", ignoreCase = true) } ||
-            displayProvider.contains("apple", ignoreCase = true)
-    val hasQobuz = effectiveSources.any { it.provider.displayName.contains("qobuz", ignoreCase = true) } ||
-            displayProvider.contains("qobuz", ignoreCase = true)
+    val hasApple =
+        effectiveSources.any { it.provider.displayName.contains("apple", ignoreCase = true) } ||
+                displayProvider.contains("apple", ignoreCase = true)
+    val hasQobuz =
+        effectiveSources.any { it.provider.displayName.contains("qobuz", ignoreCase = true) } ||
+                displayProvider.contains("qobuz", ignoreCase = true)
     val hasDolby = effectiveSources.any { it.codec == Codec.Ec3 } ||
             activeSource?.codec == Codec.Ec3 ||
             displayCodec.contains("ec-3", ignoreCase = true) ||
             displayCodec.contains("ec3", ignoreCase = true) ||
             displayCodec.contains("atmos", ignoreCase = true)
-    val hasHiRes = effectiveSources.any { (it.bitDepth ?: 16) >= 24 || (it.sampleRate ?: 44100) >= 88200 } ||
-            (activeSource?.bitDepth ?: track.bit_depth ?: 16) >= 24 ||
-            (activeSource?.sampleRate ?: track.sample_rate ?: 44100) >= 88200
+    val hasHiRes =
+        effectiveSources.any { (it.bitDepth ?: 16) >= 24 || (it.sampleRate ?: 44100) >= 88200 } ||
+                (activeSource?.bitDepth ?: track.bit_depth ?: 16) >= 24 ||
+                (activeSource?.sampleRate ?: track.sample_rate ?: 44100) >= 88200
 
     var showAudioDetails by remember { mutableStateOf(false) }
+    var showTrackMenu by remember { mutableStateOf(false) }
 
     if (showAudioDetails) {
         val detailTrack = canonicalTrack?.toSummaryDto(activeSource) ?: track
@@ -417,14 +461,22 @@ fun TrackRow(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        if (source.provider.displayName.contains("apple", ignoreCase = true)) {
+                                        if (source.provider.displayName.contains(
+                                                "apple",
+                                                ignoreCase = true
+                                            )
+                                        ) {
                                             PeerlessIcon(
                                                 icon = PeerlessIcons.AppleLogo,
                                                 contentDescription = "Apple Music",
                                                 tint = colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                                                 modifier = Modifier.size(12.dp)
                                             )
-                                        } else if (source.provider.displayName.contains("qobuz", ignoreCase = true)) {
+                                        } else if (source.provider.displayName.contains(
+                                                "qobuz",
+                                                ignoreCase = true
+                                            )
+                                        ) {
                                             PeerlessIcon(
                                                 icon = PeerlessIcons.QobuzLogo,
                                                 contentDescription = "Qobuz",
@@ -452,7 +504,8 @@ fun TrackRow(
                                             )
                                         } else {
                                             val isSourceHiRes =
-                                                (source.bitDepth ?: 16) >= 24 || (source.sampleRate ?: 44100) >= 88200
+                                                (source.bitDepth ?: 16) >= 24 || (source.sampleRate
+                                                    ?: 44100) >= 88200
                                             if (isSourceHiRes) {
                                                 PeerlessIcon(
                                                     icon = PeerlessIcons.HiRes,
@@ -462,7 +515,9 @@ fun TrackRow(
                                                 )
                                             }
                                             val specLabel = buildString {
-                                                if (source.bitDepth != null && source.bitDepth >= 24) append("${source.bitDepth}-bit ")
+                                                if (source.bitDepth != null && source.bitDepth >= 24) append(
+                                                    "${source.bitDepth}-bit "
+                                                )
                                                 if (source.sampleRate != null) {
                                                     val khz =
                                                         if (source.sampleRate % 1000 == 0) "${source.sampleRate / 1000}" else "${source.sampleRate / 1000.0}"
@@ -493,7 +548,8 @@ fun TrackRow(
                                     if (onSelectSource != null) {
                                         onSelectSource(source)
                                     } else {
-                                        val sourceSummary = canonicalTrack?.toSummaryDto(source) ?: track
+                                        val sourceSummary =
+                                            canonicalTrack?.toSummaryDto(source) ?: track
                                         onTrackClick(sourceSummary)
                                     }
                                 },
@@ -581,7 +637,15 @@ fun TrackRow(
             }
 
             IconButton(
-                onClick = { showAudioDetails = true },
+                onClick = {
+                    if (onPlayNext != null || onAddToQueue != null || onStartRadio != null ||
+                        onRemoveFromQueue != null || onMoveQueueItemUp != null || onMoveQueueItemDown != null
+                    ) {
+                        showTrackMenu = true
+                    } else {
+                        showAudioDetails = true
+                    }
+                },
                 modifier = Modifier.size(28.dp)
             ) {
                 PeerlessIcon(
@@ -589,6 +653,52 @@ fun TrackRow(
                     contentDescription = "Track options",
                     tint = colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
                     modifier = Modifier.size(16.dp)
+                )
+            }
+            DropdownMenu(
+                expanded = showTrackMenu,
+                onDismissRequest = { showTrackMenu = false }
+            ) {
+                val actionTrack = canonicalTrack?.toSummaryDto(activeSource) ?: track
+                onPlayNext?.let { action ->
+                    DropdownMenuItem(
+                        text = { Text("Play next") },
+                        onClick = { showTrackMenu = false; action(actionTrack) }
+                    )
+                }
+                onAddToQueue?.let { action ->
+                    DropdownMenuItem(
+                        text = { Text("Add to queue") },
+                        onClick = { showTrackMenu = false; action(actionTrack) }
+                    )
+                }
+                onStartRadio?.let { action ->
+                    DropdownMenuItem(
+                        text = { Text("Start radio") },
+                        onClick = { showTrackMenu = false; action(actionTrack) }
+                    )
+                }
+                onMoveQueueItemUp?.let { action ->
+                    DropdownMenuItem(
+                        text = { Text("Move up") },
+                        onClick = { showTrackMenu = false; action() }
+                    )
+                }
+                onMoveQueueItemDown?.let { action ->
+                    DropdownMenuItem(
+                        text = { Text("Move down") },
+                        onClick = { showTrackMenu = false; action() }
+                    )
+                }
+                onRemoveFromQueue?.let { action ->
+                    DropdownMenuItem(
+                        text = { Text("Remove from queue") },
+                        onClick = { showTrackMenu = false; action() }
+                    )
+                }
+                DropdownMenuItem(
+                    text = { Text("Audio details") },
+                    onClick = { showTrackMenu = false; showAudioDetails = true }
                 )
             }
         }
@@ -604,6 +714,12 @@ fun TrackRow(
     modifier: Modifier = Modifier,
     onSelectSource: ((TrackSource) -> Unit)? = null,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null,
+    onPlayNext: ((TrackSummaryDto) -> Unit)? = null,
+    onAddToQueue: ((TrackSummaryDto) -> Unit)? = null,
+    onStartRadio: ((TrackSummaryDto) -> Unit)? = null,
+    onRemoveFromQueue: (() -> Unit)? = null,
+    onMoveQueueItemUp: (() -> Unit)? = null,
+    onMoveQueueItemDown: (() -> Unit)? = null,
     isFavorite: Boolean? = null,
     onToggleFavorite: ((TrackSummaryDto) -> Unit)? = null,
     isCurrent: Boolean = isPlaying,
@@ -611,7 +727,8 @@ fun TrackRow(
     showArtworkOverlay: Boolean = !embedded
 ) {
     val activeSource = canonicalTrack.immediatePlaySource() ?: canonicalTrack.bestSource
-    val summary = remember(canonicalTrack, activeSource) { canonicalTrack.toSummaryDto(activeSource) }
+    val summary =
+        remember(canonicalTrack, activeSource) { canonicalTrack.toSummaryDto(activeSource) }
     TrackRow(
         track = summary,
         artworkUrl = artworkUrl,
@@ -621,6 +738,12 @@ fun TrackRow(
         canonicalTrack = canonicalTrack,
         onSelectSource = onSelectSource,
         onRipClick = onRipClick,
+        onPlayNext = onPlayNext,
+        onAddToQueue = onAddToQueue,
+        onStartRadio = onStartRadio,
+        onRemoveFromQueue = onRemoveFromQueue,
+        onMoveQueueItemUp = onMoveQueueItemUp,
+        onMoveQueueItemDown = onMoveQueueItemDown,
         isFavorite = isFavorite,
         onToggleFavorite = onToggleFavorite,
         isCurrent = isCurrent,
