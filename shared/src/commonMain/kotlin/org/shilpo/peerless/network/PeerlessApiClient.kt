@@ -1,20 +1,55 @@
 package org.shilpo.peerless.network
 
 import androidx.compose.runtime.staticCompositionLocalOf
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
-import io.ktor.utils.io.*
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.delete
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.parameter
+import io.ktor.client.request.post
+import io.ktor.client.request.prepareGet
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.URLBuilder
+import io.ktor.http.contentType
+import io.ktor.http.encodeURLPathPart
+import io.ktor.http.isSuccess
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.LineEnding
+import io.ktor.utils.io.readLine
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
 import org.shilpo.peerless.auth.TokenStorage
 import org.shilpo.peerless.config.AppConfig
-import org.shilpo.peerless.model.*
+import org.shilpo.peerless.model.AlbumSummaryDto
+import org.shilpo.peerless.model.CreatePlaylistRequest
+import org.shilpo.peerless.model.ExchangeRequest
+import org.shilpo.peerless.model.ExchangeResponse
+import org.shilpo.peerless.model.LastFmIntegrationResponse
+import org.shilpo.peerless.model.LastFmLoginRequest
+import org.shilpo.peerless.model.LyricsResponse
+import org.shilpo.peerless.model.MeResponse
+import org.shilpo.peerless.model.PlaybackInfo
+import org.shilpo.peerless.model.PlaylistDto
+import org.shilpo.peerless.model.RefreshRequest
+import org.shilpo.peerless.model.RefreshResponse
+import org.shilpo.peerless.model.RipTaskRequest
+import org.shilpo.peerless.model.RipTaskResponse
+import org.shilpo.peerless.model.SearchResponse
+import org.shilpo.peerless.model.ServerHealthDto
+import org.shilpo.peerless.model.TaskProgressEvent
+import org.shilpo.peerless.model.TrackDetailDto
+import org.shilpo.peerless.model.TrackSummaryDto
 
 fun createDefaultPeerlessHttpClient(): HttpClient = HttpClient {
     install(ContentNegotiation) {
@@ -82,16 +117,17 @@ open class PeerlessApiClient(
         response.body<TrackDetailDto>()
     }
 
-    suspend fun listAlbums(page: Int = 1, limit: Int = 30): Result<List<AlbumSummaryDto>> = runCatching {
-        val response = httpClient.get("$baseUrl/api/v1/albums") {
-            parameter("page", page)
-            parameter("limit", limit)
+    suspend fun listAlbums(page: Int = 1, limit: Int = 30): Result<List<AlbumSummaryDto>> =
+        runCatching {
+            val response = httpClient.get("$baseUrl/api/v1/albums") {
+                parameter("page", page)
+                parameter("limit", limit)
+            }
+            if (!response.status.isSuccess()) {
+                error("List albums failed with status: ${response.status}")
+            }
+            response.body<List<AlbumSummaryDto>>()
         }
-        if (!response.status.isSuccess()) {
-            error("List albums failed with status: ${response.status}")
-        }
-        response.body<List<AlbumSummaryDto>>()
-    }
 
     suspend fun getAlbumTracks(albumId: Int): Result<List<TrackSummaryDto>> = runCatching {
         val response = httpClient.get("$baseUrl/api/v1/albums/$albumId")
@@ -176,13 +212,16 @@ open class PeerlessApiClient(
         return "$baseUrl/api/v1/assets/tracks/$trackId/artwork?size=$size"
     }
 
-    suspend fun getLyrics(trackId: Int): Result<LyricsResponse> = runCatching {
-        val response = httpClient.get("$baseUrl/api/v1/assets/tracks/$trackId/lyrics")
-        if (!response.status.isSuccess()) {
-            error("Get lyrics failed with status: ${response.status}")
+    suspend fun getLyrics(trackId: Int, refresh: Boolean = false): Result<LyricsResponse> =
+        runCatching {
+            val response = httpClient.get("$baseUrl/api/v1/assets/tracks/$trackId/lyrics") {
+                if (refresh) parameter("refresh", true)
+            }
+            if (!response.status.isSuccess()) {
+                error("Get lyrics failed with status: ${response.status}")
+            }
+            response.body<LyricsResponse>()
         }
-        response.body<LyricsResponse>()
-    }
 
     open suspend fun createRipTask(
         provider: String,
@@ -204,69 +243,70 @@ open class PeerlessApiClient(
         response.body<RipTaskResponse>()
     }
 
-    open fun streamTaskEvents(taskId: String, token: String? = null): Flow<TaskProgressEvent> = flow {
-        val authToken = resolveToken(token)
-        try {
-            val statement = httpClient.prepareGet("$baseUrl/api/v1/tasks/$taskId/events") {
-                header(HttpHeaders.Accept, "text/event-stream")
-                if (!authToken.isNullOrBlank()) {
-                    header(HttpHeaders.Authorization, "Bearer $authToken")
-                }
-            }
-            statement.execute { response ->
-                if (!response.status.isSuccess()) {
-                    emit(
-                        TaskProgressEvent(
-                            task_id = taskId,
-                            stage = "failed",
-                            completed = true,
-                            error = "SSE connection failed with status: ${response.status}"
-                        )
-                    )
-                    return@execute
-                }
-                val channel: ByteReadChannel = response.body()
-                while (true) {
-                    val line = channel.readLine(lineEnding = LineEnding.Lenient) ?: break
-                    val trimmed = line.trim()
-                    if (trimmed.isEmpty() || trimmed.startsWith(":") || trimmed.contains(
-                            "keep-alive",
-                            ignoreCase = true
-                        )
-                    ) {
-                        continue
+    open fun streamTaskEvents(taskId: String, token: String? = null): Flow<TaskProgressEvent> =
+        flow {
+            val authToken = resolveToken(token)
+            try {
+                val statement = httpClient.prepareGet("$baseUrl/api/v1/tasks/$taskId/events") {
+                    header(HttpHeaders.Accept, "text/event-stream")
+                    if (!authToken.isNullOrBlank()) {
+                        header(HttpHeaders.Authorization, "Bearer $authToken")
                     }
-                    if (trimmed.startsWith("data:")) {
-                        val jsonStr = trimmed.removePrefix("data:").trim()
-                        if (jsonStr.isNotEmpty()) {
-                            val event = try {
-                                json.decodeFromString<TaskProgressEvent>(jsonStr)
-                            } catch (e: Exception) {
-                                null
-                            }
-                            if (event != null) {
-                                emit(event)
-                                if (event.isFinished) {
-                                    break
+                }
+                statement.execute { response ->
+                    if (!response.status.isSuccess()) {
+                        emit(
+                            TaskProgressEvent(
+                                task_id = taskId,
+                                stage = "failed",
+                                completed = true,
+                                error = "SSE connection failed with status: ${response.status}"
+                            )
+                        )
+                        return@execute
+                    }
+                    val channel: ByteReadChannel = response.body()
+                    while (true) {
+                        val line = channel.readLine(lineEnding = LineEnding.Lenient) ?: break
+                        val trimmed = line.trim()
+                        if (trimmed.isEmpty() || trimmed.startsWith(":") || trimmed.contains(
+                                "keep-alive",
+                                ignoreCase = true
+                            )
+                        ) {
+                            continue
+                        }
+                        if (trimmed.startsWith("data:")) {
+                            val jsonStr = trimmed.removePrefix("data:").trim()
+                            if (jsonStr.isNotEmpty()) {
+                                val event = try {
+                                    json.decodeFromString<TaskProgressEvent>(jsonStr)
+                                } catch (e: Exception) {
+                                    null
+                                }
+                                if (event != null) {
+                                    emit(event)
+                                    if (event.isFinished) {
+                                        break
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            emit(
-                TaskProgressEvent(
-                    task_id = taskId,
-                    stage = "failed",
-                    completed = true,
-                    error = e.message ?: "Network error during SSE stream"
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                emit(
+                    TaskProgressEvent(
+                        task_id = taskId,
+                        stage = "failed",
+                        completed = true,
+                        error = e.message ?: "Network error during SSE stream"
+                    )
                 )
-            )
+            }
         }
-    }
 
     open suspend fun exchangeOtp(
         code: String,
@@ -275,7 +315,13 @@ open class PeerlessApiClient(
     ): Result<ExchangeResponse> = runCatching {
         val response = httpClient.post("$baseUrl/api/v1/auth/exchange") {
             contentType(ContentType.Application.Json)
-            setBody(ExchangeRequest(code = code.trim(), device_name = deviceName, platform = platform))
+            setBody(
+                ExchangeRequest(
+                    code = code.trim(),
+                    device_name = deviceName,
+                    platform = platform
+                )
+            )
         }
         if (!response.status.isSuccess()) {
             error("Exchange code failed with status: ${response.status}")
@@ -285,20 +331,21 @@ open class PeerlessApiClient(
         exchangeResp
     }
 
-    open suspend fun refreshToken(refreshToken: String? = null): Result<RefreshResponse> = runCatching {
-        val currentToken = resolveToken(refreshToken)
-            ?: error("No refresh token available")
-        val response = httpClient.post("$baseUrl/api/v1/auth/refresh") {
-            contentType(ContentType.Application.Json)
-            setBody(RefreshRequest(refresh_token = currentToken))
+    open suspend fun refreshToken(refreshToken: String? = null): Result<RefreshResponse> =
+        runCatching {
+            val currentToken = resolveToken(refreshToken)
+                ?: error("No refresh token available")
+            val response = httpClient.post("$baseUrl/api/v1/auth/refresh") {
+                contentType(ContentType.Application.Json)
+                setBody(RefreshRequest(refresh_token = currentToken))
+            }
+            if (!response.status.isSuccess()) {
+                error("Refresh token failed with status: ${response.status}")
+            }
+            val refreshResp = response.body<RefreshResponse>()
+            tokenStorage?.saveToken(refreshResp.access_token)
+            refreshResp
         }
-        if (!response.status.isSuccess()) {
-            error("Refresh token failed with status: ${response.status}")
-        }
-        val refreshResp = response.body<RefreshResponse>()
-        tokenStorage?.saveToken(refreshResp.access_token)
-        refreshResp
-    }
 
     open suspend fun logout(refreshToken: String? = null): Result<Unit> = runCatching {
         val currentToken = resolveToken(refreshToken)
@@ -330,16 +377,17 @@ open class PeerlessApiClient(
         response.body<ServerHealthDto>()
     }
 
-    open suspend fun getFavorites(token: String? = null): Result<List<TrackSummaryDto>> = runCatching {
-        val authToken = resolveToken(token) ?: error("Not authenticated")
-        val response = httpClient.get("$baseUrl/api/v1/me/favorites") {
-            header(HttpHeaders.Authorization, "Bearer $authToken")
+    open suspend fun getFavorites(token: String? = null): Result<List<TrackSummaryDto>> =
+        runCatching {
+            val authToken = resolveToken(token) ?: error("Not authenticated")
+            val response = httpClient.get("$baseUrl/api/v1/me/favorites") {
+                header(HttpHeaders.Authorization, "Bearer $authToken")
+            }
+            if (!response.status.isSuccess()) {
+                error("Get favorites failed with status: ${response.status}")
+            }
+            response.body<List<TrackSummaryDto>>()
         }
-        if (!response.status.isSuccess()) {
-            error("Get favorites failed with status: ${response.status}")
-        }
-        response.body<List<TrackSummaryDto>>()
-    }
 
     suspend fun addFavorite(trackId: Int, token: String? = null): Result<Unit> = runCatching {
         val authToken = resolveToken(token) ?: error("Not authenticated")
@@ -372,18 +420,19 @@ open class PeerlessApiClient(
         response.body<List<PlaylistDto>>()
     }
 
-    suspend fun createPlaylist(name: String, token: String? = null): Result<PlaylistDto> = runCatching {
-        val authToken = resolveToken(token) ?: error("Not authenticated")
-        val response = httpClient.post("$baseUrl/api/v1/me/playlists") {
-            contentType(ContentType.Application.Json)
-            header(HttpHeaders.Authorization, "Bearer $authToken")
-            setBody(CreatePlaylistRequest(name = name))
+    suspend fun createPlaylist(name: String, token: String? = null): Result<PlaylistDto> =
+        runCatching {
+            val authToken = resolveToken(token) ?: error("Not authenticated")
+            val response = httpClient.post("$baseUrl/api/v1/me/playlists") {
+                contentType(ContentType.Application.Json)
+                header(HttpHeaders.Authorization, "Bearer $authToken")
+                setBody(CreatePlaylistRequest(name = name))
+            }
+            if (!response.status.isSuccess()) {
+                error("Create playlist failed with status: ${response.status}")
+            }
+            response.body<PlaylistDto>()
         }
-        if (!response.status.isSuccess()) {
-            error("Create playlist failed with status: ${response.status}")
-        }
-        response.body<PlaylistDto>()
-    }
 
     open suspend fun loginLastFm(
         username: String,
@@ -403,16 +452,17 @@ open class PeerlessApiClient(
         response.body<LastFmIntegrationResponse>()
     }
 
-    open suspend fun getLastFmStatus(token: String? = null): Result<LastFmIntegrationResponse> = runCatching {
-        val authToken = resolveToken(token) ?: error("Not authenticated")
-        val response = httpClient.get("$baseUrl/api/v1/integrations/lastfm/status") {
-            header(HttpHeaders.Authorization, "Bearer $authToken")
+    open suspend fun getLastFmStatus(token: String? = null): Result<LastFmIntegrationResponse> =
+        runCatching {
+            val authToken = resolveToken(token) ?: error("Not authenticated")
+            val response = httpClient.get("$baseUrl/api/v1/integrations/lastfm/status") {
+                header(HttpHeaders.Authorization, "Bearer $authToken")
+            }
+            if (!response.status.isSuccess()) {
+                error("Get Last.fm status failed with status: ${response.status}")
+            }
+            response.body<LastFmIntegrationResponse>()
         }
-        if (!response.status.isSuccess()) {
-            error("Get Last.fm status failed with status: ${response.status}")
-        }
-        response.body<LastFmIntegrationResponse>()
-    }
 
     open suspend fun disconnectLastFm(token: String? = null): Result<Unit> = runCatching {
         val authToken = resolveToken(token) ?: error("Not authenticated")

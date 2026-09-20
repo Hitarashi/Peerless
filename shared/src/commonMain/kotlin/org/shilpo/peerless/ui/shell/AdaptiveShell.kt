@@ -79,6 +79,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.shilpo.peerless.auth.LocalSessionManager
 import org.shilpo.peerless.auth.SessionState
+import org.shilpo.peerless.lyrics.LyricsLoader
 import org.shilpo.peerless.model.CanonicalDeduplicator
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.network.LocalPeerlessApiClient
@@ -122,6 +123,7 @@ fun AdaptiveShell(
 ) {
     val playerConnection = LocalPlayerConnection.current
     val apiClient = LocalPeerlessApiClient.current
+    val currentServerUrl by apiClient.baseUrlState.collectAsState()
     val sessionManager = LocalSessionManager.current
     val sessionState by sessionManager.sessionState.collectAsState()
     val hasCredentials = sessionManager.hasSavedCredentials()
@@ -145,6 +147,11 @@ fun AdaptiveShell(
 
     val currentTrack by playerConnection.currentTrack.collectAsState()
     val currentTrackDto = currentTrack?.toSummaryDto()
+    val lyricsScope = rememberCoroutineScope()
+    val lyricsLoader = remember(apiClient, lyricsScope) { LyricsLoader(apiClient, lyricsScope) }
+    LaunchedEffect(currentTrackDto?.id, currentServerUrl) {
+        lyricsLoader.selectTrack(currentTrackDto?.id, currentServerUrl)
+    }
     val status by playerConnection.status.collectAsState()
     val isPlaying by playerConnection.isPlaying.collectAsState()
     val queue by playerConnection.queue.collectAsState()
@@ -155,6 +162,7 @@ fun AdaptiveShell(
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
     val volume by playerConnection.volume.collectAsState()
     val positionMs by playerConnection.positionMs.collectAsState()
+    val spectrumFrame by playerConnection.spectrum.collectAsState()
     val durationMs by playerConnection.durationMs.collectAsState()
     val bufferedPositionMs by playerConnection.bufferedPositionMs.collectAsState()
 
@@ -323,6 +331,7 @@ fun AdaptiveShell(
                             },
                             playerConnection = playerConnection,
                             currentTrackDto = currentTrackDto,
+                            lyricsLoader = lyricsLoader,
                             status = status,
                             serverConnected = serverConnected,
                             searchQuery = searchQuery,
@@ -369,13 +378,14 @@ fun AdaptiveShell(
                     currentTrackDto?.let { trackDto ->
                         NowPlayingSheet(
                             track = trackDto,
+                            lyricsLoader = lyricsLoader,
                             playbackInfo = playerConnection.playbackInfo.collectAsState().value,
                             status = status,
                             positionMs = positionMs,
                             durationMs = durationMs,
                             bufferedPositionMs = bufferedPositionMs,
                             artworkUrl = apiClient.getArtworkUrl(trackDto, 600),
-                            serverUrl = apiClient.baseUrl,
+                            serverUrl = currentServerUrl,
                             onTogglePlayPause = { playerConnection.togglePlayPause() },
                             onSeekTo = { pos -> playerConnection.seekTo(pos) },
                             onPlayNext = { playerConnection.playNext() },
@@ -385,7 +395,8 @@ fun AdaptiveShell(
                             isShuffle = shuffleMode,
                             onToggleShuffle = { playerConnection.toggleShuffle() },
                             repeatMode = repeatMode,
-                            onToggleRepeat = { playerConnection.cycleRepeatMode() }
+                            onToggleRepeat = { playerConnection.cycleRepeatMode() },
+                            spectrumFrame = spectrumFrame
                         )
                     }
                 }
@@ -632,6 +643,7 @@ private fun ExpandedLayout(
     onSupportingPaneWidthChange: (Dp) -> Unit = {},
     playerConnection: PlayerConnection,
     currentTrackDto: TrackSummaryDto?,
+    lyricsLoader: LyricsLoader,
     status: PlaybackStatus,
     serverConnected: Boolean,
     searchQuery: String,
@@ -655,6 +667,7 @@ private fun ExpandedLayout(
     val isRepeat = repeatMode != org.shilpo.peerless.model.RepeatMode.OFF
 
     val positionMs by playerConnection.positionMs.collectAsState()
+    val isPlaying by playerConnection.isPlaying.collectAsState()
     val durationMs by playerConnection.durationMs.collectAsState()
     val bufferedPositionMs by playerConnection.bufferedPositionMs.collectAsState()
 
@@ -744,7 +757,10 @@ private fun ExpandedLayout(
                         paneType = paneType,
                         playerConnection = playerConnection,
                         currentTrackDto = currentTrackDto,
+                        lyricsLoader = lyricsLoader,
+                        positionMs = positionMs,
                         status = status,
+                        isPlaying = isPlaying,
                         onClose = { onToggleSupportingPane(paneType) },
                         onSelectPane = onSelectSupportingPane,
                         currentWidth = supportingPaneWidth,
@@ -1017,7 +1033,10 @@ private fun SupportingPaneContainer(
     paneType: SupportingPaneType,
     playerConnection: PlayerConnection,
     currentTrackDto: TrackSummaryDto?,
+    lyricsLoader: LyricsLoader,
+    positionMs: Long,
     status: PlaybackStatus,
+    isPlaying: Boolean,
     onClose: () -> Unit,
     onSelectPane: (SupportingPaneType) -> Unit,
     currentWidth: Dp,
@@ -1142,7 +1161,7 @@ private fun SupportingPaneContainer(
                         )
                     )
                     .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                    .padding(12.dp)
+                    .padding(if (paneType == SupportingPaneType.LYRICS) 0.dp else 12.dp)
             ) {
                 when (paneType) {
                     SupportingPaneType.QUEUE -> {
@@ -1155,7 +1174,11 @@ private fun SupportingPaneContainer(
 
                     SupportingPaneType.LYRICS -> {
                         LyricsPaneContent(
-                            currentTrack = currentTrackDto
+                            currentTrack = currentTrackDto,
+                            lyricsLoader = lyricsLoader,
+                            positionMs = positionMs,
+                            onSeekTo = playerConnection::seekTo,
+                            isPlaying = isPlaying
                         )
                     }
 

@@ -5,16 +5,42 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
-import androidx.media3.common.*
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.Format
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.Tracks
+import androidx.media3.common.audio.AudioProcessor
+import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.session.MediaSession
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 object AndroidAudioContextHolder {
     @Volatile
@@ -56,6 +82,9 @@ class AndroidAudioEngine(
     private val _signalPath = MutableStateFlow<SignalPathSnapshot?>(null)
     override val signalPath: StateFlow<SignalPathSnapshot?> = _signalPath.asStateFlow()
 
+    private val spectrumAnalyzer = AudioSpectrumAnalyzer()
+    override val spectrum: StateFlow<AudioSpectrumFrame?> = spectrumAnalyzer.frame
+
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val mainHandler = Handler(Looper.getMainLooper())
     private var progressJob: Job? = null
@@ -73,8 +102,18 @@ class AndroidAudioEngine(
             .setUsage(C.USAGE_MEDIA)
             .build()
 
-        val renderersFactory =
-            DefaultRenderersFactory(ctx).setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+        val spectrumProcessor = SpectrumAudioProcessor(spectrumAnalyzer)
+        val renderersFactory = object : DefaultRenderersFactory(ctx) {
+            override fun buildAudioSink(
+                context: Context,
+                enableFloatOutput: Boolean,
+                enableAudioOutputPlaybackParams: Boolean
+            ): AudioSink = DefaultAudioSink.Builder(context)
+                .setEnableFloatOutput(enableFloatOutput)
+                .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
+                .setAudioProcessors(arrayOf(spectrumProcessor))
+                .build()
+        }.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
 
         val player = ExoPlayer.Builder(ctx, renderersFactory)
             .setAudioAttributes(audioAttributes, true)
@@ -116,7 +155,12 @@ class AndroidAudioEngine(
                     status = PlaybackStatus.ERROR,
                     errorMessage = error.message
                 )
-                _events.tryEmit(AudioEngineEvent.Error(error.message ?: "Unknown playback error", error.errorCode))
+                _events.tryEmit(
+                    AudioEngineEvent.Error(
+                        error.message ?: "Unknown playback error",
+                        error.errorCode
+                    )
+                )
                 stopProgressUpdates()
             }
         })
@@ -172,7 +216,7 @@ class AndroidAudioEngine(
             bitRateKbps = bitRate,
             decoder = "Media3 ExoPlayer / AudioTrack (Direct HAL)",
             outputSink = "AudioTrack Direct",
-            isBitPerfect = true,
+            isBitPerfect = false,
             isDolbyAtmos = isAtmos
         )
     }
@@ -237,6 +281,7 @@ class AndroidAudioEngine(
         artworkUrl: String?
     ) {
         currentTitle = title
+        spectrumAnalyzer.reset()
         artworkJob?.cancel()
         mainHandler.post {
             val player = getOrCreatePlayer()
@@ -272,7 +317,10 @@ class AndroidAudioEngine(
                     headers = headers
                 )
             } else {
-                android.util.Log.w("AndroidAudioEngine", "No artwork URL was provided for media session metadata")
+                android.util.Log.w(
+                    "AndroidAudioEngine",
+                    "No artwork URL was provided for media session metadata"
+                )
             }
         }
     }
@@ -320,18 +368,27 @@ class AndroidAudioEngine(
             withContext(Dispatchers.Main) {
                 val index = player.currentMediaItemIndex
                 val currentItem = player.currentMediaItem ?: run {
-                    android.util.Log.w("AndroidAudioEngine", "Media item disappeared before artwork loaded")
+                    android.util.Log.w(
+                        "AndroidAudioEngine",
+                        "Media item disappeared before artwork loaded"
+                    )
                     return@withContext
                 }
                 if (currentItem.localConfiguration?.uri?.toString() != mediaUri) {
-                    android.util.Log.d("AndroidAudioEngine", "Discarding artwork for a no longer active track")
+                    android.util.Log.d(
+                        "AndroidAudioEngine",
+                        "Discarding artwork for a no longer active track"
+                    )
                     return@withContext
                 }
 
                 val metadata = currentItem.mediaMetadata.buildUpon()
                     .setArtworkData(artworkBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
                     .build()
-                player.replaceMediaItem(index, currentItem.buildUpon().setMediaMetadata(metadata).build())
+                player.replaceMediaItem(
+                    index,
+                    currentItem.buildUpon().setMediaMetadata(metadata).build()
+                )
                 android.util.Log.d(
                     "AndroidAudioEngine",
                     "Attached ${artworkBytes.size} bytes of artwork to media session"
@@ -405,6 +462,7 @@ class AndroidAudioEngine(
             AndroidMediaSessionHolder.mediaSession = null
             AndroidMediaSessionHolder.player?.release()
             AndroidMediaSessionHolder.player = null
+            spectrumAnalyzer.reset()
             _state.value = AudioEngineState(status = PlaybackStatus.IDLE)
         }
     }
@@ -415,3 +473,81 @@ class AndroidAudioEngine(
 }
 
 actual fun createAudioEngine(): AudioEngine = AndroidAudioEngine()
+
+@androidx.annotation.OptIn(UnstableApi::class)
+private class SpectrumAudioProcessor(
+    private val analyzer: AudioSpectrumAnalyzer
+) : BaseAudioProcessor() {
+    private var sampleBuffer = FloatArray(0)
+
+    override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
+        val supportedEncoding = inputAudioFormat.encoding in setOf(
+            C.ENCODING_PCM_8BIT,
+            C.ENCODING_PCM_16BIT,
+            C.ENCODING_PCM_24BIT,
+            C.ENCODING_PCM_32BIT,
+            C.ENCODING_PCM_FLOAT
+        )
+        return if (supportedEncoding) inputAudioFormat else AudioProcessor.AudioFormat.NOT_SET
+    }
+
+    override fun queueInput(inputBuffer: ByteBuffer) {
+        val format = inputAudioFormat
+        val frameSize = format.bytesPerFrame
+        val channels = format.channelCount
+        val byteCount = inputBuffer.remaining()
+        if (frameSize > 0 && channels > 0 && format.sampleRate > 0) {
+            val sampleCount = byteCount / (frameSize / channels)
+            if (sampleBuffer.size < sampleCount) sampleBuffer = FloatArray(sampleCount)
+            val sampleView = inputBuffer.duplicate().order(ByteOrder.nativeOrder())
+            var index = 0
+            while (sampleView.remaining() >= frameSize) {
+                repeat(channels) {
+                    sampleBuffer[index++] = readSample(sampleView, format.encoding)
+                }
+            }
+            if (index > 0) {
+                analyzer.acceptInterleavedPcm(
+                    samples = sampleBuffer,
+                    channels = channels,
+                    sampleRate = format.sampleRate,
+                    sampleCount = index
+                )
+            }
+        }
+
+        val output = replaceOutputBuffer(byteCount)
+        output.put(inputBuffer)
+        output.flip()
+    }
+
+    override fun onFlush(streamMetadata: AudioProcessor.StreamMetadata) {
+        analyzer.reset()
+    }
+
+    override fun onReset() {
+        analyzer.reset()
+        sampleBuffer = FloatArray(0)
+    }
+
+    private fun readSample(buffer: ByteBuffer, encoding: Int): Float = when (encoding) {
+        C.ENCODING_PCM_FLOAT -> buffer.float.coerceIn(-1f, 1f)
+        C.ENCODING_PCM_8BIT -> ((buffer.get().toInt() and 0xff) - 128) / 128f
+        C.ENCODING_PCM_16BIT -> buffer.short / 32768f
+        C.ENCODING_PCM_24BIT -> {
+            val first = buffer.get().toInt() and 0xff
+            val second = buffer.get().toInt() and 0xff
+            val third = buffer.get().toInt() and 0xff
+            val value = if (ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN) {
+                first or (second shl 8) or (third shl 16)
+            } else {
+                third or (second shl 8) or (first shl 16)
+            }
+            val signedValue = if (value and 0x800000 != 0) value or -0x1000000 else value
+            signedValue / 8_388_608f
+        }
+
+        C.ENCODING_PCM_32BIT -> buffer.int / 2_147_483_648f
+        else -> 0f
+    }
+}

@@ -10,6 +10,7 @@ interface PlayerConnection {
     val currentTrack: StateFlow<Track?>
     val playbackInfo: StateFlow<PlaybackInfo?>
     val signalPath: StateFlow<SignalPathSnapshot?>
+    val spectrum: StateFlow<AudioSpectrumFrame?> get() = EmptyAudioSpectrum
     val status: StateFlow<PlaybackStatus>
     val isPlaying: StateFlow<Boolean>
     val queue: StateFlow<List<Track>>

@@ -52,6 +52,7 @@ class RealPlayerConnection(
     override val playbackInfo: StateFlow<PlaybackInfo?> = _playbackInfo.asStateFlow()
 
     override val signalPath: StateFlow<SignalPathSnapshot?> = audioEngine.signalPath
+    override val spectrum: StateFlow<AudioSpectrumFrame?> = audioEngine.spectrum
 
     private val _status = MutableStateFlow(PlaybackStatus.IDLE)
     override val status: StateFlow<PlaybackStatus> = _status.asStateFlow()

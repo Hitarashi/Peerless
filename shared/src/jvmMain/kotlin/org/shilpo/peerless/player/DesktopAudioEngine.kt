@@ -1,10 +1,27 @@
 package org.shilpo.peerless.player
 
-import com.sun.jna.*
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import com.sun.jna.Library
+import com.sun.jna.Native
+import com.sun.jna.Platform
+import com.sun.jna.Pointer
+import com.sun.jna.Structure
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import java.io.File
-import java.util.*
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
 @Suppress("FunctionName")
@@ -145,6 +162,9 @@ class DesktopAudioEngine : AudioEngine {
     private val _signalPath = MutableStateFlow<SignalPathSnapshot?>(null)
     override val signalPath: StateFlow<SignalPathSnapshot?> = _signalPath.asStateFlow()
 
+    private val spectrumAnalyzer = AudioSpectrumAnalyzer()
+    override val spectrum: StateFlow<AudioSpectrumFrame?> = spectrumAnalyzer.frame
+
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val isReleased = AtomicBoolean(false)
 
@@ -272,12 +292,14 @@ class DesktopAudioEngine : AudioEngine {
                         updateSignalPathSnapshot()
                         val durSec = getProperty("duration")?.toDoubleOrNull()
                         if (durSec != null) {
-                            _state.value = _state.value.copy(durationMs = (durSec * 1000.0).toLong())
+                            _state.value =
+                                _state.value.copy(durationMs = (durSec * 1000.0).toLong())
                         }
                         if (isPlaying) {
                             setProperty("pause", "no")
                             _state.value = _state.value.copy(status = PlaybackStatus.PLAYING)
                             startProgressUpdates()
+                            startSpectrumCapture()
                         }
                     }
 
@@ -289,6 +311,7 @@ class DesktopAudioEngine : AudioEngine {
                         if (eofReached && playlistPos >= playlistCount - 1 && isPlaying) {
                             isPlaying = false
                             stopProgressUpdates()
+                            stopSpectrumCapture()
                             _state.value = _state.value.copy(status = PlaybackStatus.COMPLETED)
                             _events.emit(AudioEngineEvent.TrackCompleted)
                         }
@@ -338,11 +361,13 @@ class DesktopAudioEngine : AudioEngine {
         if (pauseVal == "yes") {
             isPlaying = false
             stopProgressUpdates()
+            stopSpectrumCapture()
             _state.value = _state.value.copy(status = PlaybackStatus.PAUSED)
         } else if (pauseVal == "no") {
             isPlaying = true
             _state.value = _state.value.copy(status = PlaybackStatus.PLAYING)
             startProgressUpdates()
+            startSpectrumCapture()
         }
 
         val eofVal = getProperty("eof-reached")
@@ -351,6 +376,7 @@ class DesktopAudioEngine : AudioEngine {
             val playlistPos = getProperty("playlist-pos")?.toIntOrNull() ?: 0
             if (playlistPos >= playlistCount - 1) {
                 isPlaying = false
+                stopSpectrumCapture()
                 _state.value = _state.value.copy(status = PlaybackStatus.COMPLETED)
                 scope.launch {
                     _events.emit(AudioEngineEvent.TrackCompleted)
@@ -435,6 +461,9 @@ class DesktopAudioEngine : AudioEngine {
     ) {
         currentTrackTitle = title
         nextPreloadedUrl = null
+        stopSpectrumCapture()
+        spectrumCaptureFailed = false
+        spectrumAnalyzer.reset()
         _state.value = AudioEngineState(status = PlaybackStatus.BUFFERING)
 
         scope.launch {
@@ -472,6 +501,16 @@ class DesktopAudioEngine : AudioEngine {
     }
 
     private var progressJob: Job? = null
+    private var spectrumCaptureJob: Job? = null
+
+    @Volatile
+    private var spectrumCaptureProcess: Process? = null
+
+    @Volatile
+    private var spectrumCaptureFailed = false
+
+    @Volatile
+    private var windowsSpectrumCapture: WindowsSpectrumCapture? = null
 
     private fun startProgressUpdates() {
         if (progressJob?.isActive == true) return
@@ -490,7 +529,9 @@ class DesktopAudioEngine : AudioEngine {
                         cacheDurSec != null && cacheDurSec > 0.0 -> ((timePosSec + cacheDurSec) * 1000.0).toLong()
                             .coerceAtLeast(ms)
 
-                        cacheTimeSec != null && cacheTimeSec > 0.0 -> (cacheTimeSec * 1000.0).toLong().coerceAtLeast(ms)
+                        cacheTimeSec != null && cacheTimeSec > 0.0 -> (cacheTimeSec * 1000.0).toLong()
+                            .coerceAtLeast(ms)
+
                         durMs > 0L && _state.value.bufferedPositionMs >= durMs -> durMs
                         else -> maxOf(ms, _state.value.bufferedPositionMs)
                     }
@@ -512,10 +553,91 @@ class DesktopAudioEngine : AudioEngine {
         progressJob = null
     }
 
+    private fun startSpectrumCapture() {
+        if (spectrumCaptureFailed) return
+        if (Platform.isWindows()) {
+            if (windowsSpectrumCapture != null) return
+            windowsSpectrumCapture = WindowsSpectrumCapture(spectrumAnalyzer) { error ->
+                spectrumCaptureFailed = true
+                System.err.println("Peerless WASAPI spectrum capture unavailable: ${error.message}")
+            }.also(WindowsSpectrumCapture::start)
+            return
+        }
+        if (!Platform.isLinux() || spectrumCaptureJob?.isActive == true) return
+        spectrumCaptureJob = scope.launch(Dispatchers.IO) {
+            val process = runCatching {
+                ProcessBuilder(
+                    "parec",
+                    "--device=@DEFAULT_MONITOR@",
+                    "--format=float32le",
+                    "--rate=48000",
+                    "--channels=2",
+                    "--raw"
+                ).redirectError(ProcessBuilder.Redirect.DISCARD).start()
+            }.getOrElse { error ->
+                spectrumCaptureFailed = true
+                System.err.println("Peerless spectrum capture unavailable: ${error.message}")
+                return@launch
+            }
+            spectrumCaptureProcess = process
+            try {
+                process.inputStream.use { input ->
+                    val bytes = ByteArray(8192 + 8)
+                    var carry = 0
+                    while (isActive && isPlaying) {
+                        val count = input.read(bytes, carry, bytes.size - carry)
+                        if (count < 0) break
+                        if (count == 0) continue
+                        val totalBytes = carry + count
+                        val completeBytes = totalBytes - totalBytes % 8
+                        if (completeBytes > 0) {
+                            val buffer = ByteBuffer.wrap(bytes, 0, completeBytes)
+                                .order(ByteOrder.LITTLE_ENDIAN)
+                            val samples = FloatArray(completeBytes / Float.SIZE_BYTES)
+                            for (index in samples.indices) samples[index] = buffer.float
+                            spectrumAnalyzer.acceptInterleavedPcm(
+                                samples = samples,
+                                channels = 2,
+                                sampleRate = 48_000
+                            )
+                        }
+                        carry = totalBytes - completeBytes
+                        if (carry > 0) bytes.copyInto(
+                            bytes,
+                            destinationOffset = 0,
+                            startIndex = completeBytes,
+                            endIndex = totalBytes
+                        )
+                    }
+                }
+            } catch (error: Throwable) {
+                if (isActive) {
+                    spectrumCaptureFailed = true
+                    System.err.println("Peerless spectrum capture stopped: ${error.message}")
+                }
+            } finally {
+                if (spectrumCaptureProcess === process) spectrumCaptureProcess = null
+                process.destroy()
+            }
+        }
+    }
+
+    private fun stopSpectrumCapture() {
+        spectrumCaptureJob?.cancel()
+        spectrumCaptureJob = null
+        windowsSpectrumCapture?.stop()
+        windowsSpectrumCapture = null
+        val process = spectrumCaptureProcess
+        spectrumCaptureProcess = null
+        process?.destroy()
+        if (process?.isAlive == true) process.destroyForcibly()
+    }
+
     override fun play() {
         isPlaying = true
         _state.value = _state.value.copy(status = PlaybackStatus.PLAYING)
         startProgressUpdates()
+        startSpectrumCapture()
         scope.launch {
             if (initMpv()) {
                 setProperty("pause", "no")
@@ -526,6 +648,7 @@ class DesktopAudioEngine : AudioEngine {
     override fun pause() {
         isPlaying = false
         stopProgressUpdates()
+        stopSpectrumCapture()
         _state.value = _state.value.copy(status = PlaybackStatus.PAUSED)
         scope.launch {
             setProperty("pause", "yes")
@@ -535,6 +658,8 @@ class DesktopAudioEngine : AudioEngine {
     override fun stop() {
         isPlaying = false
         stopProgressUpdates()
+        stopSpectrumCapture()
+        spectrumAnalyzer.reset()
         _state.value = AudioEngineState(status = PlaybackStatus.IDLE, positionMs = 0L)
         scope.launch {
             executeCommand("stop")
@@ -563,6 +688,8 @@ class DesktopAudioEngine : AudioEngine {
         if (isReleased.getAndSet(true)) return
         isPlaying = false
         stopProgressUpdates()
+        stopSpectrumCapture()
+        spectrumAnalyzer.reset()
         eventLoopJob?.cancel()
 
         val ctx = mpvContext

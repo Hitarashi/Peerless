@@ -7,10 +7,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -32,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.shilpo.peerless.lyrics.LyricsLoader
 import org.shilpo.peerless.model.PlaybackInfo
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.network.LocalPeerlessApiClient
@@ -40,8 +40,12 @@ import org.shilpo.peerless.player.PlayerConnection
 import org.shilpo.peerless.theme.ExpressiveTypography
 import org.shilpo.peerless.theme.SpecBadgeTypography
 import org.shilpo.peerless.theme.SquircleShapeSmall
+import org.shilpo.peerless.theme.rememberArtworkSeedColor
+import org.shilpo.peerless.theme.rememberMiniPlayerGlowPalette
+import org.shilpo.peerless.ui.components.LyricsArtworkGlowBackground
 import org.shilpo.peerless.ui.components.PeerlessIcon
 import org.shilpo.peerless.ui.components.PeerlessIcons
+import org.shilpo.peerless.ui.components.SyncedLyricsContent
 import org.shilpo.peerless.ui.components.TrackRow
 
 @Composable
@@ -126,7 +130,21 @@ internal fun QueuePaneContent(
 }
 
 @Composable
-internal fun LyricsPaneContent(currentTrack: TrackSummaryDto?) {
+internal fun LyricsPaneContent(
+    currentTrack: TrackSummaryDto?,
+    lyricsLoader: LyricsLoader,
+    positionMs: Long,
+    onSeekTo: (Long) -> Unit,
+    isPlaying: Boolean
+) {
+    val apiClient = LocalPeerlessApiClient.current
+    val serverUrl by apiClient.baseUrlState.collectAsState()
+    val lyricsState by lyricsLoader.state.collectAsState()
+
+    LaunchedEffect(currentTrack?.id, serverUrl) {
+        currentTrack?.let { lyricsLoader.loadIfNeeded(it, serverUrl) }
+    }
+
     if (currentTrack == null) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -139,50 +157,56 @@ internal fun LyricsPaneContent(currentTrack: TrackSummaryDto?) {
             )
         }
     } else {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = currentTrack.title,
-                style = ExpressiveTypography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center
+        val artworkUrl = apiClient.getArtworkUrl(currentTrack, 600)
+        val palette = rememberMiniPlayerGlowPalette(
+            rememberArtworkSeedColor(artworkUrl, MaterialTheme.colorScheme.primary)
+        )
+        Box(modifier = Modifier.fillMaxSize()) {
+            LyricsArtworkGlowBackground(
+                artworkUrl = artworkUrl,
+                palette = palette,
+                spectrumFrame = null,
+                showSpectrum = false,
+                showPaletteTint = false,
+                isPlaying = isPlaying
             )
-
-            Text(
-                text = currentTrack.artist,
-                style = ExpressiveTypography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            val sampleLyrics = listOf(
-                "Ticking away the moments that make up a dull day",
-                "Fritter and waste the hours in an offhand way",
-                "Kicking around on a piece of ground in your hometown",
-                "Waiting for someone or something to show you the way",
-                "Tired of lying in the sunshine, staying home to watch the rain"
-            )
-
-            sampleLyrics.forEachIndexed { index, line ->
-                val isActive = index == 1
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text(
-                    text = line,
-                    style = if (isActive) ExpressiveTypography.titleMedium else ExpressiveTypography.bodyLarge,
-                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                    color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                        alpha = 0.5f
-                    ),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
+                    text = currentTrack.title,
+                    style = ExpressiveTypography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    textAlign = TextAlign.Center
                 )
+
+                Text(
+                    text = currentTrack.artist,
+                    style = ExpressiveTypography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.82f),
+                    textAlign = TextAlign.Center
+                )
+
+                MaterialTheme(
+                    colorScheme = MaterialTheme.colorScheme.copy(
+                        onSurface = Color.White,
+                        onSurfaceVariant = Color.White.copy(alpha = 0.76f)
+                    )
+                ) {
+                    SyncedLyricsContent(
+                        state = lyricsState,
+                        positionMs = positionMs,
+                        onSeekTo = onSeekTo,
+                        onRetry = { lyricsLoader.retry(currentTrack, serverUrl) },
+                        modifier = Modifier.weight(1f),
+                        compact = true
+                    )
+                }
             }
         }
     }

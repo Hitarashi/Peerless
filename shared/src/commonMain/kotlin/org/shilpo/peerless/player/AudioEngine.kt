@@ -43,6 +43,7 @@ interface AudioEngine {
     val state: StateFlow<AudioEngineState>
     val events: SharedFlow<AudioEngineEvent>
     val signalPath: StateFlow<SignalPathSnapshot?>
+    val spectrum: StateFlow<AudioSpectrumFrame?> get() = EmptyAudioSpectrum
 
     fun prepare(
         url: String,
