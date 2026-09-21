@@ -1,14 +1,19 @@
 package org.shilpo.peerless.ui.components
 
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,10 +29,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
+import androidx.compose.material3.toPath
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,8 +44,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Matrix
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
@@ -49,6 +60,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.graphics.shapes.Morph
 import coil3.compose.AsyncImage
 import org.shilpo.peerless.model.PlaybackInfo
 import org.shilpo.peerless.model.TrackSummaryDto
@@ -118,11 +130,6 @@ fun PersistentBottomPlayer(
     )
 
     val playButtonInteractionSource = remember { MutableInteractionSource() }
-    val isPlayPressed by playButtonInteractionSource.collectIsPressedAsState()
-    val playButtonScale by animateFloatAsState(
-        targetValue = if (isPlayPressed) 0.92f else 1f,
-        label = "PersistentPlayScale"
-    )
 
     Box(
         modifier = modifier
@@ -346,7 +353,7 @@ fun PersistentBottomPlayer(
                                 icon = PeerlessIcons.SkipPrevious,
                                 contentDescription = "Previous Track",
                                 tint = colorScheme.onSurface,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
 
@@ -367,12 +374,14 @@ fun PersistentBottomPlayer(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .scale(playButtonScale)
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(colorScheme.primary),
+                                    .size(48.dp),
                                 contentAlignment = Alignment.Center
                             ) {
+                                PlaybackButtonFace(
+                                    isPlaying = isPlaying,
+                                    color = colorScheme.primary,
+                                    modifier = Modifier.fillMaxSize()
+                                )
                                 PlayPauseMorphIcon(
                                     isPlaying = isPlaying,
                                     tint = colorScheme.onPrimary,
@@ -389,7 +398,7 @@ fun PersistentBottomPlayer(
                                 icon = PeerlessIcons.SkipNext,
                                 contentDescription = "Next Track",
                                 tint = colorScheme.onSurface,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
@@ -467,6 +476,69 @@ fun PersistentBottomPlayer(
                 }
             }
         }
+    }
+}
+
+internal const val PLAYBACK_COOKIE_ROTATION_DURATION_MILLIS = 60_000
+
+internal fun playbackCookieRotationDegrees(progress: Float): Float =
+    progress.coerceIn(0f, 1f) * 360f
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun PlaybackButtonFace(
+    isPlaying: Boolean,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    val shapeProgress = animateFloatAsState(
+        targetValue = if (isPlaying) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
+            stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
+            visibilityThreshold = 0.001f
+        ),
+        label = "PlaybackButtonShapeMorph"
+    )
+    val rotationProgress = if (isPlaying) {
+        rememberInfiniteTransition(label = "PlaybackCookieRotation").animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(
+                    durationMillis = PLAYBACK_COOKIE_ROTATION_DURATION_MILLIS,
+                    easing = LinearEasing
+                )
+            ),
+            label = "PlaybackCookieRotationProgress"
+        )
+    } else {
+        null
+    }
+    val morph = remember { Morph(MaterialShapes.Circle, MaterialShapes.Cookie12Sided) }
+    val path = remember { Path() }
+    val scaleMatrix = remember { Matrix() }
+
+    Canvas(
+        modifier = modifier.graphicsLayer {
+            rotationZ = rotationProgress?.value?.let(::playbackCookieRotationDegrees) ?: 0f
+        }
+    ) {
+        val morphPath = morph.toPath(
+            progress = shapeProgress.value.coerceIn(0f, 1f),
+            path = path
+        )
+        scaleMatrix.reset()
+        scaleMatrix.scale(x = size.width, y = size.height)
+        morphPath.transform(scaleMatrix)
+        val pathCenter = morphPath.getBounds().center
+        morphPath.translate(
+            Offset(
+                x = size.width / 2f - pathCenter.x,
+                y = size.height / 2f - pathCenter.y
+            )
+        )
+        drawPath(morphPath, color)
     }
 }
 
