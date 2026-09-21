@@ -25,9 +25,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SplitButtonDefaults
@@ -51,6 +49,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import org.shilpo.peerless.auth.LocalSessionManager
+import org.shilpo.peerless.home.HomeFeedEmptyReason
 import org.shilpo.peerless.home.HomeFeedItem
 import org.shilpo.peerless.home.HomeFeedState
 import org.shilpo.peerless.home.LocalHomeFeedRepository
@@ -191,7 +192,7 @@ val SampleLosslessLibrary = listOf(
 fun HomeTopHeader(
     serverConnected: Boolean,
     onNavigateToSearch: () -> Unit,
-    onToggleStats: () -> Unit,
+    onToggleStats: (() -> Unit)?,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -241,67 +242,72 @@ fun HomeTopHeader(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .border(
-                        1.dp,
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                        CircleShape
-                    )
-                    .clickable(onClick = onToggleStats),
-                contentAlignment = Alignment.Center
-            ) {
-                PeerlessIcon(
-                    icon = PeerlessIcons.Compass,
-                    contentDescription = "Explore & Stats",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
+            if (onToggleStats != null) {
+                IconButton(onClick = onToggleStats, modifier = Modifier.size(48.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainer)
+                            .border(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                                CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        PeerlessIcon(
+                            icon = PeerlessIcons.Compass,
+                            contentDescription = "Explore & Stats",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
             }
 
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .border(
-                        1.dp,
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                        CircleShape
+            IconButton(onClick = onNavigateToSearch, modifier = Modifier.size(48.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .border(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                            CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    PeerlessIcon(
+                        icon = PeerlessIcons.Search,
+                        contentDescription = "Search",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
-                    .clickable(onClick = onNavigateToSearch),
-                contentAlignment = Alignment.Center
-            ) {
-                PeerlessIcon(
-                    icon = PeerlessIcons.Search,
-                    contentDescription = "Search",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
+                }
             }
 
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .border(
-                        1.dp,
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                        CircleShape
+            IconButton(onClick = onOpenSettings, modifier = Modifier.size(48.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .border(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                            CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    PeerlessIcon(
+                        icon = PeerlessIcons.Settings,
+                        contentDescription = "Settings",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
-                    .clickable(onClick = onOpenSettings),
-                contentAlignment = Alignment.Center
-            ) {
-                PeerlessIcon(
-                    icon = PeerlessIcons.Settings,
-                    contentDescription = "Settings",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
+                }
             }
         }
     }
@@ -309,7 +315,9 @@ fun HomeTopHeader(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun QuickPicksCarousel(
+fun HomeTrackCarousel(
+    title: String,
+    subtitle: String? = null,
     picks: List<HomeFeedItem>,
     currentTrackId: Int?,
     isPlaying: Boolean,
@@ -350,13 +358,25 @@ fun QuickPicksCarousel(
             val carouselState = rememberCarouselState { picks.size }
 
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = "Quick picks",
-                    style = ExpressiveTypography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
+                Column(
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = ExpressiveTypography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.semantics { heading() }
+                    )
+                    subtitle?.let {
+                        Text(
+                            text = it,
+                            style = ExpressiveTypography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 HorizontalMultiBrowseCarousel(
                     state = carouselState,
                     preferredItemWidth = heroMaxWidth,
@@ -439,7 +459,7 @@ fun QuickPickCard(
 
         AsyncImage(
             model = artworkUrl,
-            contentDescription = "${track.title} cover",
+            contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
         )
@@ -516,32 +536,37 @@ fun QuickPickCard(
             }
         }
 
-        FilledIconButton(
-            onClick = onClick,
-            enabled = canActivate,
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(12.dp)
-                .size(44.dp),
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            )
+                .padding(10.dp)
+                .size(48.dp)
+                .clip(CircleShape)
+                .clickable(enabled = canActivate, onClick = onClick),
+            contentAlignment = Alignment.Center
         ) {
-            PeerlessIcon(
-                icon = when {
-                    isPlaying -> PeerlessIcons.LosslessWave
-                    track.is_cached -> PeerlessIcons.Play
-                    else -> PeerlessIcons.Download
-                },
-                contentDescription = when {
-                    isPlaying -> "Now playing ${track.title}"
-                    track.is_cached -> "Play ${track.title}"
-                    else -> "Rip ${track.title}"
-                },
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(20.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                PeerlessIcon(
+                    icon = when {
+                        isPlaying -> PeerlessIcons.LosslessWave
+                        track.is_cached -> PeerlessIcons.Play
+                        else -> PeerlessIcons.Download
+                    },
+                    contentDescription = when {
+                        isPlaying -> "Now playing ${track.title}"
+                        track.is_cached -> "Play ${track.title}"
+                        else -> "Rip ${track.title}"
+                    },
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }
@@ -627,7 +652,8 @@ private fun HomeFeedSectionHeader(title: String) {
         text = title,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 2.dp),
+            .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 2.dp)
+            .semantics { heading() },
         style = ExpressiveTypography.titleLarge,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onSurface
@@ -699,7 +725,7 @@ fun HomeScreenContent(
     allTracks: List<TrackSummaryDto>,
     onOpenSettings: () -> Unit,
     onNavigateToSearch: () -> Unit,
-    onToggleStats: () -> Unit,
+    onToggleStats: (() -> Unit)?,
     contentBottomPadding: Dp,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -756,16 +782,48 @@ fun HomeScreenContent(
         }
 
         if (searchQuery.isBlank()) {
-            if (homeFeed.quickPicks.isNotEmpty()) {
-                item(key = "quick_picks") {
-                    QuickPicksCarousel(
-                        picks = homeFeed.quickPicks,
+            if (homeFeed.isLoading && homeFeed.yourRotation.isEmpty() &&
+                homeFeed.recentTracks.isEmpty() && homeFeed.similarToTaste.isEmpty()
+            ) {
+                item(key = "home_feed_loading") { HomeFeedLoading() }
+            } else if (homeFeed.hasError) {
+                item(key = "home_feed_error") {
+                    HomeFeedMessage(
+                        message = "Your Last.fm listening feed could not be loaded.",
+                        actionLabel = "Retry",
+                        onAction = { homeFeedRefreshKey += 1 }
+                    )
+                }
+            } else when (homeFeed.emptyReason) {
+                HomeFeedEmptyReason.NO_LISTENING_HISTORY -> item(key = "home_feed_no_history") {
+                    HomeFeedMessage(
+                        message = "Last.fm doesn't show any listening history yet. Start scrobbling on Last.fm and your Home feed will fill in."
+                    )
+                }
+
+                HomeFeedEmptyReason.NO_PLAYABLE_MATCHES -> item(key = "home_feed_no_matches") {
+                    HomeFeedMessage(
+                        message = "Your Last.fm history is available, but we couldn't match those tracks in the Peerless catalog.",
+                        actionLabel = "Search",
+                        onAction = onNavigateToSearch
+                    )
+                }
+
+                null -> Unit
+            }
+
+            if (homeFeed.yourRotation.isNotEmpty()) {
+                item(key = "your_rotation") {
+                    HomeTrackCarousel(
+                        title = "Your rotation",
+                        subtitle = "From your Last.fm listening",
+                        picks = homeFeed.yourRotation,
                         currentTrackId = currentTrackDto?.id,
                         isPlaying = status == PlaybackStatus.PLAYING,
                         onTrackClick = { clicked ->
                             playerConnection.playFromContext(
                                 clicked.toTrack(),
-                                homeFeed.quickPicks.map { it.track.toTrack() }
+                                homeFeed.yourRotation.map { it.track.toTrack() }
                             )
                         },
                         onPlayNext = { clicked -> playerConnection.playNextInQueue(clicked.toTrack()) },
@@ -779,24 +837,24 @@ fun HomeScreenContent(
                 }
             }
 
-            if (homeFeed.isLoading && homeFeed.quickPicks.isEmpty()) {
-                item(key = "home_feed_loading") { HomeFeedLoading() }
-            } else if (homeFeed.hasError) {
-                item(key = "home_feed_error") {
-                    HomeFeedMessage(
-                        message = "Your Last.fm listening feed could not be loaded.",
-                        actionLabel = "Retry",
-                        onAction = { homeFeedRefreshKey += 1 }
-                    )
-                }
-            } else if (
-                homeFeed.quickPicks.isEmpty() &&
-                homeFeed.recentTracks.isEmpty() &&
-                homeFeed.similarToTaste.isEmpty()
-            ) {
-                item(key = "home_feed_empty") {
-                    HomeFeedMessage(
-                        message = "Your Last.fm activity will appear here when Peerless finds matching tracks."
+            if (homeFeed.similarToTaste.isNotEmpty()) {
+                item(key = "similar_to_your_taste") {
+                    HomeTrackCarousel(
+                        title = "Similar to your taste",
+                        picks = homeFeed.similarToTaste,
+                        currentTrackId = currentTrackDto?.id,
+                        isPlaying = status == PlaybackStatus.PLAYING,
+                        onTrackClick = { clicked ->
+                            playerConnection.playFromContext(
+                                clicked.toTrack(),
+                                homeFeed.similarToTaste.map { it.track.toTrack() }
+                            )
+                        },
+                        onPlayNext = { clicked -> playerConnection.playNextInQueue(clicked.toTrack()) },
+                        onAddToQueue = { clicked -> playerConnection.addToQueue(clicked.toTrack()) },
+                        onStartRadio = { clicked -> playerConnection.startRadio(clicked.toTrack()) },
+                        onRipClick = onRipClick,
+                        getArtworkUrl = { track -> apiClient.getArtworkUrl(track, 300) }
                     )
                 }
             }
@@ -837,41 +895,6 @@ fun HomeScreenContent(
                 }
             }
 
-            if (homeFeed.similarToTaste.isNotEmpty()) {
-                item(key = "related_tracks_header") {
-                    HomeFeedSectionHeader(title = "Similar to your taste")
-                }
-                items(
-                    items = homeFeed.similarToTaste,
-                    key = { "related_${it.track.provider}_${it.track.track_id}" }
-                ) { item ->
-                    val track = item.track
-                    Box(modifier = Modifier.padding(horizontal = 12.dp)) {
-                        TrackRow(
-                            track = track,
-                            artworkUrl = apiClient.getArtworkUrl(track, 200),
-                            isPlaying = currentTrackDto?.id == track.id && status == PlaybackStatus.PLAYING,
-                            canonicalTrack = item.canonicalTrack,
-                            onTrackClick = { clicked ->
-                                playerConnection.playFromContext(
-                                    clicked.toTrack(),
-                                    homeFeed.similarToTaste.map { it.track.toTrack() }
-                                )
-                            },
-                            onPlayNext = if (track.is_cached) {
-                                { clicked -> playerConnection.playNextInQueue(clicked.toTrack()) }
-                            } else null,
-                            onAddToQueue = if (track.is_cached) {
-                                { clicked -> playerConnection.addToQueue(clicked.toTrack()) }
-                            } else null,
-                            onStartRadio = if (track.is_cached) {
-                                { clicked -> playerConnection.startRadio(clicked.toTrack()) }
-                            } else null,
-                            onRipClick = onRipClick
-                        )
-                    }
-                }
-            }
         }
 
         if (searchQuery.isNotBlank()) {

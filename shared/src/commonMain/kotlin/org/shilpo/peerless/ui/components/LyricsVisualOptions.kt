@@ -1,5 +1,8 @@
 package org.shilpo.peerless.ui.components
 
+import org.shilpo.peerless.preferences.LyricsPresentation
+import org.shilpo.peerless.ui.components.lyrics.VisualLyricsConfig
+
 /** Defaults match BetterLyrics' normal word-synced lyrics presentation. */
 data class LyricsAnimationOptions(
     val wordByWord: Boolean = true,
@@ -23,3 +26,31 @@ data class LyricsBackgroundOptions(
     val fog: Boolean = false,
     val rain: Boolean = false
 )
+
+internal fun LyricsPresentation.animationOptions(): LyricsAnimationOptions = when (this) {
+    LyricsPresentation.VISUAL -> LyricsAnimationOptions()
+    LyricsPresentation.READABLE -> LyricsAnimationOptions(
+        blur = false,
+        fadeOut = false,
+        edgeFeathering = false,
+        outOfSightScale = false,
+        glow = false,
+        shadow = false,
+        scale = false,
+        float = false,
+        breathing = false,
+        fan = false,
+        threeDimensional = false
+    )
+}
+
+internal fun LyricsPresentation.visualConfig(syncOffsetMs: Long): VisualLyricsConfig = when (this) {
+    LyricsPresentation.VISUAL -> VisualLyricsConfig(syncOffsetMs = syncOffsetMs)
+    LyricsPresentation.READABLE -> VisualLyricsConfig(
+        enableSparkles = false,
+        enableBlur = false,
+        enableVocalElevation = false,
+        enableElasticScroll = false,
+        syncOffsetMs = syncOffsetMs
+    )
+}

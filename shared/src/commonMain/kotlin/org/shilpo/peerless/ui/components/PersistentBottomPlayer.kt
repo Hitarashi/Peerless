@@ -9,14 +9,29 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,6 +40,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -136,7 +155,11 @@ fun PersistentBottomPlayer(
                         .size(54.dp)
                         .clip(SquircleShapeSmall)
                         .background(colorScheme.surfaceContainer)
-                        .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.6f), SquircleShapeSmall),
+                        .border(
+                            1.dp,
+                            colorScheme.outlineVariant.copy(alpha = 0.6f),
+                            SquircleShapeSmall
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     if (track != null) {
@@ -192,7 +215,8 @@ fun PersistentBottomPlayer(
                                     effectiveCodec.contains("ec3", ignoreCase = true) ||
                                     effectiveCodec.contains("atmos", ignoreCase = true)
                             val effectiveBitDepth = playbackInfo?.bit_depth ?: track.bit_depth ?: 16
-                            val effectiveSampleRate = playbackInfo?.sample_rate ?: track.sample_rate ?: 44100
+                            val effectiveSampleRate =
+                                playbackInfo?.sample_rate ?: track.sample_rate ?: 44100
                             val hasHiRes = effectiveBitDepth >= 24 || effectiveSampleRate >= 88200
                             val hasAnyIcon =
                                 hasApple || hasQobuz || effectiveProvider.isNotBlank() || hasDolby || hasHiRes
@@ -210,7 +234,11 @@ fun PersistentBottomPlayer(
                                 Row(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(6.dp))
-                                        .background(if (isIconHovered) colorScheme.onSurfaceVariant.copy(alpha = 0.12f) else Color.Transparent)
+                                        .background(
+                                            if (isIconHovered) colorScheme.onSurfaceVariant.copy(
+                                                alpha = 0.12f
+                                            ) else Color.Transparent
+                                        )
                                         .pointerHoverIcon(PointerIcon.Hand)
                                         .clickable(
                                             interactionSource = iconInteractionSource,
@@ -287,19 +315,21 @@ fun PersistentBottomPlayer(
                 ) {
                     IconButton(
                         onClick = onToggleShuffle,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         PeerlessIcon(
                             icon = PeerlessIcons.Shuffle,
                             contentDescription = "Shuffle",
-                            tint = if (isShuffle) colorScheme.secondary else colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            tint = if (isShuffle) colorScheme.secondary else colorScheme.onSurfaceVariant.copy(
+                                alpha = 0.5f
+                            ),
                             modifier = Modifier.size(18.dp)
                         )
                     }
 
                     IconButton(
                         onClick = onPlayPrevious,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         PeerlessIcon(
                             icon = PeerlessIcons.SkipPrevious,
@@ -311,27 +341,37 @@ fun PersistentBottomPlayer(
 
                     Box(
                         modifier = Modifier
-                            .scale(playButtonScale)
-                            .size(42.dp)
-                            .clip(SquircleShapeSmall)
-                            .background(colorScheme.primary)
+                            .size(48.dp)
                             .clickable(
                                 interactionSource = playButtonInteractionSource,
                                 indication = ripple(),
                                 onClick = onTogglePlayPause
-                            ),
+                            )
+                            .semantics {
+                                role = Role.Button
+                                contentDescription = if (isPlaying) "Pause" else "Play"
+                            },
                         contentAlignment = Alignment.Center
                     ) {
-                        PlayPauseMorphIcon(
-                            isPlaying = isPlaying,
-                            tint = colorScheme.onPrimary,
-                            size = 22.dp
-                        )
+                        Box(
+                            modifier = Modifier
+                                .scale(playButtonScale)
+                                .size(42.dp)
+                                .clip(SquircleShapeSmall)
+                                .background(colorScheme.primary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            PlayPauseMorphIcon(
+                                isPlaying = isPlaying,
+                                tint = colorScheme.onPrimary,
+                                size = 22.dp
+                            )
+                        }
                     }
 
                     IconButton(
                         onClick = onPlayNext,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         PeerlessIcon(
                             icon = PeerlessIcons.SkipNext,
@@ -343,12 +383,14 @@ fun PersistentBottomPlayer(
 
                     IconButton(
                         onClick = onToggleRepeat,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         PeerlessIcon(
                             icon = PeerlessIcons.Repeat,
                             contentDescription = "Repeat",
-                            tint = if (isRepeat) colorScheme.secondary else colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            tint = if (isRepeat) colorScheme.secondary else colorScheme.onSurfaceVariant.copy(
+                                alpha = 0.5f
+                            ),
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -383,32 +425,34 @@ fun PersistentBottomPlayer(
 
                 PlaybackDeviceIndicator(
                     showLabel = false,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(48.dp)
                 )
 
                 Spacer(modifier = Modifier.width(4.dp))
 
-                val isPaneOpen = activeSupportingPane != null
-                IconButton(
-                    onClick = {
-                        if (isPaneOpen) {
-                            onToggleSupportingPane?.invoke(activeSupportingPane)
-                        } else {
-                            onToggleSupportingPane?.invoke(SupportingPaneType.QUEUE)
-                        }
-                    },
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .pointerHoverIcon(PointerIcon.Hand)
-                ) {
-                    NavToggleMorphIcon(
-                        isExpanded = isPaneOpen,
-                        size = 20.dp,
-                        tint = if (isPaneOpen) colorScheme.primary else colorScheme.onSurfaceVariant,
-                        contentDescription = if (isPaneOpen) "Close supporting pane" else "Open supporting pane",
-                        flipHorizontal = true
-                    )
+                if (onToggleSupportingPane != null) {
+                    val isPaneOpen = activeSupportingPane != null
+                    IconButton(
+                        onClick = {
+                            if (isPaneOpen) {
+                                onToggleSupportingPane(activeSupportingPane)
+                            } else {
+                                onToggleSupportingPane(SupportingPaneType.QUEUE)
+                            }
+                        },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .pointerHoverIcon(PointerIcon.Hand)
+                    ) {
+                        NavToggleMorphIcon(
+                            isExpanded = isPaneOpen,
+                            size = 20.dp,
+                            tint = if (isPaneOpen) colorScheme.primary else colorScheme.onSurfaceVariant,
+                            contentDescription = if (isPaneOpen) "Close supporting pane" else "Open supporting pane",
+                            flipHorizontal = true
+                        )
+                    }
                 }
             }
         }
@@ -478,7 +522,7 @@ private fun ExpressiveWavySeekBar(
             thumbLineHeightWhenInteracting = 24.dp,
             modifier = Modifier
                 .weight(1f)
-                .height(40.dp)
+                .height(48.dp)
         )
 
         Text(

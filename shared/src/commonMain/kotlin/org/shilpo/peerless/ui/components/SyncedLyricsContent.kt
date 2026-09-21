@@ -46,9 +46,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -88,6 +91,7 @@ fun SyncedLyricsContent(
     showRomanization: Boolean = true,
     accentColors: List<Color> = emptyList(),
     animationOptions: LyricsAnimationOptions = LyricsAnimationOptions(),
+    readableMode: Boolean = false,
     config: VisualLyricsConfig = VisualLyricsConfig()
 ) {
     when (state) {
@@ -140,6 +144,7 @@ fun SyncedLyricsContent(
             showRomanization = showRomanization,
             accentColors = accentColors,
             animationOptions = animationOptions,
+            readableMode = readableMode,
             config = config,
             modifier = modifier
         )
@@ -163,6 +168,49 @@ private fun LyricsMessage(message: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
+private fun ReadableLyricsLine(
+    text: String,
+    words: List<org.shilpo.peerless.model.LyricsWordDto>,
+    positionMs: Long,
+    isActive: Boolean,
+    isPast: Boolean,
+    baseColor: Color,
+    activeColor: Color,
+    style: TextStyle,
+    modifier: Modifier = Modifier
+) {
+    val annotatedText = remember(text, words, positionMs, isActive, baseColor, activeColor) {
+        buildAnnotatedString {
+            var cursor = 0
+            words.forEach { word ->
+                val spokenWord = word.text
+                if (spokenWord.isBlank()) return@forEach
+                val start = text.indexOf(spokenWord, cursor, ignoreCase = true)
+                if (start < cursor) return@forEach
+
+                append(text.substring(cursor, start))
+                val end = (start + spokenWord.length).coerceAtMost(text.length)
+                withStyle(
+                    SpanStyle(
+                        color = if (isActive && positionMs >= word.start_ms) activeColor else baseColor
+                    )
+                ) {
+                    append(text.substring(start, end))
+                }
+                cursor = end
+            }
+            append(text.substring(cursor))
+        }
+    }
+    Text(
+        text = annotatedText,
+        style = style.copy(color = if (isActive || isPast) activeColor else baseColor),
+        textAlign = TextAlign.Start,
+        modifier = modifier.fillMaxWidth()
+    )
+}
+
+@Composable
 private fun VisualLyricsLines(
     lyrics: LyricsResponse,
     positionMs: Long,
@@ -172,6 +220,7 @@ private fun VisualLyricsLines(
     showRomanization: Boolean,
     accentColors: List<Color>,
     animationOptions: LyricsAnimationOptions,
+    readableMode: Boolean,
     config: VisualLyricsConfig,
     modifier: Modifier = Modifier
 ) {
@@ -337,7 +386,7 @@ private fun VisualLyricsLines(
                 // Uniform opacity matching XMusic (active = 1.0f, inactive = 0.35f)
                 val lineAlpha by animateFloatAsState(
                     targetValue = when {
-                        activeLineIndex < 0 || !animationOptions.fadeOut -> 1f
+                        readableMode || activeLineIndex < 0 || !animationOptions.fadeOut -> 1f
                         isActive -> 1.0f
                         else -> 0.35f
                     },
@@ -420,23 +469,38 @@ private fun VisualLyricsLines(
                             )
 
                             val isPast = activeLineIndex >= 0 && index < activeLineIndex
-                            val unplayedColor = lineColor.copy(alpha = 0.35f)
+                            val unplayedColor =
+                                lineColor.copy(alpha = if (readableMode) 1f else 0.35f)
                             val singingActiveColor =
                                 if (line.agent != null) voiceAccent else lineColor
 
-                            VisualLyricsLine(
-                                text = mainText,
-                                words = if (animationOptions.wordByWord) line.words else emptyList(),
-                                positionMs = effectivePositionMs,
-                                isActive = isActive,
-                                isPast = isPast,
-                                baseColor = unplayedColor,
-                                activeColor = singingActiveColor,
-                                style = lyricStyle,
-                                textAlign = TextAlign.Start,
-                                config = config,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            if (readableMode) {
+                                ReadableLyricsLine(
+                                    text = mainText,
+                                    words = line.words,
+                                    positionMs = effectivePositionMs,
+                                    isActive = isActive,
+                                    isPast = isPast,
+                                    baseColor = unplayedColor,
+                                    activeColor = singingActiveColor,
+                                    style = lyricStyle,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            } else {
+                                VisualLyricsLine(
+                                    text = mainText,
+                                    words = if (animationOptions.wordByWord) line.words else emptyList(),
+                                    positionMs = effectivePositionMs,
+                                    isActive = isActive,
+                                    isPast = isPast,
+                                    baseColor = unplayedColor,
+                                    activeColor = singingActiveColor,
+                                    style = lyricStyle,
+                                    textAlign = TextAlign.Start,
+                                    config = config,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
 
                         // Subordinate background vocal line
@@ -445,23 +509,41 @@ private fun VisualLyricsLines(
                         }
                         if (backgroundText.isNotBlank()) {
                             val bgIsPast = activeLineIndex >= 0 && index < activeLineIndex
-                            VisualLyricsLine(
-                                text = backgroundText,
-                                words = if (animationOptions.wordByWord) line.background_words else emptyList(),
-                                positionMs = effectivePositionMs,
-                                isActive = isActive,
-                                isPast = bgIsPast,
-                                baseColor = lineColor.copy(alpha = if (isActive) 0.3f else 0.55f),
-                                activeColor = voiceAccent.copy(alpha = 0.85f),
-                                style = (if (desktopText) {
-                                    ExpressiveTypography.bodyLarge
-                                } else {
-                                    ExpressiveTypography.bodyMedium
-                                }).copy(fontWeight = FontWeight.Medium),
-                                textAlign = TextAlign.Start,
-                                config = config.copy(enableSparkles = false),
-                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                            val backgroundBaseColor = lineColor.copy(
+                                alpha = if (readableMode) 1f else if (isActive) 0.3f else 0.55f
                             )
+                            val backgroundStyle = (if (desktopText) {
+                                ExpressiveTypography.bodyLarge
+                            } else {
+                                ExpressiveTypography.bodyMedium
+                            }).copy(fontWeight = FontWeight.Medium)
+                            if (readableMode) {
+                                ReadableLyricsLine(
+                                    text = backgroundText,
+                                    words = line.background_words,
+                                    positionMs = effectivePositionMs,
+                                    isActive = isActive,
+                                    isPast = bgIsPast,
+                                    baseColor = backgroundBaseColor,
+                                    activeColor = voiceAccent,
+                                    style = backgroundStyle,
+                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                                )
+                            } else {
+                                VisualLyricsLine(
+                                    text = backgroundText,
+                                    words = if (animationOptions.wordByWord) line.background_words else emptyList(),
+                                    positionMs = effectivePositionMs,
+                                    isActive = isActive,
+                                    isPast = bgIsPast,
+                                    baseColor = backgroundBaseColor,
+                                    activeColor = voiceAccent.copy(alpha = 0.85f),
+                                    style = backgroundStyle,
+                                    textAlign = TextAlign.Start,
+                                    config = config.copy(enableSparkles = false),
+                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                                )
+                            }
                         }
 
                         // Subordinate romanization line
@@ -474,7 +556,9 @@ private fun VisualLyricsLines(
                                     } else {
                                         ExpressiveTypography.bodySmall
                                     },
-                                    color = lineColor.copy(alpha = if (isActive) 0.75f else 0.45f),
+                                    color = lineColor.copy(
+                                        alpha = if (readableMode) 1f else if (isActive) 0.75f else 0.45f
+                                    ),
                                     textAlign = TextAlign.Start,
                                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
                                 )
@@ -491,7 +575,9 @@ private fun VisualLyricsLines(
                                     } else {
                                         ExpressiveTypography.bodySmall
                                     },
-                                    color = lineColor.copy(alpha = if (isActive) 0.75f else 0.45f),
+                                    color = lineColor.copy(
+                                        alpha = if (readableMode) 1f else if (isActive) 0.75f else 0.45f
+                                    ),
                                     textAlign = TextAlign.Start,
                                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
                                 )

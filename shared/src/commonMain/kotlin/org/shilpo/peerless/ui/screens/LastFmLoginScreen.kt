@@ -1,16 +1,60 @@
 package org.shilpo.peerless.ui.screens
 
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.layout.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -19,6 +63,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -27,6 +74,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.shilpo.peerless.auth.LocalSessionManager
@@ -170,12 +218,14 @@ fun LastFmLoginScreen(
         if (isFormValid && !isLoggingIn) {
             keyboardController?.hide()
             focusManager.clearFocus()
+            val submittedUsername = username.trim()
+            val submittedPassword = password
+            isLoggingIn = true
+            errorMessage = null
             scope.launch {
-                isLoggingIn = true
-                errorMessage = null
                 try {
                     val result = if (onLogin != null) {
-                        onLogin(username.trim(), password.trim())
+                        onLogin(submittedUsername, submittedPassword)
                     } else {
                         // Default simulation if no callback is supplied
                         delay(600)
@@ -185,10 +235,12 @@ fun LastFmLoginScreen(
                     result.onSuccess {
                         onLoginSuccess?.invoke()
                     }.onFailure { err ->
-                        errorMessage = err.message ?: "Invalid Last.fm username or password. Please try again."
+                        errorMessage = actionableLastFmError(err)
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Throwable) {
-                    errorMessage = e.message ?: "Failed to connect to Last.fm servers."
+                    errorMessage = actionableLastFmError(e)
                 } finally {
                     isLoggingIn = false
                 }
@@ -251,7 +303,7 @@ fun LastFmLoginScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Sign in to keep your listening history in sync.",
+                            text = "Last.fm is required to build Your rotation, Listen again, and music discovery based on your taste. Connect your account to continue.",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -266,13 +318,19 @@ fun LastFmLoginScreen(
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .semantics { liveRegion = LiveRegionMode.Polite }
                                     .offset { IntOffset(shakeOffset.value.roundToInt(), 0) },
                                 shape = MaterialTheme.shapes.large,
                                 color = MaterialTheme.colorScheme.errorContainer,
                                 contentColor = MaterialTheme.colorScheme.onErrorContainer
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 8.dp),
+                                    modifier = Modifier.padding(
+                                        start = 16.dp,
+                                        top = 12.dp,
+                                        bottom = 12.dp,
+                                        end = 8.dp
+                                    ),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
@@ -287,7 +345,10 @@ fun LastFmLoginScreen(
                                         modifier = Modifier.weight(1f)
                                     )
                                     IconButton(onClick = { errorMessage = null }) {
-                                        PeerlessIcon(PeerlessIcons.Close, contentDescription = "Dismiss error")
+                                        PeerlessIcon(
+                                            PeerlessIcons.Close,
+                                            contentDescription = "Dismiss error"
+                                        )
                                     }
                                 }
                             }
@@ -309,10 +370,11 @@ fun LastFmLoginScreen(
                             // Username / Email Field
                             OutlinedTextField(
                                 value = username,
-                                onValueChange = {
-                                    username = it
+                                onValueChange = { value ->
+                                    username = value
                                     errorMessage = null
                                 },
+                                enabled = !isLoggingIn,
                                 label = { Text("Username or email") },
                                 placeholder = { Text("Your Last.fm account") },
                                 leadingIcon = {
@@ -324,7 +386,10 @@ fun LastFmLoginScreen(
                                 },
                                 trailingIcon = {
                                     if (username.isNotBlank()) {
-                                        IconButton(onClick = { username = "" }) {
+                                        IconButton(
+                                            onClick = { username = "" },
+                                            enabled = !isLoggingIn
+                                        ) {
                                             PeerlessIcon(
                                                 icon = PeerlessIcons.Close,
                                                 contentDescription = "Clear username",
@@ -351,10 +416,11 @@ fun LastFmLoginScreen(
                             // Password Field
                             OutlinedTextField(
                                 value = password,
-                                onValueChange = {
-                                    password = it
+                                onValueChange = { value ->
+                                    password = value
                                     errorMessage = null
                                 },
+                                enabled = !isLoggingIn,
                                 label = { Text("Password") },
                                 placeholder = { Text("Enter your password") },
                                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -366,7 +432,10 @@ fun LastFmLoginScreen(
                                     )
                                 },
                                 trailingIcon = {
-                                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                    IconButton(
+                                        onClick = { passwordVisible = !passwordVisible },
+                                        enabled = !isLoggingIn
+                                    ) {
                                         PeerlessIcon(
                                             icon = if (passwordVisible) PeerlessIcons.VisibilityOff else PeerlessIcons.Visibility,
                                             contentDescription = if (passwordVisible) "Hide password" else "Show password",
@@ -471,11 +540,34 @@ fun LastFmLoginScreen(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text("Use a different Telegram account", style = MaterialTheme.typography.labelMedium)
+                        Text(
+                            "Use a different Telegram account",
+                            style = MaterialTheme.typography.labelMedium
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+internal fun actionableLastFmError(error: Throwable): String {
+    val message = error.message.orEmpty().lowercase()
+    return when {
+        listOf("invalid", "incorrect", "credential", "password", "unauthorized", "authorize")
+            .any(message::contains) ->
+            "Last.fm didn't accept these credentials. Check the username and password, then try again."
+
+        listOf("timeout", "network", "connect", "socket", "host", "resolve", "unreachable")
+            .any(message::contains) ->
+            "Couldn't reach Peerless or Last.fm. Check your internet connection and retry."
+
+        listOf("502", "503", "service unavailable", "internal server error")
+            .any(message::contains) ->
+            "The Last.fm sign-in service is temporarily unavailable. Try again in a moment."
+
+        else ->
+            "Last.fm sign-in failed. Check your credentials and connection, then try again."
     }
 }
 
@@ -516,7 +608,7 @@ private fun LastFmValuePanel(modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "Connect once and Peerless will scrobble the tracks you play, building a listening history that stays yours.",
+                text = "Last.fm is required to build Your rotation, Listen again, and recommendations based on your taste. Once connected, Peerless can also scrobble your playback.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.widthIn(max = 400.dp)
@@ -549,6 +641,10 @@ private fun LastFmBenefit(label: String) {
                 )
             }
         }
-        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }

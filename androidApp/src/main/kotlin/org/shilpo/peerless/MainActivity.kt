@@ -12,18 +12,21 @@ import org.shilpo.peerless.auth.DeepLinkHandler
 import org.shilpo.peerless.player.AndroidAudioContextHolder
 
 class MainActivity : ComponentActivity() {
+    private lateinit var windowPostureProvider: AndroidWindowPostureProvider
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         AndroidAudioContextHolder.context = applicationContext
         AndroidContextProvider.context = applicationContext
+        windowPostureProvider = AndroidWindowPostureProvider(this)
 
         intent?.dataString?.let { uri ->
             DeepLinkHandler.handleUri(uri)
         }
 
         setContent {
-            App()
+            App(windowPostureProvider = windowPostureProvider)
         }
     }
 

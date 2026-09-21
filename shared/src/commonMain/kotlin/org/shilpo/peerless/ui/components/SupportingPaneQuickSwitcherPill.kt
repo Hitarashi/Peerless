@@ -1,13 +1,29 @@
 package org.shilpo.peerless.ui.components
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -15,6 +31,10 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import org.shilpo.peerless.ui.shell.SupportingPaneType
@@ -93,11 +113,13 @@ fun SupportingPaneQuickSwitcherPill(
         }
     }
 
-    val slotSizeDp = 36.dp
+    val hitTargetSizeDp = 48.dp
+    val iconSlotSizeDp = 36.dp
     val slotGapDp = 2.dp
-    val slotSizePx = with(density) { slotSizeDp.toPx() }
+    val hitTargetSizePx = with(density) { hitTargetSizeDp.toPx() }
+    val iconSlotSizePx = with(density) { iconSlotSizeDp.toPx() }
     val slotGapPx = with(density) { slotGapDp.toPx() }
-    val slotStepPx = slotSizePx + slotGapPx
+    val slotStepPx = hitTargetSizePx + slotGapPx
 
     Box(
         modifier = modifier
@@ -107,8 +129,9 @@ fun SupportingPaneQuickSwitcherPill(
     ) {
         // Shilpo Elastic Stretching Pill Indicator
         if (visibilityProgress.value > 0.01f) {
-            val fromPos = fromIndex * slotStepPx
-            val toPos = toIndex * slotStepPx
+            val visualInset = (hitTargetSizePx - iconSlotSizePx) / 2f
+            val fromPos = fromIndex * slotStepPx + visualInset
+            val toPos = toIndex * slotStepPx + visualInset
             val p = motionProgress.value.coerceIn(0f, 1f)
 
             // Sine ease-out progress curve (out_sine in shilpo)
@@ -123,15 +146,15 @@ fun SupportingPaneQuickSwitcherPill(
             val indicatorPos: Float
             val indicatorWidth: Float
             if (movingForward) {
-                val head = fromPos + slotSizePx + (toPos - fromPos) * headProgress
+                val head = fromPos + iconSlotSizePx + (toPos - fromPos) * headProgress
                 val tail = fromPos + (toPos - fromPos) * tailProgress
                 indicatorPos = tail
-                indicatorWidth = maxOf(head - tail, slotSizePx)
+                indicatorWidth = maxOf(head - tail, iconSlotSizePx)
             } else {
                 val head = fromPos + (toPos - fromPos) * headProgress
-                val tail = fromPos + slotSizePx + (toPos - fromPos) * tailProgress
+                val tail = fromPos + iconSlotSizePx + (toPos - fromPos) * tailProgress
                 indicatorPos = head
-                indicatorWidth = maxOf(tail - head, slotSizePx)
+                indicatorWidth = maxOf(tail - head, iconSlotSizePx)
             }
 
             Box(
@@ -139,12 +162,12 @@ fun SupportingPaneQuickSwitcherPill(
                     .offset {
                         IntOffset(
                             x = indicatorPos.roundToInt(),
-                            y = 0
+                            y = ((hitTargetSizePx - iconSlotSizePx) / 2f).roundToInt()
                         )
                     }
                     .size(
                         width = with(density) { indicatorWidth.toDp() },
-                        height = slotSizeDp
+                        height = iconSlotSizeDp
                     )
                     .scale(visibilityProgress.value)
                     .clip(CircleShape)
@@ -169,26 +192,36 @@ fun SupportingPaneQuickSwitcherPill(
 
                 Box(
                     modifier = Modifier
-                        .size(slotSizeDp)
-                        .clip(CircleShape)
+                        .size(hitTargetSizeDp)
                         .clickable { onToggleSupportingPane(type) }
-                        .pointerHoverIcon(PointerIcon.Hand),
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .semantics {
+                            role = Role.Button
+                            selected = isSelected
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    if (type == SupportingPaneType.LYRICS) {
-                        LyricsMorphIcon(
-                            selected = isSelected,
-                            tint = iconTint,
-                            size = 18.dp,
-                            contentDescription = type.title
-                        )
-                    } else {
-                        PeerlessIcon(
-                            icon = icon,
-                            contentDescription = type.title,
-                            tint = iconTint,
-                            modifier = Modifier.size(18.dp)
-                        )
+                    Box(
+                        modifier = Modifier
+                            .size(iconSlotSizeDp)
+                            .clip(CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (type == SupportingPaneType.LYRICS) {
+                            LyricsMorphIcon(
+                                selected = isSelected,
+                                tint = iconTint,
+                                size = 18.dp,
+                                contentDescription = type.title
+                            )
+                        } else {
+                            PeerlessIcon(
+                                icon = icon,
+                                contentDescription = type.title,
+                                tint = iconTint,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }

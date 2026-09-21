@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -108,6 +109,9 @@ import org.shilpo.peerless.ui.components.ServerSettingsDialog
 import org.shilpo.peerless.ui.components.SettingsMorphIcon
 import org.shilpo.peerless.ui.components.SupportingPaneQuickSwitcherPill
 import org.shilpo.peerless.ui.navigation.NavigationDestination
+import org.shilpo.peerless.ui.posture.LocalWindowPostureProvider
+import org.shilpo.peerless.ui.posture.WindowPosture
+import org.shilpo.peerless.ui.posture.WindowPostureKind
 import org.shilpo.peerless.ui.screens.AuthOnboardingScreen
 import org.shilpo.peerless.ui.screens.HomeScreenContent
 import org.shilpo.peerless.ui.screens.LastFmLoginScreen
@@ -117,6 +121,32 @@ import org.shilpo.peerless.ui.screens.SampleLosslessLibrary
 import org.shilpo.peerless.ui.screens.SearchScreen
 import org.shilpo.peerless.ui.screens.SettingsScreen
 
+private data class ShellDisplayState(
+    val currentDestination: NavigationDestination,
+    val onSelectDestination: (NavigationDestination) -> Unit,
+    val playerConnection: PlayerConnection,
+    val currentTrackDto: TrackSummaryDto?,
+    val status: PlaybackStatus,
+    val serverConnected: Boolean,
+    val searchQuery: String,
+    val onQueryChange: (String) -> Unit,
+    val selectedFilter: String,
+    val onSelectFilter: (String) -> Unit,
+    val displayedTracks: List<TrackSummaryDto>,
+    val allTracks: List<TrackSummaryDto>,
+    val onOpenNowPlaying: () -> Unit,
+    val onOpenSettings: () -> Unit,
+    val onOpenProfile: () -> Unit,
+    val onRipClick: (TrackSummaryDto) -> Unit
+)
+
+private data class FoldRegion(
+    val x: Dp,
+    val y: Dp,
+    val width: Dp,
+    val height: Dp
+)
+
 @Composable
 fun AdaptiveShell(
     modifier: Modifier = Modifier
@@ -125,6 +155,8 @@ fun AdaptiveShell(
     val apiClient = LocalPeerlessApiClient.current
     val currentServerUrl by apiClient.baseUrlState.collectAsState()
     val sessionManager = LocalSessionManager.current
+    val windowPostureProvider = LocalWindowPostureProvider.current
+    val windowPosture by windowPostureProvider.posture.collectAsState()
     val sessionState by sessionManager.sessionState.collectAsState()
     val hasCredentials = sessionManager.hasSavedCredentials()
 
@@ -155,6 +187,7 @@ fun AdaptiveShell(
     val status by playerConnection.status.collectAsState()
     val isPlaying by playerConnection.isPlaying.collectAsState()
     val queue by playerConnection.queue.collectAsState()
+    val currentQueueIndex by playerConnection.currentIndex.collectAsState()
     val queueDtos = remember(queue) { queue.map { it.toSummaryDto() } }
     val shuffleMode by playerConnection.shuffleMode.collectAsState()
     val repeatMode by playerConnection.repeatMode.collectAsState()
@@ -235,6 +268,10 @@ fun AdaptiveShell(
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val windowSizeClass = WindowWidthSizeClass.fromWidth(maxWidth)
+        val paneLayout = supportingPaneLayout(maxWidth, supportingPaneWidth)
+        val supportingPaneAvailable =
+            paneLayout.isAvailable && windowPosture.kind == WindowPostureKind.FLAT
+        val fullPlayerBounds = fullPlayerRegion(maxWidth, maxHeight, windowPosture)
 
         CompositionLocalProvider(LocalWindowWidthSizeClass provides windowSizeClass) {
             Box(
@@ -271,94 +308,126 @@ fun AdaptiveShell(
                     }
                 }
 
-                when (windowSizeClass) {
-                    WindowWidthSizeClass.COMPACT -> {
-                        CompactLayout(
-                            currentDestination = currentDestination,
-                            onSelectDestination = { currentDestination = it },
-                            playerConnection = playerConnection,
-                            currentTrackDto = currentTrackDto,
-                            status = status,
-                            serverConnected = serverConnected,
-                            searchQuery = searchQuery,
-                            onQueryChange = { searchQuery = it },
-                            selectedFilter = selectedFilter,
-                            onSelectFilter = { selectedFilter = it },
-                            displayedTracks = displayedTracks,
-                            allTracks = activeLibrary,
-                            onOpenNowPlaying = { isNowPlayingOpen = true },
-                            onOpenSettings = { isSettingsOpen = true },
-                            onOpenProfile = { isProfileOpen = true },
-                            onRipClick = onRipClick
-                        )
-                    }
+                val displayState = ShellDisplayState(
+                    currentDestination = currentDestination,
+                    onSelectDestination = { currentDestination = it },
+                    playerConnection = playerConnection,
+                    currentTrackDto = currentTrackDto,
+                    status = status,
+                    serverConnected = serverConnected,
+                    searchQuery = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    selectedFilter = selectedFilter,
+                    onSelectFilter = { selectedFilter = it },
+                    displayedTracks = displayedTracks,
+                    allTracks = activeLibrary,
+                    onOpenNowPlaying = { isNowPlayingOpen = true },
+                    onOpenSettings = { isSettingsOpen = true },
+                    onOpenProfile = { isProfileOpen = true },
+                    onRipClick = onRipClick
+                )
 
-                    WindowWidthSizeClass.MEDIUM -> {
-                        MediumLayout(
-                            currentDestination = currentDestination,
-                            onSelectDestination = { currentDestination = it },
-                            playerConnection = playerConnection,
-                            currentTrackDto = currentTrackDto,
-                            status = status,
-                            serverConnected = serverConnected,
-                            searchQuery = searchQuery,
-                            onQueryChange = { searchQuery = it },
-                            selectedFilter = selectedFilter,
-                            onSelectFilter = { selectedFilter = it },
-                            displayedTracks = displayedTracks,
-                            allTracks = activeLibrary,
-                            onOpenNowPlaying = { isNowPlayingOpen = true },
-                            onOpenSettings = { isSettingsOpen = true },
-                            onOpenProfile = { isProfileOpen = true },
-                            onRipClick = onRipClick
-                        )
-                    }
+                when (windowPosture.kind) {
+                    WindowPostureKind.BOOK -> BookPostureLayout(
+                        state = displayState,
+                        posture = windowPosture
+                    )
 
-                    WindowWidthSizeClass.EXPANDED -> {
-                        ExpandedLayout(
-                            currentDestination = currentDestination,
-                            onSelectDestination = { currentDestination = it },
-                            activeSupportingPane = activeSupportingPane,
-                            onToggleSupportingPane = { pane ->
-                                activeSupportingPane =
-                                    if (activeSupportingPane == pane) null else pane
-                            },
-                            onSelectSupportingPane = { pane ->
-                                activeSupportingPane = pane
-                            },
-                            supportingPaneWidth = supportingPaneWidth,
-                            onSupportingPaneWidthChange = {
-                                supportingPaneWidth = it.coerceIn(280.dp, 560.dp)
-                            },
-                            playerConnection = playerConnection,
-                            currentTrackDto = currentTrackDto,
-                            lyricsLoader = lyricsLoader,
-                            status = status,
-                            serverConnected = serverConnected,
-                            searchQuery = searchQuery,
-                            onQueryChange = { searchQuery = it },
-                            selectedFilter = selectedFilter,
-                            onSelectFilter = { selectedFilter = it },
-                            displayedTracks = displayedTracks,
-                            allTracks = activeLibrary,
-                            volume = volume,
-                            onVolumeChange = { playerConnection.setVolume(it) },
-                            isShuffle = shuffleMode,
-                            onToggleShuffle = { playerConnection.setShuffleMode(!shuffleMode) },
-                            repeatMode = repeatMode,
-                            onToggleRepeat = {
-                                val next = when (repeatMode) {
-                                    org.shilpo.peerless.model.RepeatMode.OFF -> org.shilpo.peerless.model.RepeatMode.ALL
-                                    org.shilpo.peerless.model.RepeatMode.ALL -> org.shilpo.peerless.model.RepeatMode.ONE
-                                    org.shilpo.peerless.model.RepeatMode.ONE -> org.shilpo.peerless.model.RepeatMode.OFF
-                                }
-                                playerConnection.setRepeatMode(next)
-                            },
-                            onOpenNowPlaying = { isNowPlayingOpen = true },
-                            onOpenSettings = { isSettingsOpen = true },
-                            onOpenProfile = { isProfileOpen = true },
-                            onRipClick = onRipClick
-                        )
+                    WindowPostureKind.TABLETOP -> TabletopPostureLayout(
+                        state = displayState,
+                        posture = windowPosture
+                    )
+
+                    WindowPostureKind.FLAT -> when (windowSizeClass) {
+                        WindowWidthSizeClass.COMPACT -> {
+                            CompactLayout(
+                                currentDestination = currentDestination,
+                                onSelectDestination = { currentDestination = it },
+                                playerConnection = playerConnection,
+                                currentTrackDto = currentTrackDto,
+                                status = status,
+                                serverConnected = serverConnected,
+                                searchQuery = searchQuery,
+                                onQueryChange = { searchQuery = it },
+                                selectedFilter = selectedFilter,
+                                onSelectFilter = { selectedFilter = it },
+                                displayedTracks = displayedTracks,
+                                allTracks = activeLibrary,
+                                onOpenNowPlaying = { isNowPlayingOpen = true },
+                                onOpenSettings = { isSettingsOpen = true },
+                                onOpenProfile = { isProfileOpen = true },
+                                onRipClick = onRipClick
+                            )
+                        }
+
+                        WindowWidthSizeClass.MEDIUM -> {
+                            MediumLayout(
+                                currentDestination = currentDestination,
+                                onSelectDestination = { currentDestination = it },
+                                playerConnection = playerConnection,
+                                currentTrackDto = currentTrackDto,
+                                status = status,
+                                serverConnected = serverConnected,
+                                searchQuery = searchQuery,
+                                onQueryChange = { searchQuery = it },
+                                selectedFilter = selectedFilter,
+                                onSelectFilter = { selectedFilter = it },
+                                displayedTracks = displayedTracks,
+                                allTracks = activeLibrary,
+                                onOpenNowPlaying = { isNowPlayingOpen = true },
+                                onOpenSettings = { isSettingsOpen = true },
+                                onOpenProfile = { isProfileOpen = true },
+                                onRipClick = onRipClick
+                            )
+                        }
+
+                        WindowWidthSizeClass.EXPANDED -> {
+                            ExpandedLayout(
+                                currentDestination = currentDestination,
+                                onSelectDestination = { currentDestination = it },
+                                activeSupportingPane = activeSupportingPane.takeIf { supportingPaneAvailable },
+                                isSupportingPaneAvailable = supportingPaneAvailable,
+                                onToggleSupportingPane = { pane ->
+                                    activeSupportingPane =
+                                        if (activeSupportingPane == pane) null else pane
+                                },
+                                onSelectSupportingPane = { pane ->
+                                    activeSupportingPane = pane
+                                },
+                                supportingPaneWidth = paneLayout.width,
+                                onSupportingPaneWidthChange = {
+                                    supportingPaneWidth = it.coerceIn(280.dp, 560.dp)
+                                },
+                                playerConnection = playerConnection,
+                                currentTrackDto = currentTrackDto,
+                                lyricsLoader = lyricsLoader,
+                                status = status,
+                                serverConnected = serverConnected,
+                                searchQuery = searchQuery,
+                                onQueryChange = { searchQuery = it },
+                                selectedFilter = selectedFilter,
+                                onSelectFilter = { selectedFilter = it },
+                                displayedTracks = displayedTracks,
+                                allTracks = activeLibrary,
+                                volume = volume,
+                                onVolumeChange = { playerConnection.setVolume(it) },
+                                isShuffle = shuffleMode,
+                                onToggleShuffle = { playerConnection.setShuffleMode(!shuffleMode) },
+                                repeatMode = repeatMode,
+                                onToggleRepeat = {
+                                    val next = when (repeatMode) {
+                                        org.shilpo.peerless.model.RepeatMode.OFF -> org.shilpo.peerless.model.RepeatMode.ALL
+                                        org.shilpo.peerless.model.RepeatMode.ALL -> org.shilpo.peerless.model.RepeatMode.ONE
+                                        org.shilpo.peerless.model.RepeatMode.ONE -> org.shilpo.peerless.model.RepeatMode.OFF
+                                    }
+                                    playerConnection.setRepeatMode(next)
+                                },
+                                onOpenNowPlaying = { isNowPlayingOpen = true },
+                                onOpenSettings = { isSettingsOpen = true },
+                                onOpenProfile = { isProfileOpen = true },
+                                onRipClick = onRipClick
+                            )
+                        }
                     }
                 }
 
@@ -398,7 +467,13 @@ fun AdaptiveShell(
                             onToggleShuffle = { playerConnection.toggleShuffle() },
                             repeatMode = repeatMode,
                             onToggleRepeat = { playerConnection.cycleRepeatMode() },
-                            spectrumFrame = spectrumFrame
+                            spectrumFrame = spectrumFrame,
+                            queueTracks = queueDtos,
+                            currentQueueIndex = currentQueueIndex,
+                            onPlayQueueItem = playerConnection::playQueueItem,
+                            modifier = Modifier
+                                .offset(x = fullPlayerBounds.x, y = fullPlayerBounds.y)
+                                .size(fullPlayerBounds.width, fullPlayerBounds.height)
                         )
                     }
                 }
@@ -453,7 +528,8 @@ private fun CompactLayout(
     onOpenNowPlaying: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenProfile: () -> Unit,
-    onRipClick: ((TrackSummaryDto) -> Unit)? = null
+    onRipClick: ((TrackSummaryDto) -> Unit)? = null,
+    modifier: Modifier = Modifier
 ) {
     val apiClient = LocalPeerlessApiClient.current
     val canSkipNext by playerConnection.canSkipNext.collectAsState()
@@ -461,7 +537,7 @@ private fun CompactLayout(
     val positionMs by playerConnection.positionMs.collectAsState()
     val durationMs by playerConnection.durationMs.collectAsState()
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -639,6 +715,7 @@ private fun ExpandedLayout(
     currentDestination: NavigationDestination,
     onSelectDestination: (NavigationDestination) -> Unit,
     activeSupportingPane: SupportingPaneType?,
+    isSupportingPaneAvailable: Boolean,
     onToggleSupportingPane: (SupportingPaneType) -> Unit,
     onSelectSupportingPane: (SupportingPaneType) -> Unit = onToggleSupportingPane,
     supportingPaneWidth: Dp = 340.dp,
@@ -712,7 +789,9 @@ private fun ExpandedLayout(
                     onOpenSettings = onOpenSettings,
                     onOpenProfile = onOpenProfile,
                     onOpenNowPlaying = onOpenNowPlaying,
-                    onToggleStats = { onToggleSupportingPane(SupportingPaneType.SIGNAL_PATH) },
+                    onToggleStats = if (isSupportingPaneAvailable) {
+                        { onToggleSupportingPane(SupportingPaneType.SIGNAL_PATH) }
+                    } else null,
                     contentBottomPadding = 16.dp,
                     onRipClick = onRipClick
                 )
@@ -771,7 +850,7 @@ private fun ExpandedLayout(
                             onSupportingPaneWidthChange(340.dp)
                         },
                         modifier = Modifier
-                            .width(supportingPaneWidth)
+                            .width(supportingPaneWidth + 48.dp)
                             .fillMaxHeight()
                     )
                 }
@@ -796,7 +875,7 @@ private fun ExpandedLayout(
                 onPlayNext = { playerConnection.playNext() },
                 onPlayPrevious = { playerConnection.playPrevious() },
                 activeSupportingPane = activeSupportingPane,
-                onToggleSupportingPane = onToggleSupportingPane,
+                onToggleSupportingPane = onToggleSupportingPane.takeIf { isSupportingPaneAvailable },
                 volume = volume,
                 onVolumeChange = onVolumeChange,
                 isShuffle = isShuffle,
@@ -807,6 +886,262 @@ private fun ExpandedLayout(
                 modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 4.dp, top = 2.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun BookPostureLayout(
+    state: ShellDisplayState,
+    posture: WindowPosture
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val hinge = posture.hingeBounds
+        if (hinge == null) {
+            CompactFoldRegion(state, FoldRegion(0.dp, 0.dp, maxWidth, maxHeight))
+            return@BoxWithConstraints
+        }
+
+        val leftWidth = maxWidth * hinge.left.coerceIn(0f, 1f)
+        val hingeWidth = maxWidth * (hinge.right - hinge.left).coerceAtLeast(0f)
+        val rightWidth = maxWidth * (1f - hinge.right).coerceIn(0f, 1f)
+        if (leftWidth >= 96.dp && rightWidth >= 280.dp) {
+            CompositionLocalProvider(
+                LocalWindowWidthSizeClass provides WindowWidthSizeClass.fromWidth(rightWidth)
+            ) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Box(modifier = Modifier.width(leftWidth).fillMaxHeight()) {
+                        ExpressiveWideNavigationRail(
+                            selectedDestination = state.currentDestination,
+                            onSelectDestination = state.onSelectDestination,
+                            initialExpanded = false,
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .statusBarsPadding()
+                                .navigationBarsPadding()
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(hingeWidth))
+                    Column(modifier = Modifier.width(rightWidth).fillMaxHeight()) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .statusBarsPadding()
+                        ) {
+                            state.RenderDestination(contentBottomPadding = 16.dp)
+                        }
+                        state.RenderMiniPlayer(
+                            isPairedWithNavigation = false,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .navigationBarsPadding()
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+        } else {
+            val useLeftRegion = leftWidth >= rightWidth
+            CompactFoldRegion(
+                state = state,
+                region = if (useLeftRegion) {
+                    FoldRegion(0.dp, 0.dp, leftWidth, maxHeight)
+                } else {
+                    FoldRegion(maxWidth * hinge.right, 0.dp, rightWidth, maxHeight)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun TabletopPostureLayout(
+    state: ShellDisplayState,
+    posture: WindowPosture
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val hinge = posture.hingeBounds
+        if (hinge == null) {
+            CompactFoldRegion(state, FoldRegion(0.dp, 0.dp, maxWidth, maxHeight))
+            return@BoxWithConstraints
+        }
+
+        val topHeight = maxHeight * hinge.top.coerceIn(0f, 1f)
+        val hingeHeight = maxHeight * (hinge.bottom - hinge.top).coerceAtLeast(0f)
+        val bottomHeight = maxHeight * (1f - hinge.bottom).coerceIn(0f, 1f)
+        val requiredBottomHeight = if (state.currentTrackDto == null) 128.dp else 208.dp
+        if (topHeight >= 240.dp && bottomHeight >= requiredBottomHeight) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(topHeight)
+                        .statusBarsPadding()
+                ) {
+                    state.RenderDestination(contentBottomPadding = 16.dp)
+                }
+                Spacer(modifier = Modifier.height(hingeHeight))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(bottomHeight)
+                        .navigationBarsPadding()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Bottom
+                ) {
+                    state.RenderMiniPlayer(
+                        isPairedWithNavigation = true,
+                        modifier = Modifier
+                            .widthIn(max = NavigationBarMaxWidth)
+                            .fillMaxWidth()
+                            .padding(horizontal = NavigationBarHorizontalPadding)
+                            .padding(bottom = MiniPlayerBottomSpacing)
+                    )
+                    FloatingNavigationToolbar(
+                        items = NavigationDestination.MainDestinations,
+                        selectedDestination = state.currentDestination,
+                        onSelectDestination = state.onSelectDestination,
+                        isPairedWithMiniPlayer = state.currentTrackDto != null,
+                        modifier = Modifier
+                            .widthIn(max = NavigationBarMaxWidth)
+                            .fillMaxWidth()
+                            .padding(horizontal = NavigationBarHorizontalPadding)
+                    )
+                }
+            }
+        } else {
+            val useTopRegion = topHeight >= bottomHeight
+            CompactFoldRegion(
+                state = state,
+                region = if (useTopRegion) {
+                    FoldRegion(0.dp, 0.dp, maxWidth, topHeight)
+                } else {
+                    FoldRegion(0.dp, maxHeight * hinge.bottom, maxWidth, bottomHeight)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompactFoldRegion(
+    state: ShellDisplayState,
+    region: FoldRegion
+) {
+    CompositionLocalProvider(
+        LocalWindowWidthSizeClass provides WindowWidthSizeClass.fromWidth(region.width)
+    ) {
+        CompactLayout(
+            currentDestination = state.currentDestination,
+            onSelectDestination = state.onSelectDestination,
+            playerConnection = state.playerConnection,
+            currentTrackDto = state.currentTrackDto,
+            status = state.status,
+            serverConnected = state.serverConnected,
+            searchQuery = state.searchQuery,
+            onQueryChange = state.onQueryChange,
+            selectedFilter = state.selectedFilter,
+            onSelectFilter = state.onSelectFilter,
+            displayedTracks = state.displayedTracks,
+            allTracks = state.allTracks,
+            onOpenNowPlaying = state.onOpenNowPlaying,
+            onOpenSettings = state.onOpenSettings,
+            onOpenProfile = state.onOpenProfile,
+            onRipClick = state.onRipClick,
+            modifier = Modifier
+                .offset(x = region.x, y = region.y)
+                .size(region.width, region.height)
+        )
+    }
+}
+
+@Composable
+private fun ShellDisplayState.RenderDestination(contentBottomPadding: Dp) {
+    DestinationContent(
+        destination = currentDestination,
+        onSelectDestination = onSelectDestination,
+        playerConnection = playerConnection,
+        currentTrackDto = currentTrackDto,
+        status = status,
+        serverConnected = serverConnected,
+        searchQuery = searchQuery,
+        onQueryChange = onQueryChange,
+        selectedFilter = selectedFilter,
+        onSelectFilter = onSelectFilter,
+        displayedTracks = displayedTracks,
+        allTracks = allTracks,
+        onOpenSettings = onOpenSettings,
+        onOpenProfile = onOpenProfile,
+        onOpenNowPlaying = onOpenNowPlaying,
+        contentBottomPadding = contentBottomPadding,
+        onRipClick = onRipClick
+    )
+}
+
+@Composable
+private fun ShellDisplayState.RenderMiniPlayer(
+    isPairedWithNavigation: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val track = currentTrackDto ?: return
+    val apiClient = LocalPeerlessApiClient.current
+    val positionMs by playerConnection.positionMs.collectAsState()
+    val durationMs by playerConnection.durationMs.collectAsState()
+    val canSkipNext by playerConnection.canSkipNext.collectAsState()
+    val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
+    val playbackInfo by playerConnection.playbackInfo.collectAsState()
+
+    AnimatedVisibility(
+        visible = true,
+        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        modifier = modifier
+    ) {
+        MiniPlayerBar(
+            track = track,
+            playbackInfo = playbackInfo,
+            status = status,
+            positionMs = positionMs,
+            durationMs = durationMs,
+            artworkUrl = apiClient.getArtworkUrl(track, 200),
+            onTogglePlayPause = { playerConnection.togglePlayPause() },
+            onPlayNext = { playerConnection.playNext() },
+            onPlayPrevious = { playerConnection.playPrevious() },
+            onOpenNowPlaying = onOpenNowPlaying,
+            onDismiss = { playerConnection.stopAndDismiss() },
+            canSkipNext = canSkipNext,
+            canSkipPrevious = canSkipPrevious,
+            isPairedWithNavigation = isPairedWithNavigation,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+private fun fullPlayerRegion(width: Dp, height: Dp, posture: WindowPosture): FoldRegion {
+    val hinge = posture.hingeBounds ?: return FoldRegion(0.dp, 0.dp, width, height)
+    return when (posture.kind) {
+        WindowPostureKind.BOOK -> {
+            val leftWidth = width * hinge.left.coerceIn(0f, 1f)
+            val rightWidth = width * (1f - hinge.right).coerceIn(0f, 1f)
+            if (rightWidth >= 280.dp || rightWidth >= leftWidth) {
+                FoldRegion(width * hinge.right, 0.dp, rightWidth, height)
+            } else {
+                FoldRegion(0.dp, 0.dp, leftWidth, height)
+            }
+        }
+
+        WindowPostureKind.TABLETOP -> {
+            val topHeight = height * hinge.top.coerceIn(0f, 1f)
+            val bottomHeight = height * (1f - hinge.bottom).coerceIn(0f, 1f)
+            if (topHeight >= bottomHeight) {
+                FoldRegion(0.dp, 0.dp, width, topHeight)
+            } else {
+                FoldRegion(0.dp, height * hinge.bottom, width, bottomHeight)
+            }
+        }
+
+        WindowPostureKind.FLAT -> FoldRegion(0.dp, 0.dp, width, height)
     }
 }
 
@@ -967,7 +1302,7 @@ private fun SupportingPaneSplitter(
     Box(
         modifier = modifier
             .fillMaxHeight()
-            .width(16.dp)
+            .width(48.dp)
             .pointerHoverIcon(PointerIcon.Crosshair)
             .hoverable(interactionSource)
             .onGloballyPositioned { splitterCoordinates = it }
@@ -1233,7 +1568,7 @@ private fun DestinationContent(
                 allTracks = allTracks,
                 onOpenSettings = onOpenSettings,
                 onNavigateToSearch = { onSelectDestination(NavigationDestination.SEARCH) },
-                onToggleStats = onToggleStats ?: onOpenNowPlaying,
+                onToggleStats = onToggleStats,
                 contentBottomPadding = contentBottomPadding,
                 onRipClick = onRipClick
             )

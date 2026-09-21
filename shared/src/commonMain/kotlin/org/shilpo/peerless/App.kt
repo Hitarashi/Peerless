@@ -19,15 +19,27 @@ import org.shilpo.peerless.network.PeerlessApiClient
 import org.shilpo.peerless.player.LocalPlayerConnection
 import org.shilpo.peerless.player.RealPlayerConnection
 import org.shilpo.peerless.player.platformSetup
+import org.shilpo.peerless.preferences.AppPreferences
+import org.shilpo.peerless.preferences.LocalAppPreferences
+import org.shilpo.peerless.preferences.createPlatformAppPreferences
 import org.shilpo.peerless.sync.LocalPlaybackSyncManager
 import org.shilpo.peerless.sync.PlaybackSyncManager
 import org.shilpo.peerless.theme.ExpressiveTheme
 import org.shilpo.peerless.theme.rememberArtworkSeedColor
+import org.shilpo.peerless.ui.posture.FlatWindowPostureProvider
+import org.shilpo.peerless.ui.posture.LocalWindowPostureProvider
+import org.shilpo.peerless.ui.posture.WindowPostureProvider
 import org.shilpo.peerless.ui.shell.AdaptiveShell
 
 @Composable
 @Preview
-fun App() {
+fun App(
+    appPreferences: AppPreferences? = null,
+    windowPostureProvider: WindowPostureProvider = FlatWindowPostureProvider()
+) {
+    val preferences = remember(appPreferences) {
+        appPreferences ?: createPlatformAppPreferences()
+    }
     val tokenStorage = remember { createPlatformTokenStorage() }
     val apiClient = remember(tokenStorage) { PeerlessApiClient(tokenStorage = tokenStorage) }
     val sessionManager = remember(apiClient, tokenStorage) {
@@ -129,7 +141,9 @@ fun App() {
             LocalPeerlessApiClient provides apiClient,
             LocalSessionManager provides sessionManager,
             org.shilpo.peerless.home.LocalHomeFeedRepository provides homeFeedRepository,
-            org.shilpo.peerless.library.LocalFavoritesManager provides favoritesManager
+            org.shilpo.peerless.library.LocalFavoritesManager provides favoritesManager,
+            LocalAppPreferences provides preferences,
+            LocalWindowPostureProvider provides windowPostureProvider
         ) {
             AdaptiveShell()
         }

@@ -1,10 +1,16 @@
 package org.shilpo.peerless.auth
 
 import androidx.compose.runtime.staticCompositionLocalOf
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.shilpo.peerless.lastfm.LastFmConfig
 import org.shilpo.peerless.model.UserDto
 import org.shilpo.peerless.network.PeerlessApiClient
@@ -71,36 +77,37 @@ class RealSessionManager(
         connectManual(creds.serverUrl, creds.code).getOrThrow()
     }
 
-    override suspend fun connectManual(serverUrl: String, code: String): Result<UserDto> = runCatching {
-        _sessionState.value = SessionState.Loading
+    override suspend fun connectManual(serverUrl: String, code: String): Result<UserDto> =
+        runCatching {
+            _sessionState.value = SessionState.Loading
 
-        val sanitizedUrl = serverUrl.trim().trimEnd('/')
-        apiClient.baseUrl = sanitizedUrl
+            val sanitizedUrl = serverUrl.trim().trimEnd('/')
+            apiClient.baseUrl = sanitizedUrl
 
-        val exchangeResult = apiClient.exchangeOtp(code.trim())
-        if (exchangeResult.isFailure) {
+            val exchangeResult = apiClient.exchangeOtp(code.trim())
+            if (exchangeResult.isFailure) {
+                _sessionState.value = SessionState.Unauthenticated
+                throw exchangeResult.exceptionOrNull() ?: Exception("OTP exchange failed")
+            }
+
+            val exchangeResponse = exchangeResult.getOrThrow()
+            tokenStorage.saveToken(exchangeResponse.token)
+            tokenStorage.saveServerUrl(sanitizedUrl)
+
+            val meResult = apiClient.getMe(exchangeResponse.token)
+            val user = if (meResult.isSuccess) {
+                meResult.getOrThrow().user
+            } else {
+                exchangeResponse.user
+            }
+
+            _sessionState.value = SessionState.Authenticated(user = user, serverUrl = sanitizedUrl)
+            startSlidingRefresh()
+            refreshLastFmStatus()
+            user
+        }.onFailure {
             _sessionState.value = SessionState.Unauthenticated
-            throw exchangeResult.exceptionOrNull() ?: Exception("OTP exchange failed")
         }
-
-        val exchangeResponse = exchangeResult.getOrThrow()
-        tokenStorage.saveToken(exchangeResponse.token)
-        tokenStorage.saveServerUrl(sanitizedUrl)
-
-        val meResult = apiClient.getMe(exchangeResponse.token)
-        val user = if (meResult.isSuccess) {
-            meResult.getOrThrow().user
-        } else {
-            exchangeResponse.user
-        }
-
-        _sessionState.value = SessionState.Authenticated(user = user, serverUrl = sanitizedUrl)
-        startSlidingRefresh()
-        refreshLastFmStatus()
-        user
-    }.onFailure {
-        _sessionState.value = SessionState.Unauthenticated
-    }
 
     override suspend fun checkExistingSession(): Boolean {
         _sessionState.value = SessionState.Loading
@@ -158,19 +165,21 @@ class RealSessionManager(
         }
     }
 
-    override suspend fun loginLastFm(username: String, password: String): Result<Unit> = runCatching {
-        val response = apiClient.loginLastFm(username.trim(), password).getOrThrow()
-        _isLastFmConnected.value = response.connected
-        _lastFmUsername.value = response.username
-        if (response.connected && response.session_key != null && response.api_key != null && response.api_secret != null) {
-            _lastFmConfig.value = LastFmConfig(
-                apiKey = response.api_key,
-                apiSecret = response.api_secret,
-                sessionKey = response.session_key,
-                username = response.username ?: ""
-            )
+    override suspend fun loginLastFm(username: String, password: String): Result<Unit> =
+        runCatching {
+            val response = apiClient.loginLastFm(username.trim(), password).getOrThrow()
+            check(response.connected) { "Last.fm did not authorize this account" }
+            _isLastFmConnected.value = response.connected
+            _lastFmUsername.value = response.username
+            if (response.connected && response.session_key != null && response.api_key != null && response.api_secret != null) {
+                _lastFmConfig.value = LastFmConfig(
+                    apiKey = response.api_key,
+                    apiSecret = response.api_secret,
+                    sessionKey = response.session_key,
+                    username = response.username ?: ""
+                )
+            }
         }
-    }
 
     override suspend fun disconnectLastFm(): Result<Unit> = runCatching {
         apiClient.disconnectLastFm().getOrThrow()

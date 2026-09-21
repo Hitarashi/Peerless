@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -247,6 +248,7 @@ fun TrackRow(
                 },
                 onLongClick = { showAudioDetails = true }
             )
+            .semantics(mergeDescendants = true) { }
             .padding(
                 horizontal = if (embedded) 8.dp else 10.dp,
                 vertical = 6.dp
@@ -282,7 +284,7 @@ fun TrackRow(
 
             AsyncImage(
                 model = artworkUrl,
-                contentDescription = "${track.title} artwork",
+                contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
@@ -585,7 +587,7 @@ fun TrackRow(
                         favoritesManager?.toggleFavorite(favTrack)
                     }
                 },
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(48.dp)
             ) {
                 PeerlessIcon(
                     icon = if (isFav) PeerlessIcons.Heart else PeerlessIcons.HeartBorder,
@@ -646,7 +648,7 @@ fun TrackRow(
                         showAudioDetails = true
                     }
                 },
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(48.dp)
             ) {
                 PeerlessIcon(
                     icon = PeerlessIcons.MoreVert,

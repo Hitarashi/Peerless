@@ -27,12 +27,18 @@ data class HomeFeedItem(
     val canonicalTrack: CanonicalTrack? = null
 )
 
+enum class HomeFeedEmptyReason {
+    NO_LISTENING_HISTORY,
+    NO_PLAYABLE_MATCHES
+}
+
 data class HomeFeedState(
     val isLoading: Boolean = false,
     val hasError: Boolean = false,
     val recentTracks: List<HomeFeedItem> = emptyList(),
-    val quickPicks: List<HomeFeedItem> = emptyList(),
-    val similarToTaste: List<HomeFeedItem> = emptyList()
+    val yourRotation: List<HomeFeedItem> = emptyList(),
+    val similarToTaste: List<HomeFeedItem> = emptyList(),
+    val emptyReason: HomeFeedEmptyReason? = null
 )
 
 /** Blends Last.fm listening windows and resolves recommendations through Peerless. */
@@ -62,8 +68,9 @@ class HomeFeedRepository(
             return HomeFeedState(hasError = true)
         }
 
-        val recentSignals = recentResult.getOrDefault(emptyList())
+        val allRecentSignals = recentResult.getOrDefault(emptyList())
             .distinctBy(::trackKey)
+        val recentSignals = allRecentSignals
             .take(RECENT_TRACK_COUNT)
         val weeklySignals = weeklyResult.getOrDefault(emptyList())
             .sortedByDescending { it.playCount }
@@ -72,20 +79,22 @@ class HomeFeedRepository(
             .sortedByDescending { it.playCount }
             .distinctBy(::trackKey)
 
-        val quickPickSignals = rankListeningHistory(
-            recent = recentSignals,
+        val recentKeys = allRecentSignals.mapTo(mutableSetOf(), ::trackKey)
+        val rotationSignals = rankListeningHistory(
+            recent = allRecentSignals,
             weekly = weeklySignals,
             overall = overallSignals
-        ).take(QUICK_PICK_COUNT)
-        val knownSignals = (recentSignals + weeklySignals + overallSignals)
+        ).filterNot { trackKey(it) in recentKeys }
+            .take(QUICK_PICK_COUNT)
+        val knownSignals = (allRecentSignals + weeklySignals + overallSignals)
             .distinctBy(::trackKey)
         val listeningMatches = resolveSignals(
-            (quickPickSignals + recentSignals).distinctBy(::trackKey),
+            (rotationSignals + recentSignals).distinctBy(::trackKey),
             libraryTracks
         ).associateBy { trackKey(it.first) }
 
         val similarSignals = findSimilarSignals(
-            recent = recentSignals,
+            recent = allRecentSignals,
             weekly = weeklySignals,
             overall = overallSignals,
             excludedKeys = knownSignals.mapTo(mutableSetOf(), ::trackKey)
@@ -93,10 +102,29 @@ class HomeFeedRepository(
         val resolvedSimilar = resolveSignals(similarSignals, libraryTracks)
             .associateBy { trackKey(it.first) }
 
+        val resolvedRecent = recentSignals.mapNotNull { listeningMatches[trackKey(it)]?.second }
+            .distinctBy { it.track.id }
+        val recentTrackIds = resolvedRecent.mapTo(mutableSetOf()) { it.track.id }
+        val resolvedRotation = rotationSignals.mapNotNull { listeningMatches[trackKey(it)]?.second }
+            .distinctBy { it.track.id }
+            .filterNot { it.track.id in recentTrackIds }
+        val excludedTrackIds = (recentTrackIds + resolvedRotation.map { it.track.id }).toSet()
+        val resolvedSimilarItems =
+            similarSignals.mapNotNull { resolvedSimilar[trackKey(it)]?.second }
+                .distinctBy { it.track.id }
+                .filterNot { it.track.id in excludedTrackIds }
+        val hasPlayableTracks = resolvedRecent.isNotEmpty() || resolvedRotation.isNotEmpty() ||
+                resolvedSimilarItems.isNotEmpty()
+
         return HomeFeedState(
-            recentTracks = recentSignals.mapNotNull { listeningMatches[trackKey(it)]?.second },
-            quickPicks = quickPickSignals.mapNotNull { listeningMatches[trackKey(it)]?.second },
-            similarToTaste = similarSignals.mapNotNull { resolvedSimilar[trackKey(it)]?.second }
+            recentTracks = resolvedRecent,
+            yourRotation = resolvedRotation,
+            similarToTaste = resolvedSimilarItems,
+            emptyReason = when {
+                hasPlayableTracks -> null
+                knownSignals.isEmpty() -> HomeFeedEmptyReason.NO_LISTENING_HISTORY
+                else -> HomeFeedEmptyReason.NO_PLAYABLE_MATCHES
+            }
         )
     }
 

@@ -19,10 +19,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -71,6 +74,8 @@ import org.shilpo.peerless.model.RepeatMode
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.player.AudioSpectrumFrame
 import org.shilpo.peerless.player.PlaybackStatus
+import org.shilpo.peerless.preferences.LocalAppPreferences
+import org.shilpo.peerless.preferences.LyricsPresentation
 import org.shilpo.peerless.theme.ExpressiveTypography
 import org.shilpo.peerless.theme.HeroArtworkShape
 import org.shilpo.peerless.theme.MiniPlayerGlowPalette
@@ -79,7 +84,6 @@ import org.shilpo.peerless.theme.SpecBadgeTypography
 import org.shilpo.peerless.theme.SquircleShapeMedium
 import org.shilpo.peerless.theme.rememberArtworkSeedColor
 import org.shilpo.peerless.theme.rememberMiniPlayerGlowPalette
-import org.shilpo.peerless.ui.components.lyrics.VisualLyricsConfig
 
 internal enum class LyricsSpectrumStyle {
     Curve,
@@ -115,10 +119,15 @@ fun NowPlayingSheet(
     onToggleRepeat: () -> Unit = {},
     isFavorite: Boolean? = null,
     onToggleFavorite: (() -> Unit)? = null,
+    queueTracks: List<TrackSummaryDto> = emptyList(),
+    currentQueueIndex: Int = -1,
+    onPlayQueueItem: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
     spectrumFrame: AudioSpectrumFrame? = null
 ) {
     val favoritesManager = org.shilpo.peerless.library.LocalFavoritesManager.current
+    val appPreferences = LocalAppPreferences.current
+    val lyricsPresentation by appPreferences.lyricsPresentation.collectAsState()
     val favoriteIds by (favoritesManager?.favoriteIds
         ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet()) }).collectAsState()
     val isFav = isFavorite ?: favoriteIds.contains(track.id)
@@ -126,6 +135,7 @@ fun NowPlayingSheet(
     val isPlaying = status == PlaybackStatus.PLAYING
     val lyricsState by lyricsLoader.state.collectAsState()
     var isLyricsView by remember { mutableStateOf(false) }
+    var isQueueView by remember { mutableStateOf(false) }
     var showSpectrum by remember { mutableStateOf(true) }
     var spectrumStyle by remember { mutableStateOf(LyricsSpectrumStyle.Curve) }
     var spectrumPlacement by remember { mutableStateOf(LyricsSpectrumPlacement.Bottom) }
@@ -243,6 +253,16 @@ fun NowPlayingSheet(
                 onToggleSpectrumGlow = { spectrumGlowEnabled = !spectrumGlowEnabled },
                 showTranslations = showLyricsTranslations,
                 showRomanization = showLyricsRomanization,
+                lyricsPresentation = lyricsPresentation,
+                onToggleLyricsPresentation = {
+                    appPreferences.setLyricsPresentation(
+                        if (lyricsPresentation == LyricsPresentation.VISUAL) {
+                            LyricsPresentation.READABLE
+                        } else {
+                            LyricsPresentation.VISUAL
+                        }
+                    )
+                },
                 onToggleTranslations = { showLyricsTranslations = !showLyricsTranslations },
                 onToggleRomanization = { showLyricsRomanization = !showLyricsRomanization },
                 modifier = Modifier
@@ -251,8 +271,21 @@ fun NowPlayingSheet(
             )
         }
 
+        if (isQueueView) {
+            FullPlayerQueueView(
+                queueTracks = queueTracks,
+                currentQueueIndex = currentQueueIndex,
+                status = status,
+                onPlayQueueItem = { index ->
+                    onPlayQueueItem(index)
+                    isQueueView = false
+                },
+                onBack = { isQueueView = false }
+            )
+        }
+
         AnimatedVisibility(
-            visible = !isLyricsView,
+            visible = !isLyricsView && !isQueueView,
             modifier = Modifier.fillMaxSize()
         ) {
             Column(
@@ -294,17 +327,20 @@ fun NowPlayingSheet(
                 ) {
                     IconButton(
                         onClick = onClose,
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(colorScheme.surfaceContainer)
+                        modifier = Modifier.size(48.dp)
                     ) {
-                        PeerlessIcon(
-                            icon = PeerlessIcons.ExpandMore,
-                            contentDescription = "Collapse player",
-                            tint = colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp)
-                        )
+                        Box(
+                            modifier = Modifier.size(42.dp).clip(CircleShape)
+                                .background(colorScheme.surfaceContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            PeerlessIcon(
+                                icon = PeerlessIcons.ExpandMore,
+                                contentDescription = "Collapse player",
+                                tint = colorScheme.onSurface,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -324,32 +360,56 @@ fun NowPlayingSheet(
 
                     IconButton(
                         onClick = { isLyricsView = true },
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(colorScheme.surfaceContainer)
+                        modifier = Modifier.size(48.dp)
                     ) {
-                        PeerlessIcon(
-                            icon = PeerlessIcons.Lyrics,
-                            contentDescription = "Show synced lyrics",
-                            tint = colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Box(
+                            modifier = Modifier.size(42.dp).clip(CircleShape)
+                                .background(colorScheme.surfaceContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            PeerlessIcon(
+                                icon = PeerlessIcons.Lyrics,
+                                contentDescription = "Show synced lyrics",
+                                tint = colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { isQueueView = true },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.size(42.dp).clip(CircleShape)
+                                .background(colorScheme.surfaceContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            PeerlessIcon(
+                                icon = PeerlessIcons.Queue,
+                                contentDescription = "Show playback queue",
+                                tint = colorScheme.onSurface,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
 
                     IconButton(
                         onClick = onOpenSettings,
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(colorScheme.surfaceContainer)
+                        modifier = Modifier.size(48.dp)
                     ) {
-                        PeerlessIcon(
-                            icon = PeerlessIcons.Settings,
-                            contentDescription = "Playback settings",
-                            tint = colorScheme.onSurface,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Box(
+                            modifier = Modifier.size(42.dp).clip(CircleShape)
+                                .background(colorScheme.surfaceContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            PeerlessIcon(
+                                icon = PeerlessIcons.Settings,
+                                contentDescription = "Playback settings",
+                                tint = colorScheme.onSurface,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
 
@@ -424,7 +484,7 @@ fun NowPlayingSheet(
 
                     PlaybackDeviceIndicator(
                         showLabel = true,
-                        modifier = Modifier.wrapContentWidth()
+                        modifier = Modifier.heightIn(min = 48.dp).wrapContentWidth()
                     )
                 }
 
@@ -453,7 +513,8 @@ fun NowPlayingSheet(
                             }
                         },
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(48.dp)
+                            .padding(7.dp)
                             .clip(CircleShape)
                             .background(colorScheme.surfaceContainer)
                     ) {
@@ -504,7 +565,7 @@ fun NowPlayingSheet(
                         thumbLineHeightWhenInteracting = 22.dp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(36.dp)
+                            .height(48.dp)
                     )
 
                     Row(
@@ -537,7 +598,7 @@ fun NowPlayingSheet(
                 ) {
                     IconButton(
                         onClick = onToggleShuffle,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         PeerlessIcon(
                             icon = PeerlessIcons.Shuffle,
@@ -595,7 +656,7 @@ fun NowPlayingSheet(
 
                     IconButton(
                         onClick = onToggleRepeat,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         val repeatIcon =
                             if (repeatMode == RepeatMode.ONE) PeerlessIcons.RepeatOne else PeerlessIcons.Repeat
@@ -620,6 +681,7 @@ fun NowPlayingSheet(
                         .background(colorScheme.surfaceContainer)
                         .border(1.dp, colorScheme.outlineVariant, PillShape)
                         .clickable { onOpenSettings() }
+                        .heightIn(min = 48.dp)
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -641,6 +703,76 @@ fun NowPlayingSheet(
                         text = "•  $serverUrl",
                         style = SpecBadgeTypography.copy(fontSize = 9.sp),
                         color = colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FullPlayerQueueView(
+    queueTracks: List<TrackSummaryDto>,
+    currentQueueIndex: Int,
+    status: PlaybackStatus,
+    onPlayQueueItem: (Int) -> Unit,
+    onBack: () -> Unit
+) {
+    val apiClient = org.shilpo.peerless.network.LocalPeerlessApiClient.current
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 24.dp, vertical = 16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                PeerlessIcon(
+                    icon = PeerlessIcons.ExpandMore,
+                    contentDescription = "Return to player",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Text(
+                text = "Queue",
+                style = ExpressiveTypography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+
+        if (queueTracks.isEmpty()) {
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Queue is empty",
+                    style = ExpressiveTypography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                itemsIndexed(
+                    items = queueTracks,
+                    key = { index, track -> "full_player_queue_${track.id}_$index" }
+                ) { index, track ->
+                    TrackRow(
+                        track = track,
+                        artworkUrl = apiClient.getArtworkUrl(track, 120),
+                        isPlaying = currentQueueIndex == index && status == PlaybackStatus.PLAYING,
+                        isCurrent = currentQueueIndex == index,
+                        onTrackClick = { onPlayQueueItem(index) },
+                        showArtworkOverlay = false
                     )
                 }
             }
@@ -857,6 +989,8 @@ private fun LyricsPlayerLayout(
     onToggleSpectrumGlow: () -> Unit,
     showTranslations: Boolean,
     showRomanization: Boolean,
+    lyricsPresentation: LyricsPresentation,
+    onToggleLyricsPresentation: () -> Unit,
     onToggleTranslations: () -> Unit,
     onToggleRomanization: () -> Unit,
     modifier: Modifier = Modifier
@@ -903,7 +1037,8 @@ private fun LyricsPlayerLayout(
             IconButton(
                 onClick = onClose,
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(48.dp)
+                    .padding(3.dp)
                     .clip(CircleShape)
                     .background(Color.Black.copy(alpha = 0.24f))
             ) {
@@ -936,7 +1071,8 @@ private fun LyricsPlayerLayout(
                         IconButton(
                             onClick = { spectrumOptionsExpanded = true },
                             modifier = Modifier
-                                .size(42.dp)
+                                .size(48.dp)
+                                .padding(3.dp)
                                 .clip(CircleShape)
                                 .background(Color.Black.copy(alpha = 0.24f))
                         ) {
@@ -992,7 +1128,8 @@ private fun LyricsPlayerLayout(
                 IconButton(
                     onClick = onReturnToPlayer,
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(48.dp)
+                        .padding(3.dp)
                         .clip(CircleShape)
                         .background(Color.Black.copy(alpha = 0.24f))
                 ) {
@@ -1006,7 +1143,8 @@ private fun LyricsPlayerLayout(
                 IconButton(
                     onClick = onOpenSettings,
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(48.dp)
+                        .padding(3.dp)
                         .clip(CircleShape)
                         .background(Color.Black.copy(alpha = 0.24f))
                 ) {
@@ -1050,6 +1188,16 @@ private fun LyricsPlayerLayout(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            LyricsPresentationControl(
+                presentation = lyricsPresentation,
+                onToggle = onToggleLyricsPresentation
+            )
         }
 
         val availableLyrics = (lyricsState as? LyricsLoadState.Available)?.lyrics
@@ -1107,7 +1255,7 @@ private fun LyricsPlayerLayout(
                 ) {
                     IconButton(
                         onClick = { manualNudgeMs -= 50L },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Text(
                             "-50",
@@ -1122,7 +1270,7 @@ private fun LyricsPlayerLayout(
                     )
                     IconButton(
                         onClick = { manualNudgeMs += 50L },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Text(
                             "+50",
@@ -1137,7 +1285,7 @@ private fun LyricsPlayerLayout(
                                 horizontal = 8.dp,
                                 vertical = 2.dp
                             ),
-                            modifier = Modifier.height(28.dp)
+                            modifier = Modifier.heightIn(min = 48.dp)
                         ) {
                             Text("Reset", style = MaterialTheme.typography.labelSmall)
                         }
@@ -1154,7 +1302,9 @@ private fun LyricsPlayerLayout(
             showTranslations = showTranslations,
             showRomanization = showRomanization,
             accentColors = lyricAccentColors,
-            config = VisualLyricsConfig(syncOffsetMs = effectiveOffset),
+            animationOptions = lyricsPresentation.animationOptions(),
+            readableMode = lyricsPresentation == LyricsPresentation.READABLE,
+            config = lyricsPresentation.visualConfig(effectiveOffset),
             modifier = Modifier.weight(1f).fillMaxWidth()
         )
 
@@ -1175,7 +1325,7 @@ private fun LyricsPlayerLayout(
                 thumbRadius = 6.dp,
                 idleGap = 3.5.dp,
                 thumbLineHeightWhenInteracting = 22.dp,
-                modifier = Modifier.fillMaxWidth().height(36.dp)
+                modifier = Modifier.fillMaxWidth().height(48.dp)
             )
 
             Row(
@@ -1200,7 +1350,7 @@ private fun LyricsPlayerLayout(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onToggleShuffle, modifier = Modifier.size(44.dp)) {
+            IconButton(onClick = onToggleShuffle, modifier = Modifier.size(48.dp)) {
                 PeerlessIcon(
                     icon = PeerlessIcons.Shuffle,
                     contentDescription = "Shuffle",
@@ -1243,7 +1393,7 @@ private fun LyricsPlayerLayout(
                     modifier = Modifier.size(30.dp)
                 )
             }
-            IconButton(onClick = onToggleRepeat, modifier = Modifier.size(44.dp)) {
+            IconButton(onClick = onToggleRepeat, modifier = Modifier.size(48.dp)) {
                 val repeatIcon =
                     if (repeatMode == RepeatMode.ONE) PeerlessIcons.RepeatOne else PeerlessIcons.Repeat
                 PeerlessIcon(

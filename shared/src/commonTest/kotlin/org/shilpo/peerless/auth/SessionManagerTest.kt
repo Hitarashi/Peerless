@@ -5,7 +5,15 @@ import org.shilpo.peerless.model.ExchangeResponse
 import org.shilpo.peerless.model.MeResponse
 import org.shilpo.peerless.model.UserDto
 import org.shilpo.peerless.network.PeerlessApiClient
-import kotlin.test.*
+import org.shilpo.peerless.preferences.InMemoryAppPreferences
+import org.shilpo.peerless.preferences.LyricsPresentation
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class FakePeerlessApiClient(
     var exchangeResult: Result<ExchangeResponse> = Result.success(
@@ -114,6 +122,21 @@ class SessionManagerTest {
     }
 
     @Test
+    fun testLyricsPresentationSurvivesLogout() = runTest {
+        val preferences = InMemoryAppPreferences()
+        val sessionManager = RealSessionManager(
+            apiClient = FakePeerlessApiClient(),
+            tokenStorage = InMemoryTokenStorage(),
+            scope = backgroundScope
+        )
+        preferences.setLyricsPresentation(LyricsPresentation.READABLE)
+
+        sessionManager.logout()
+
+        assertEquals(LyricsPresentation.READABLE, preferences.lyricsPresentation.value)
+    }
+
+    @Test
     fun testConnectManualAndConnectWithPayload() = runTest {
         val storage = InMemoryTokenStorage()
         val fakeClient = FakePeerlessApiClient()
@@ -208,6 +231,9 @@ class SessionManagerTest {
 
         // Passing ticket must return URL with ticket query param
         val streamUrl = client.resolveStreamUrl(101, "ticket_secret_token_123")
-        assertEquals("http://localhost:4444/api/v1/stream?ticket=ticket_secret_token_123", streamUrl)
+        assertEquals(
+            "http://localhost:4444/api/v1/stream?ticket=ticket_secret_token_123",
+            streamUrl
+        )
     }
 }
