@@ -1,8 +1,8 @@
 package org.shilpo.peerless.auth
 
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -21,22 +21,17 @@ object DeepLinkHandler {
         coerceInputValues = true
     }
 
-    private val _deepLinkEvents = MutableSharedFlow<ConnectionCredentials>(
-        replay = 1,
-        extraBufferCapacity = 16
-    )
-    val deepLinkEvents: SharedFlow<ConnectionCredentials> = _deepLinkEvents.asSharedFlow()
+    private val deepLinkEventsChannel = Channel<ConnectionCredentials>(Channel.BUFFERED)
+    val deepLinkEvents: Flow<ConnectionCredentials> = deepLinkEventsChannel.receiveAsFlow()
 
     fun handleUri(uriString: String): Boolean {
         val creds = parseDeepLink(uriString) ?: parsePayload(uriString) ?: return false
-        _deepLinkEvents.tryEmit(creds)
-        return true
+        return deepLinkEventsChannel.trySend(creds).isSuccess
     }
 
     fun handlePayload(payloadString: String): Boolean {
         val creds = parsePayload(payloadString) ?: return false
-        _deepLinkEvents.tryEmit(creds)
-        return true
+        return deepLinkEventsChannel.trySend(creds).isSuccess
     }
 
     fun parseDeepLink(uriString: String): ConnectionCredentials? {
@@ -208,9 +203,19 @@ object DeepLinkHandler {
 
     private fun sanitizeServerUrl(url: String): String {
         var clean = url.trim().trimEnd('/')
-        if (!clean.startsWith("http://", ignoreCase = true) && !clean.startsWith("https://", ignoreCase = true)) {
+        if (!clean.startsWith("http://", ignoreCase = true) && !clean.startsWith(
+                "https://",
+                ignoreCase = true
+            )
+        ) {
             clean = "http://$clean"
         }
         return clean
+    }
+}
+
+internal suspend fun SessionManager.collectDeepLinkConnections() {
+    DeepLinkHandler.deepLinkEvents.collect { credentials ->
+        connectManual(credentials.serverUrl, credentials.code)
     }
 }

@@ -1,16 +1,55 @@
 package org.shilpo.peerless.ui.screens
 
 
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -32,7 +71,7 @@ import org.shilpo.peerless.ui.components.PeerlessIcons
 fun AuthOnboardingScreen(modifier: Modifier = Modifier) {
     val sessionManager = LocalSessionManager.current
     val sessionState by sessionManager.sessionState.collectAsState()
-    val isLoading = sessionState is SessionState.Loading
+    val isLoading = sessionState is SessionState.Connecting
     val uriHandler = LocalUriHandler.current
 
     val clipboard = LocalClipboard.current
@@ -115,7 +154,12 @@ fun AuthOnboardingScreen(modifier: Modifier = Modifier) {
                                 contentColor = MaterialTheme.colorScheme.onErrorContainer
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 8.dp),
+                                    modifier = Modifier.padding(
+                                        start = 16.dp,
+                                        top = 12.dp,
+                                        bottom = 12.dp,
+                                        end = 8.dp
+                                    ),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
@@ -130,7 +174,10 @@ fun AuthOnboardingScreen(modifier: Modifier = Modifier) {
                                         modifier = Modifier.weight(1f)
                                     )
                                     IconButton(onClick = { errorMessage = null }) {
-                                        PeerlessIcon(PeerlessIcons.Close, contentDescription = "Dismiss error")
+                                        PeerlessIcon(
+                                            PeerlessIcons.Close,
+                                            contentDescription = "Dismiss error"
+                                        )
                                     }
                                 }
                             }
@@ -222,9 +269,11 @@ fun AuthOnboardingScreen(modifier: Modifier = Modifier) {
                                 onClick = {
                                     scope.launch {
                                         errorMessage = null
-                                        sessionManager.connectWithPayload(connectionKey.trim()).onFailure { error ->
-                                            errorMessage = error.message ?: "Could not connect with this key"
-                                        }
+                                        sessionManager.connectWithPayload(connectionKey.trim())
+                                            .onFailure { error ->
+                                                errorMessage = error.message
+                                                    ?: "Could not connect with this key"
+                                            }
                                     }
                                 },
                                 enabled = connectionKey.isNotBlank() && !isLoading,
@@ -254,7 +303,8 @@ fun AuthOnboardingScreen(modifier: Modifier = Modifier) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             TextButton(
                                 onClick = { isManualConfigExpanded = !isManualConfigExpanded },
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.fillMaxWidth()
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                             ) {
                                 PeerlessIcon(
@@ -323,7 +373,8 @@ fun AuthOnboardingScreen(modifier: Modifier = Modifier) {
                                                     serverUrl = manualServerUrl.trim(),
                                                     code = manualOtpCode.trim()
                                                 ).onFailure { error ->
-                                                    errorMessage = error.message ?: "Could not connect to this server"
+                                                    errorMessage = error.message
+                                                        ?: "Could not connect to this server"
                                                 }
                                             }
                                         },
@@ -391,7 +442,11 @@ private fun PeerlessBrandMark(modifier: Modifier = Modifier) {
                 ),
             contentAlignment = Alignment.Center
         ) {
-            PeerlessIcon(PeerlessIcons.MusicNote, contentDescription = "Peerless", modifier = Modifier.size(34.dp))
+            PeerlessIcon(
+                PeerlessIcons.MusicNote,
+                contentDescription = "Peerless",
+                modifier = Modifier.size(34.dp)
+            )
         }
     }
 }
@@ -423,7 +478,10 @@ private fun PeerlessWelcomePanel(modifier: Modifier = Modifier) {
 
 @Composable
 private fun WelcomeBenefit(icon: DrawableResource, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
         Surface(
             modifier = Modifier.size(36.dp),
             shape = CircleShape,
@@ -434,13 +492,20 @@ private fun WelcomeBenefit(icon: DrawableResource, label: String) {
                 PeerlessIcon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
             }
         }
-        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 
 @Composable
 private fun ConnectionSectionHeader(icon: DrawableResource, title: String, supportingText: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
         Surface(
             modifier = Modifier.size(40.dp),
             shape = CircleShape,
@@ -452,7 +517,11 @@ private fun ConnectionSectionHeader(icon: DrawableResource, title: String, suppo
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
             Text(
                 supportingText,
                 style = MaterialTheme.typography.bodySmall,

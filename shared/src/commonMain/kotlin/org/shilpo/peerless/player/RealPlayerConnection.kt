@@ -448,21 +448,23 @@ class RealPlayerConnection(
             if (snapshot.positionMs > 0L) {
                 _positionMs.value = snapshot.positionMs
                 val streamUrl = resolveStreamUrl(track)
-                audioEngine.prepare(
-                    streamUrl,
-                    title = track.title,
-                    artist = track.artist,
-                    artworkUrl = apiClient.getArtworkUrl(track.toSummaryDto(), size = 600)
-                )
-                scope.launch {
-                    audioEngine.state.first {
-                        it.status == PlaybackStatus.PAUSED ||
-                                it.status == PlaybackStatus.PLAYING ||
-                                it.status == PlaybackStatus.BUFFERING ||
-                                it.durationMs > 0L
+                if (streamUrl != null) {
+                    audioEngine.prepare(
+                        streamUrl,
+                        title = track.title,
+                        artist = track.artist,
+                        artworkUrl = apiClient.getArtworkUrl(track.toSummaryDto(), size = 600)
+                    )
+                    scope.launch {
+                        audioEngine.state.first {
+                            it.status == PlaybackStatus.PAUSED ||
+                                    it.status == PlaybackStatus.PLAYING ||
+                                    it.status == PlaybackStatus.BUFFERING ||
+                                    it.durationMs > 0L
+                        }
+                        audioEngine.seekTo(snapshot.positionMs)
+                        _positionMs.value = snapshot.positionMs
                     }
-                    audioEngine.seekTo(snapshot.positionMs)
-                    _positionMs.value = snapshot.positionMs
                 }
             }
         }
@@ -701,6 +703,10 @@ class RealPlayerConnection(
 
         loadJob = scope.launch {
             val streamUrl = resolveStreamUrl(track)
+            if (streamUrl == null) {
+                audioEngine.stop()
+                return@launch
+            }
 
             launch {
                 val infoResult = apiClient.getPlaybackInfo(track.id)
@@ -734,16 +740,15 @@ class RealPlayerConnection(
         }
     }
 
-    private suspend fun resolveStreamUrl(track: Track): String {
+    private suspend fun resolveStreamUrl(track: Track): String? {
         val ticketResult = apiClient.getPlaybackInfo(track.id)
-        val playbackInfo = ticketResult.getOrNull() ?: return ""
-        return if (playbackInfo.stream_url.startsWith("http://") || playbackInfo.stream_url.startsWith(
-                "https://"
-            )
-        ) {
-            playbackInfo.stream_url
+        val playbackInfo = ticketResult.getOrNull() ?: return null
+        val streamUrl = playbackInfo.stream_url.trim()
+        if (streamUrl.isBlank()) return null
+        return if (streamUrl.startsWith("http://") || streamUrl.startsWith("https://")) {
+            streamUrl
         } else {
-            "${apiClient.baseUrl}${playbackInfo.stream_url}"
+            "${apiClient.baseUrl}$streamUrl"
         }
     }
 

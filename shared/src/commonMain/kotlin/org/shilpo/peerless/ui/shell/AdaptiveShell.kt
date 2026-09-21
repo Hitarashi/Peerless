@@ -39,8 +39,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.WideNavigationRail
@@ -69,7 +71,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -158,13 +164,26 @@ fun AdaptiveShell(
     val windowPostureProvider = LocalWindowPostureProvider.current
     val windowPosture by windowPostureProvider.posture.collectAsState()
     val sessionState by sessionManager.sessionState.collectAsState()
-    val hasCredentials = sessionManager.hasSavedCredentials()
+    val sessionCheckScope = rememberCoroutineScope()
 
     var isProfileOpen by remember { mutableStateOf(false) }
 
     val isLastFmConnected by sessionManager.isLastFmConnected.collectAsState()
 
-    if (sessionState is SessionState.Unauthenticated || (sessionState is SessionState.Loading && !hasCredentials)) {
+    if (sessionState is SessionState.Loading) {
+        AuthLoadingScreen(modifier = modifier.fillMaxSize())
+        return
+    }
+
+    if (sessionState is SessionState.VerificationFailed) {
+        SessionVerificationFailedScreen(
+            modifier = modifier.fillMaxSize(),
+            onRetry = { sessionCheckScope.launch { sessionManager.checkExistingSession() } }
+        )
+        return
+    }
+
+    if (sessionState is SessionState.Unauthenticated || sessionState is SessionState.Connecting) {
         AuthOnboardingScreen(modifier = modifier.fillMaxSize())
         return
     }
@@ -511,6 +530,70 @@ fun AdaptiveShell(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun AuthLoadingScreen(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier.semantics(mergeDescendants = true) {
+                progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
+            },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            LoadingIndicator()
+            Text(
+                text = "Checking your sign-in…",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun SessionVerificationFailedScreen(
+    modifier: Modifier = Modifier,
+    onRetry: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 480.dp)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "Couldn't verify your sign-in",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "Your saved Telegram sign-in is still on this device. Check your connection or server, then try again.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Button(onClick = onRetry) {
+                Text("Retry")
+            }
+        }
+    }
+}
+
 @Composable
 private fun CompactLayout(
     currentDestination: NavigationDestination,
@@ -789,9 +872,6 @@ private fun ExpandedLayout(
                     onOpenSettings = onOpenSettings,
                     onOpenProfile = onOpenProfile,
                     onOpenNowPlaying = onOpenNowPlaying,
-                    onToggleStats = if (isSupportingPaneAvailable) {
-                        { onToggleSupportingPane(SupportingPaneType.SIGNAL_PATH) }
-                    } else null,
                     contentBottomPadding = 16.dp,
                     onRipClick = onRipClick
                 )
@@ -1551,7 +1631,6 @@ private fun DestinationContent(
     onOpenSettings: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenNowPlaying: () -> Unit,
-    onToggleStats: (() -> Unit)? = null,
     contentBottomPadding: Dp,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
@@ -1559,16 +1638,14 @@ private fun DestinationContent(
         NavigationDestination.HOME -> {
             HomeScreenContent(
                 playerConnection = playerConnection,
-                serverConnected = serverConnected,
                 searchQuery = searchQuery,
                 onQueryChange = onQueryChange,
                 selectedFilter = selectedFilter,
                 onSelectFilter = onSelectFilter,
                 displayedTracks = displayedTracks,
                 allTracks = allTracks,
-                onOpenSettings = onOpenSettings,
                 onNavigateToSearch = { onSelectDestination(NavigationDestination.SEARCH) },
-                onToggleStats = onToggleStats,
+                onNavigateToSettings = { onSelectDestination(NavigationDestination.SETTINGS) },
                 contentBottomPadding = contentBottomPadding,
                 onRipClick = onRipClick
             )

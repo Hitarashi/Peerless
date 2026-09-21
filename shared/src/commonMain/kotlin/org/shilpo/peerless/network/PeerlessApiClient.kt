@@ -2,7 +2,12 @@ package org.shilpo.peerless.network
 
 import androidx.compose.runtime.staticCompositionLocalOf
 import io.ktor.client.HttpClient
+import io.ktor.client.HttpClientConfig
 import io.ktor.client.call.body
+import io.ktor.client.engine.HttpClientEngine
+import io.ktor.client.plugins.HttpRequestTimeoutException
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.ResponseException
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
@@ -14,6 +19,7 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLBuilder
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
@@ -51,18 +57,55 @@ import org.shilpo.peerless.model.TaskProgressEvent
 import org.shilpo.peerless.model.TrackDetailDto
 import org.shilpo.peerless.model.TrackSummaryDto
 
-fun createDefaultPeerlessHttpClient(): HttpClient = HttpClient {
-    install(ContentNegotiation) {
-        json(
-            Json {
-                ignoreUnknownKeys = true
-                isLenient = true
-                coerceInputValues = true
-                encodeDefaults = true
-            }
-        )
+fun createDefaultPeerlessHttpClient(
+    engine: HttpClientEngine? = null,
+    requestTimeoutMillis: Long = 20_000L
+): HttpClient {
+    val timeoutMillis = requestTimeoutMillis
+    val configureClient: HttpClientConfig<*>.() -> Unit = {
+        install(ContentNegotiation) {
+            json(
+                Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                    coerceInputValues = true
+                    encodeDefaults = true
+                }
+            )
+        }
+        install(HttpTimeout) {
+            this.requestTimeoutMillis = timeoutMillis
+            this.connectTimeoutMillis = minOf(timeoutMillis, 10_000L)
+            this.socketTimeoutMillis = timeoutMillis
+        }
     }
+    return if (engine == null) HttpClient(configureClient) else HttpClient(engine, configureClient)
 }
+
+class ApiHttpException(val statusCode: Int, message: String) : Exception(message)
+
+private suspend fun <T> requestResult(request: suspend () -> T): Result<T> =
+    try {
+        Result.success(request())
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (responseError: ResponseException) {
+        Result.failure(
+            ApiHttpException(
+                statusCode = responseError.response.status.value,
+                message = responseError.message ?: "HTTP request failed"
+            )
+        )
+    } catch (timeout: HttpRequestTimeoutException) {
+        Result.failure(
+            IllegalStateException(
+                "The server took too long to respond. Check your connection or server address, then try again.",
+                timeout
+            )
+        )
+    } catch (error: Exception) {
+        Result.failure(error)
+    }
 
 open class PeerlessApiClient(
     baseUrl: String = AppConfig.DEFAULT_SERVER_URL,
@@ -145,7 +188,7 @@ open class PeerlessApiClient(
         response.body<List<TrackSummaryDto>>()
     }
 
-    suspend fun getPlaybackInfo(
+    open suspend fun getPlaybackInfo(
         trackId: Int,
         token: String? = null
     ): Result<PlaybackInfo> = runCatching {
@@ -312,7 +355,7 @@ open class PeerlessApiClient(
         code: String,
         deviceName: String? = null,
         platform: String? = null
-    ): Result<ExchangeResponse> = runCatching {
+    ): Result<ExchangeResponse> = requestResult {
         val response = httpClient.post("$baseUrl/api/v1/auth/exchange") {
             contentType(ContentType.Application.Json)
             setBody(
@@ -324,7 +367,14 @@ open class PeerlessApiClient(
             )
         }
         if (!response.status.isSuccess()) {
-            error("Exchange code failed with status: ${response.status}")
+            throw ApiHttpException(
+                statusCode = response.status.value,
+                message = if (response.status.value == 401) {
+                    "Telegram connection code was rejected. It may be expired or already used; send /stream to the bot for a fresh code."
+                } else {
+                    "Exchange code failed with status: ${response.status}"
+                }
+            )
         }
         val exchangeResp = response.body<ExchangeResponse>()
         tokenStorage?.saveToken(exchangeResp.token)
@@ -332,7 +382,7 @@ open class PeerlessApiClient(
     }
 
     open suspend fun refreshToken(refreshToken: String? = null): Result<RefreshResponse> =
-        runCatching {
+        requestResult {
             val currentToken = resolveToken(refreshToken)
                 ?: error("No refresh token available")
             val response = httpClient.post("$baseUrl/api/v1/auth/refresh") {
@@ -340,7 +390,10 @@ open class PeerlessApiClient(
                 setBody(RefreshRequest(refresh_token = currentToken))
             }
             if (!response.status.isSuccess()) {
-                error("Refresh token failed with status: ${response.status}")
+                throw ApiHttpException(
+                    statusCode = response.status.value,
+                    message = "Refresh token failed with status: ${response.status}"
+                )
             }
             val refreshResp = response.body<RefreshResponse>()
             tokenStorage?.saveToken(refreshResp.access_token)
@@ -358,15 +411,34 @@ open class PeerlessApiClient(
         tokenStorage?.clearToken()
     }
 
-    open suspend fun getMe(token: String? = null): Result<MeResponse> = runCatching {
+    open suspend fun getMe(token: String? = null): Result<MeResponse> = requestResult {
         val authToken = resolveToken(token) ?: error("Not authenticated")
         val response = httpClient.get("$baseUrl/api/v1/auth/me") {
             header(HttpHeaders.Authorization, "Bearer $authToken")
         }
         if (!response.status.isSuccess()) {
-            error("Get me failed with status: ${response.status}")
+            throw ApiHttpException(
+                statusCode = response.status.value,
+                message = "Get me failed with status: ${response.status}"
+            )
         }
         response.body<MeResponse>()
+    }
+
+    open suspend fun getUserAvatar(token: String? = null): Result<ByteArray?> = runCatching {
+        val authToken = resolveToken(token) ?: error("Not authenticated")
+        val response = httpClient.get("$baseUrl/api/v1/auth/me/avatar") {
+            header(HttpHeaders.Authorization, "Bearer $authToken")
+        }
+        when (response.status) {
+            HttpStatusCode.NotFound, HttpStatusCode.NoContent -> null
+            else -> {
+                if (!response.status.isSuccess()) {
+                    error("Get user avatar failed with status: ${response.status}")
+                }
+                response.body<ByteArray>()
+            }
+        }
     }
 
     open suspend fun getServerHealth(): Result<ServerHealthDto> = runCatching {
@@ -453,13 +525,16 @@ open class PeerlessApiClient(
     }
 
     open suspend fun getLastFmStatus(token: String? = null): Result<LastFmIntegrationResponse> =
-        runCatching {
+        requestResult {
             val authToken = resolveToken(token) ?: error("Not authenticated")
             val response = httpClient.get("$baseUrl/api/v1/integrations/lastfm/status") {
                 header(HttpHeaders.Authorization, "Bearer $authToken")
             }
             if (!response.status.isSuccess()) {
-                error("Get Last.fm status failed with status: ${response.status}")
+                throw ApiHttpException(
+                    statusCode = response.status.value,
+                    message = "Get Last.fm status failed with status: ${response.status}"
+                )
             }
             response.body<LastFmIntegrationResponse>()
         }

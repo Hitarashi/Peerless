@@ -7,9 +7,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.tooling.preview.Preview
-import org.shilpo.peerless.auth.DeepLinkHandler
 import org.shilpo.peerless.auth.LocalSessionManager
 import org.shilpo.peerless.auth.RealSessionManager
+import org.shilpo.peerless.auth.collectDeepLinkConnections
 import org.shilpo.peerless.auth.createPlatformTokenStorage
 import org.shilpo.peerless.config.AppConfig
 import org.shilpo.peerless.home.HomeFeedRepository
@@ -121,9 +121,7 @@ fun App(
     }
 
     LaunchedEffect(sessionManager) {
-        DeepLinkHandler.deepLinkEvents.collect { creds ->
-            sessionManager.connectManual(creds.serverUrl, creds.code)
-        }
+        sessionManager.collectDeepLinkConnections()
     }
 
     val currentTrack by playerConnection.currentTrack.collectAsState()

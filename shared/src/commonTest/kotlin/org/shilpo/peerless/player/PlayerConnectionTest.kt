@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.test.runTest
 import org.shilpo.peerless.model.Codec
+import org.shilpo.peerless.model.PlaybackInfo
 import org.shilpo.peerless.model.Provider
 import org.shilpo.peerless.model.RepeatMode
 import org.shilpo.peerless.model.Track
@@ -376,6 +377,43 @@ class PlayerConnectionTest {
         kotlinx.coroutines.delay(100)
         assertEquals(t1, player.currentTrack.value)
         assertEquals(32_000L, player.positionMs.value)
+    }
+
+    @Test
+    fun failedRestoredPlaybackDoesNotPrepareAnEmptyUrl() = runTest {
+        val track = createTrack(1, "Track 1")
+        val storage = InMemoryQueueStorage(
+            org.shilpo.peerless.model.PlaybackStateSnapshot(
+                queue = listOf(track),
+                currentIndex = 0,
+                positionMs = 32_000L
+            )
+        )
+        val fakeEngine = TestFakeAudioEngine()
+        val apiClient = object : PeerlessApiClient("http://peerless.test") {
+            override suspend fun getPlaybackInfo(
+                trackId: Int,
+                token: String?
+            ): Result<PlaybackInfo> = Result.failure(IllegalStateException("Server unavailable"))
+        }
+        val playerScope = CoroutineScope(Dispatchers.Unconfined)
+        try {
+            val player = RealPlayerConnection(
+                apiClient = apiClient,
+                audioEngine = fakeEngine,
+                storage = storage,
+                scope = playerScope
+            )
+
+            assertEquals(track, player.currentTrack.value)
+            assertNull(
+                fakeEngine.lastPreparedUrl,
+                "A failed playback lookup must not reach the audio engine as an empty URL"
+            )
+        } finally {
+            playerScope.cancel()
+            apiClient.httpClient.close()
+        }
     }
 
     @Test

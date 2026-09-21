@@ -1,6 +1,7 @@
 package org.shilpo.peerless.auth
 
 import androidx.compose.runtime.staticCompositionLocalOf
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -13,6 +14,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.shilpo.peerless.lastfm.LastFmConfig
 import org.shilpo.peerless.model.UserDto
+import org.shilpo.peerless.network.ApiHttpException
 import org.shilpo.peerless.network.PeerlessApiClient
 import kotlin.time.Duration.Companion.hours
 
@@ -20,7 +22,21 @@ sealed interface SessionState {
     data object Unauthenticated : SessionState
     data class Authenticated(val user: UserDto, val serverUrl: String) : SessionState
     data object Loading : SessionState
+    data object Connecting : SessionState
+    data object VerificationFailed : SessionState
 }
+
+private fun Throwable?.isUnauthorized(): Boolean =
+    this is ApiHttpException && statusCode == 401
+
+private suspend fun <T> sessionResult(block: suspend () -> T): Result<T> =
+    try {
+        Result.success(block())
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        Result.failure(error)
+    }
 
 interface SessionManager {
     val sessionState: StateFlow<SessionState>
@@ -43,7 +59,7 @@ class RealSessionManager(
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 ) : SessionManager {
 
-    private val _sessionState = MutableStateFlow<SessionState>(SessionState.Unauthenticated)
+    private val _sessionState = MutableStateFlow<SessionState>(SessionState.Loading)
     override val sessionState: StateFlow<SessionState> = _sessionState.asStateFlow()
 
     private val _isLastFmConnected = MutableStateFlow(false)
@@ -61,53 +77,65 @@ class RealSessionManager(
 
     private var slidingRefreshJob: Job? = null
 
-    init {
-        scope.launch {
-            DeepLinkHandler.deepLinkEvents.collect { creds ->
-                if (_sessionState.value !is SessionState.Authenticated) {
-                    connectManual(creds.serverUrl, creds.code)
+    override suspend fun connectWithPayload(encodedPayload: String): Result<UserDto> =
+        sessionResult {
+            val creds = DeepLinkHandler.parsePayload(encodedPayload)
+                ?: error(
+                    "That isn't a connection key. Paste the full auth link or Base64 key, or enter the server URL and one-time code under Manual server setup."
+                )
+            connectManual(creds.serverUrl, creds.code).getOrThrow()
+        }
+
+    override suspend fun connectManual(serverUrl: String, code: String): Result<UserDto> {
+        _sessionState.value = SessionState.Connecting
+
+        return try {
+            sessionResult {
+                val sanitizedUrl = serverUrl.trim().trimEnd('/')
+                apiClient.baseUrl = sanitizedUrl
+
+                val exchangeResult = apiClient.exchangeOtp(code.trim())
+                if (exchangeResult.isFailure) {
+                    _sessionState.value = SessionState.Unauthenticated
+                    throw exchangeResult.exceptionOrNull() ?: Exception("OTP exchange failed")
+                }
+
+                val exchangeResponse = exchangeResult.getOrThrow()
+                tokenStorage.saveToken(exchangeResponse.token)
+                tokenStorage.saveServerUrl(sanitizedUrl)
+
+                val meResult = apiClient.getMe(exchangeResponse.token)
+                val meError = meResult.exceptionOrNull()
+                if (meError.isUnauthorized()) {
+                    logout()
+                    throw meError ?: IllegalStateException("Session was rejected")
+                }
+                val user = meResult.getOrNull()?.user ?: exchangeResponse.user
+
+                startSlidingRefresh()
+                val lastFmStatusResult = loadLastFmStatus()
+                val lastFmStatusError = lastFmStatusResult.exceptionOrNull()
+                if (lastFmStatusError == null) {
+                    _sessionState.value =
+                        SessionState.Authenticated(user = user, serverUrl = sanitizedUrl)
+                } else if (lastFmStatusError.isUnauthorized()) {
+                    logout()
+                    throw lastFmStatusError
+                } else {
+                    _sessionState.value = SessionState.VerificationFailed
+                }
+                user
+            }.onFailure {
+                if (_sessionState.value != SessionState.VerificationFailed) {
+                    _sessionState.value = SessionState.Unauthenticated
                 }
             }
-        }
-    }
-
-    override suspend fun connectWithPayload(encodedPayload: String): Result<UserDto> = runCatching {
-        val creds = DeepLinkHandler.parsePayload(encodedPayload)
-            ?: error("Invalid connection payload: unable to extract server URL and OTP code")
-        connectManual(creds.serverUrl, creds.code).getOrThrow()
-    }
-
-    override suspend fun connectManual(serverUrl: String, code: String): Result<UserDto> =
-        runCatching {
-            _sessionState.value = SessionState.Loading
-
-            val sanitizedUrl = serverUrl.trim().trimEnd('/')
-            apiClient.baseUrl = sanitizedUrl
-
-            val exchangeResult = apiClient.exchangeOtp(code.trim())
-            if (exchangeResult.isFailure) {
+        } finally {
+            if (_sessionState.value == SessionState.Connecting) {
                 _sessionState.value = SessionState.Unauthenticated
-                throw exchangeResult.exceptionOrNull() ?: Exception("OTP exchange failed")
             }
-
-            val exchangeResponse = exchangeResult.getOrThrow()
-            tokenStorage.saveToken(exchangeResponse.token)
-            tokenStorage.saveServerUrl(sanitizedUrl)
-
-            val meResult = apiClient.getMe(exchangeResponse.token)
-            val user = if (meResult.isSuccess) {
-                meResult.getOrThrow().user
-            } else {
-                exchangeResponse.user
-            }
-
-            _sessionState.value = SessionState.Authenticated(user = user, serverUrl = sanitizedUrl)
-            startSlidingRefresh()
-            refreshLastFmStatus()
-            user
-        }.onFailure {
-            _sessionState.value = SessionState.Unauthenticated
         }
+    }
 
     override suspend fun checkExistingSession(): Boolean {
         _sessionState.value = SessionState.Loading
@@ -124,46 +152,57 @@ class RealSessionManager(
         apiClient.baseUrl = sanitizedUrl
 
         val meResult = apiClient.getMe(savedToken)
-        return if (meResult.isSuccess) {
-            val user = meResult.getOrThrow().user
-            _sessionState.value = SessionState.Authenticated(user = user, serverUrl = sanitizedUrl)
-            startSlidingRefresh()
-            refreshLastFmStatus()
-            true
-        } else {
-            logout()
-            false
+        val meError = meResult.exceptionOrNull()
+        if (meError != null) {
+            if (meError.isUnauthorized()) {
+                logout()
+            } else {
+                _sessionState.value = SessionState.VerificationFailed
+            }
+            return false
         }
+
+        val user = meResult.getOrThrow().user
+        startSlidingRefresh()
+        val lastFmStatusResult = loadLastFmStatus()
+        val lastFmStatusError = lastFmStatusResult.exceptionOrNull()
+        if (lastFmStatusError != null) {
+            if (lastFmStatusError.isUnauthorized()) {
+                logout()
+            } else {
+                _sessionState.value = SessionState.VerificationFailed
+            }
+            return false
+        }
+
+        _sessionState.value = SessionState.Authenticated(user = user, serverUrl = sanitizedUrl)
+        return true
     }
 
     override suspend fun refreshLastFmStatus(): Boolean {
-        return try {
-            val result = apiClient.getLastFmStatus()
-            if (result.isSuccess) {
-                val status = result.getOrThrow()
-                _isLastFmConnected.value = status.connected
-                _lastFmUsername.value = status.username
-                if (status.connected && status.session_key != null && status.api_key != null && status.api_secret != null) {
-                    _lastFmConfig.value = LastFmConfig(
-                        apiKey = status.api_key,
-                        apiSecret = status.api_secret,
-                        sessionKey = status.session_key,
-                        username = status.username ?: ""
-                    )
-                } else {
-                    _lastFmConfig.value = null
-                }
-                status.connected
-            } else {
-                _isLastFmConnected.value = false
-                _lastFmUsername.value = null
-                _lastFmConfig.value = null
-                false
-            }
-        } catch (_: Throwable) {
-            false
+        val result = loadLastFmStatus()
+        if (result.exceptionOrNull().isUnauthorized()) {
+            logout()
         }
+        return result.getOrDefault(false)
     }
+
+    private suspend fun loadLastFmStatus(): Result<Boolean> =
+        apiClient.getLastFmStatus().map { status ->
+            _isLastFmConnected.value = status.connected
+            _lastFmUsername.value = status.username
+            if (status.connected && status.session_key != null && status.api_key != null && status.api_secret != null) {
+                _lastFmConfig.value = LastFmConfig(
+                    apiKey = status.api_key,
+                    apiSecret = status.api_secret,
+                    sessionKey = status.session_key,
+                    username = status.username ?: ""
+                )
+            } else {
+                _lastFmConfig.value = null
+            }
+            status.connected
+        }
 
     override suspend fun loginLastFm(username: String, password: String): Result<Unit> =
         runCatching {
@@ -215,13 +254,17 @@ class RealSessionManager(
                         if (refreshResult.isSuccess) {
                             val newAccessToken = refreshResult.getOrThrow().access_token
                             tokenStorage.saveToken(newAccessToken)
-                        } else {
+                        } else if (refreshResult.exceptionOrNull().isUnauthorized()) {
                             logout()
                             break
                         }
+                    } else {
+                        break
                     }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (_: Exception) {
-                    // Transient failure, keep session active
+                    continue
                 }
             }
         }

@@ -14,9 +14,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -49,6 +51,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import org.shilpo.peerless.auth.LocalSessionManager
+import org.shilpo.peerless.auth.SessionState
 import org.shilpo.peerless.home.HomeFeedEmptyReason
 import org.shilpo.peerless.home.HomeFeedItem
 import org.shilpo.peerless.home.HomeFeedState
@@ -68,7 +73,9 @@ import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
 import org.shilpo.peerless.theme.ExpressiveTypography
+import org.shilpo.peerless.theme.LocalWindowWidthSizeClass
 import org.shilpo.peerless.theme.SquircleShapeSmall
+import org.shilpo.peerless.theme.WindowWidthSizeClass
 import org.shilpo.peerless.ui.components.PeerlessIcon
 import org.shilpo.peerless.ui.components.PeerlessIcons
 import org.shilpo.peerless.ui.components.TrackRow
@@ -190,17 +197,16 @@ val SampleLosslessLibrary = listOf(
 
 @Composable
 fun HomeTopHeader(
-    serverConnected: Boolean,
-    onNavigateToSearch: () -> Unit,
-    onToggleStats: (() -> Unit)?,
+    userDisplayName: String,
+    avatarBytes: ByteArray?,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val showDisplayName = LocalWindowWidthSizeClass.current != WindowWidthSizeClass.COMPACT
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
@@ -238,79 +244,78 @@ fun HomeTopHeader(
             )
         }
 
+        Spacer(modifier = Modifier.weight(1f))
+
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .clip(CircleShape)
+                .clickable(role = Role.Button, onClick = onOpenSettings)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "Open settings for $userDisplayName"
+                }
+                .padding(start = 4.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (onToggleStats != null) {
-                IconButton(onClick = onToggleStats, modifier = Modifier.size(48.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainer)
-                            .border(
-                                1.dp,
-                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                                CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        PeerlessIcon(
-                            icon = PeerlessIcons.Compass,
-                            contentDescription = "Explore & Stats",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.tertiary
+                            )
                         )
-                    }
-                }
-            }
-
-            IconButton(onClick = onNavigateToSearch, modifier = Modifier.size(48.dp)) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainer)
-                        .border(
-                            1.dp,
-                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                            CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    PeerlessIcon(
-                        icon = PeerlessIcons.Search,
-                        contentDescription = "Search",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (avatarBytes != null) {
+                    AsyncImage(
+                        model = avatarBytes,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                    )
+                } else {
+                    Text(
+                        text = avatarInitials(userDisplayName),
+                        style = ExpressiveTypography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
                     )
                 }
             }
 
-            IconButton(onClick = onOpenSettings, modifier = Modifier.size(48.dp)) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainer)
-                        .border(
-                            1.dp,
-                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                            CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    PeerlessIcon(
-                        icon = PeerlessIcons.Settings,
-                        contentDescription = "Settings",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+            if (showDisplayName) {
+                Text(
+                    text = userDisplayName,
+                    style = ExpressiveTypography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 168.dp)
+                )
             }
         }
     }
+}
+
+internal fun avatarInitials(displayName: String): String {
+    val normalizedName = displayName.trim().removePrefix("@")
+    if (normalizedName.startsWith("User #", ignoreCase = true)) return "U"
+
+    return normalizedName
+        .split(' ')
+        .mapNotNull { word -> word.firstOrNull { it.isLetter() }?.uppercase() }
+        .take(2)
+        .joinToString("")
+        .ifBlank { "U" }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -716,16 +721,14 @@ private fun HomeFeedMessage(
 @Composable
 fun HomeScreenContent(
     playerConnection: PlayerConnection,
-    serverConnected: Boolean,
     searchQuery: String,
     onQueryChange: (String) -> Unit,
     selectedFilter: String,
     onSelectFilter: (String) -> Unit,
     displayedTracks: List<TrackSummaryDto>,
     allTracks: List<TrackSummaryDto>,
-    onOpenSettings: () -> Unit,
     onNavigateToSearch: () -> Unit,
-    onToggleStats: (() -> Unit)?,
+    onNavigateToSettings: () -> Unit,
     contentBottomPadding: Dp,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -735,6 +738,12 @@ fun HomeScreenContent(
     val status by playerConnection.status.collectAsState()
     val apiClient = LocalPeerlessApiClient.current
     val sessionManager = LocalSessionManager.current
+    val sessionState by sessionManager.sessionState.collectAsState()
+    val currentUser = (sessionState as? SessionState.Authenticated)?.user
+    val userDisplayName = currentUser?.displayName ?: "Account"
+    var avatarBytes by remember(currentUser?.telegram_id, apiClient.baseUrl) {
+        mutableStateOf<ByteArray?>(null)
+    }
     val lastFmUsername by sessionManager.lastFmUsername.collectAsState()
     val homeFeedRepository = LocalHomeFeedRepository.current
     val libraryCatalogRevision = remember(allTracks) {
@@ -747,6 +756,10 @@ fun HomeScreenContent(
         mutableStateOf(HomeFeedState(isLoading = !lastFmUsername.isNullOrBlank()))
     }
     var homeFeedRefreshKey by remember { mutableStateOf(0) }
+
+    LaunchedEffect(currentUser?.telegram_id, apiClient.baseUrl) {
+        avatarBytes = apiClient.getUserAvatar().getOrNull()
+    }
 
     LaunchedEffect(
         homeFeedRepository,
@@ -774,10 +787,9 @@ fun HomeScreenContent(
     ) {
         item(key = "top_header") {
             HomeTopHeader(
-                serverConnected = serverConnected,
-                onNavigateToSearch = onNavigateToSearch,
-                onToggleStats = onToggleStats,
-                onOpenSettings = onOpenSettings
+                userDisplayName = userDisplayName,
+                avatarBytes = avatarBytes,
+                onOpenSettings = onNavigateToSettings
             )
         }
 
