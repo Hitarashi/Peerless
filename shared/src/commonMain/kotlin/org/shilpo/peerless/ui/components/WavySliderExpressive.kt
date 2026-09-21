@@ -12,9 +12,32 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ProgressIndicatorDefaults
+import androidx.compose.material3.WavyProgressIndicatorDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -27,7 +50,11 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
@@ -63,6 +90,7 @@ fun WavySliderExpressive(
     inactiveTrackColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     bufferedTrackColor: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.42f),
     thumbColor: Color = MaterialTheme.colorScheme.primary,
+    visualContentOffsetY: Dp = 0.dp,
 
     isPlaying: Boolean = true,
     isVisible: Boolean = true,
@@ -92,7 +120,10 @@ fun WavySliderExpressive(
         derivedStateOf {
             val v = value()
             if (valueRange.endInclusive == valueRange.start) 0f
-            else ((v - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
+            else ((v - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(
+                0f,
+                1f
+            )
         }
     }
 
@@ -144,7 +175,10 @@ fun WavySliderExpressive(
         derivedStateOf {
             val b = bufferedValue?.invoke() ?: 0f
             if (valueRange.endInclusive == valueRange.start) 0f
-            else ((b - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
+            else ((b - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(
+                0f,
+                1f
+            )
         }
     }
 
@@ -157,7 +191,10 @@ fun WavySliderExpressive(
     val renderedNormalizedProgress = remember {
         val initialVal = value()
         val initialNorm = if (valueRange.endInclusive == valueRange.start) 0f
-        else ((initialVal - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
+        else ((initialVal - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(
+            0f,
+            1f
+        )
         mutableFloatStateOf(initialNorm)
     }
     var lastProgressUpdateNanos by remember { mutableLongStateOf(0L) }
@@ -195,7 +232,8 @@ fun WavySliderExpressive(
                 val frameNanos = withFrameNanos { it }
                 if (startFrameNanos == 0L) startFrameNanos = frameNanos
                 val elapsedNanos = (frameNanos - startFrameNanos).coerceAtLeast(0L)
-                val fraction = (elapsedNanos.toDouble() / durationNanos.toDouble()).toFloat().coerceIn(0f, 1f)
+                val fraction =
+                    (elapsedNanos.toDouble() / durationNanos.toDouble()).toFloat().coerceIn(0f, 1f)
                 renderedNormalizedProgress.floatValue = start + (target - start) * fraction
                 if (fraction >= 1f) break
             }
@@ -204,7 +242,10 @@ fun WavySliderExpressive(
     }
 
     val containerHeight =
-        max(WavyProgressIndicatorDefaults.LinearContainerHeight, max(thumbRadius * 2, thumbLineHeightWhenInteracting))
+        max(
+            WavyProgressIndicatorDefaults.LinearContainerHeight,
+            max(thumbRadius * 2, thumbLineHeightWhenInteracting)
+        )
 
     Box(
         modifier = modifier
@@ -237,6 +278,7 @@ fun WavySliderExpressive(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = trackEdgePadding.coerceAtLeast(0.dp))
+                    .offset(y = visualContentOffsetY)
                     .clearAndSetSemantics { },
                 color = activeTrackColor,
                 trackColor = inactiveTrackColor,
@@ -258,15 +300,17 @@ fun WavySliderExpressive(
             val trackStart = edgePaddingPx
             val trackEnd = size.width - edgePaddingPx
             val trackWidth = (trackEnd - trackStart).coerceAtLeast(0f)
-            val thumbY = size.height / 2
+            val thumbY = size.height / 2 + with(density) { visualContentOffsetY.toPx() }
             val renderedProgress = renderedNormalizedProgress.floatValue
 
             fun lerp(start: Float, stop: Float, fraction: Float): Float {
                 return start + (stop - start) * fraction
             }
 
-            val currentWidth = lerp(thumbRadiusPx * 2f, strokeWidthPx * 1.2f, thumbInteractionFraction)
-            val currentHeight = lerp(thumbRadiusPx * 2f, thumbLineHeightPx, thumbInteractionFraction)
+            val currentWidth =
+                lerp(thumbRadiusPx * 2f, strokeWidthPx * 1.2f, thumbInteractionFraction)
+            val currentHeight =
+                lerp(thumbRadiusPx * 2f, thumbLineHeightPx, thumbInteractionFraction)
             val rawThumbX = trackStart + (trackWidth * renderedProgress)
             val minThumbCenter = (currentWidth / 2f).coerceAtMost(size.width / 2f)
             val maxThumbCenter = (size.width - currentWidth / 2f).coerceAtLeast(minThumbCenter)
@@ -277,7 +321,8 @@ fun WavySliderExpressive(
             if (bufferedProgress > renderedProgress && trackWidth > 0f) {
                 val gapHalfPx = with(density) { dynamicGapSize.value.toPx() }
                 val bufferStartX = (thumbX + gapHalfPx).coerceIn(trackStart, trackEnd)
-                val bufferEndX = (trackStart + trackWidth * bufferedProgress).coerceIn(trackStart, trackEnd)
+                val bufferEndX =
+                    (trackStart + trackWidth * bufferedProgress).coerceIn(trackStart, trackEnd)
 
                 if (bufferEndX > bufferStartX) {
                     drawLine(
@@ -347,11 +392,14 @@ fun WavySliderExpressive(
                                 if (change.position != change.previousPosition) {
                                     change.consume()
                                     latestGestureValue = valueForX(change.position.x)
-                                    val quantized = (latestGestureValue.coerceIn(0f, 1f) * 20f).toInt()
+                                    val quantized =
+                                        (latestGestureValue.coerceIn(0f, 1f) * 20f).toInt()
                                     if (quantized != lastHapticStep[0]) {
                                         lastHapticStep[0] = quantized
                                         try {
-                                            currentHaptics.value.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            currentHaptics.value.performHapticFeedback(
+                                                HapticFeedbackType.TextHandleMove
+                                            )
                                         } catch (_: Throwable) {
                                         }
                                     }

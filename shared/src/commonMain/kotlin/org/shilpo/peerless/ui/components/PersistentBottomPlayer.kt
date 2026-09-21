@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -126,7 +127,7 @@ fun PersistentBottomPlayer(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(96.dp)
+            .height(116.dp)
             .clip(containerShape)
             .background(colorScheme.surfaceContainerLow)
     ) {
@@ -134,7 +135,7 @@ fun PersistentBottomPlayer(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 4.dp),
+                .padding(start = 20.dp, end = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -305,13 +306,14 @@ fun PersistentBottomPlayer(
             Column(
                 modifier = Modifier
                     .weight(1.8f)
+                    .fillMaxHeight()
                     .padding(horizontal = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Bottom
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     IconButton(
                         onClick = onToggleShuffle,
@@ -327,58 +329,69 @@ fun PersistentBottomPlayer(
                         )
                     }
 
-                    IconButton(
-                        onClick = onPlayPrevious,
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        PeerlessIcon(
-                            icon = PeerlessIcons.SkipPrevious,
-                            contentDescription = "Previous Track",
-                            tint = colorScheme.onSurface,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-
-                    Box(
+                    Row(
                         modifier = Modifier
-                            .size(48.dp)
-                            .clickable(
-                                interactionSource = playButtonInteractionSource,
-                                indication = ripple(),
-                                onClick = onTogglePlayPause
-                            )
-                            .semantics {
-                                role = Role.Button
-                                contentDescription = if (isPlaying) "Pause" else "Play"
-                            },
-                        contentAlignment = Alignment.Center
+                            .height(56.dp)
+                            .clip(CircleShape)
+                            .background(colorScheme.surfaceContainerHigh)
+                            .padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .scale(playButtonScale)
-                                .size(42.dp)
-                                .clip(SquircleShapeSmall)
-                                .background(colorScheme.primary),
-                            contentAlignment = Alignment.Center
+                        IconButton(
+                            onClick = onPlayPrevious,
+                            modifier = Modifier.size(48.dp)
                         ) {
-                            PlayPauseMorphIcon(
-                                isPlaying = isPlaying,
-                                tint = colorScheme.onPrimary,
-                                size = 22.dp
+                            PeerlessIcon(
+                                icon = PeerlessIcons.SkipPrevious,
+                                contentDescription = "Previous Track",
+                                tint = colorScheme.onSurface,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
-                    }
 
-                    IconButton(
-                        onClick = onPlayNext,
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        PeerlessIcon(
-                            icon = PeerlessIcons.SkipNext,
-                            contentDescription = "Next Track",
-                            tint = colorScheme.onSurface,
-                            modifier = Modifier.size(22.dp)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .clickable(
+                                    interactionSource = playButtonInteractionSource,
+                                    indication = ripple(),
+                                    onClick = onTogglePlayPause
+                                )
+                                .semantics {
+                                    role = Role.Button
+                                    contentDescription = if (isPlaying) "Pause" else "Play"
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .scale(playButtonScale)
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(colorScheme.primary),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                PlayPauseMorphIcon(
+                                    isPlaying = isPlaying,
+                                    tint = colorScheme.onPrimary,
+                                    size = 24.dp
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            onClick = onPlayNext,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            PeerlessIcon(
+                                icon = PeerlessIcons.SkipNext,
+                                contentDescription = "Next Track",
+                                tint = colorScheme.onSurface,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
 
                     IconButton(
@@ -395,8 +408,6 @@ fun PersistentBottomPlayer(
                         )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(4.dp))
 
                 ExpressiveWavySeekBar(
                     positionMs = positionMs,
@@ -481,6 +492,7 @@ private fun ExpressiveWavySeekBar(
     val currentPosition = scrubPositionMs ?: displayedPosition.value
     val elapsedText = formatDuration((currentPosition / 1000).toInt())
     val totalText = formatDuration((durationMs / 1000).toInt())
+    val visualContentOffsetY = (-4).dp
 
     val effectiveBufferedMs = maxOf(bufferedPositionMs, positionMs)
     val bufferedFraction = if (durationMs > 0L) {
@@ -495,7 +507,8 @@ private fun ExpressiveWavySeekBar(
         Text(
             text = elapsedText,
             style = SpecBadgeTypography.copy(fontSize = 11.sp),
-            color = colorScheme.onSurfaceVariant
+            color = colorScheme.onSurfaceVariant,
+            modifier = Modifier.offset(y = visualContentOffsetY)
         )
 
         WavySliderExpressive(
@@ -514,6 +527,7 @@ private fun ExpressiveWavySeekBar(
             inactiveTrackColor = colorScheme.surfaceContainerHighest,
             bufferedTrackColor = colorScheme.onSurface.copy(alpha = 0.42f),
             thumbColor = colorScheme.primary,
+            visualContentOffsetY = visualContentOffsetY,
             isPlaying = isPlaying,
             isVisible = true,
             strokeWidth = 5.dp,
@@ -528,7 +542,8 @@ private fun ExpressiveWavySeekBar(
         Text(
             text = totalText,
             style = SpecBadgeTypography.copy(fontSize = 11.sp),
-            color = colorScheme.onSurfaceVariant
+            color = colorScheme.onSurfaceVariant,
+            modifier = Modifier.offset(y = visualContentOffsetY)
         )
     }
 }
