@@ -1,5 +1,6 @@
 package org.shilpo.peerless.lastfm
 
+import androidx.compose.runtime.staticCompositionLocalOf
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
@@ -13,6 +14,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.shilpo.peerless.config.AppConfig
+import org.shilpo.peerless.model.LastFmAlbumInfo
 import org.shilpo.peerless.model.LastFmArtist
 import org.shilpo.peerless.model.LastFmSimilarTrack
 import org.shilpo.peerless.model.LastFmTag
@@ -62,6 +64,30 @@ class LastFmClient(
             }
         }
     }
+
+    internal suspend fun getAlbumInfo(artist: String, album: String): Result<LastFmAlbumInfo> =
+        runCatching {
+            val response = httpClient.get(baseUrl) {
+                parameter("method", "album.getinfo")
+                parameter("artist", artist)
+                parameter("album", album)
+                parameter("api_key", apiKey)
+                parameter("format", "json")
+                parameter("autocorrect", "1")
+            }
+            if (!response.status.isSuccess()) {
+                error("Last.fm album request failed with HTTP ${response.status}")
+            }
+            val root = json.parseToJsonElement(response.bodyAsText()).jsonObject
+            if (root.containsKey("error")) {
+                val msg = root["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown Last.fm error"
+                error("Last.fm API error: $msg")
+            }
+            val albumObject = root["album"]?.jsonObject
+                ?: error("Missing 'album' object in response")
+
+            parseAlbumInfo(albumObject, artist, album)
+        }
 
     suspend fun getTrackInfo(artist: String, track: String): Result<LastFmTrackInfo> = runCatching {
         try {
@@ -280,7 +306,36 @@ class LastFmClient(
             name = name,
             bioSummary = bioSummary,
             tags = tags,
-            similarArtists = similarList
+            similarArtists = similarList,
+            url = artistObj["url"]?.jsonPrimitive?.contentOrNull
+        )
+    }
+
+    private fun parseAlbumInfo(
+        albumObject: JsonObject,
+        requestedArtist: String,
+        requestedAlbum: String
+    ): LastFmAlbumInfo {
+        val name = albumObject["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+            ?: requestedAlbum
+        val artist = albumObject["artist"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+            ?: requestedArtist
+        val wikiSummary = cleanBio(
+            albumObject["wiki"]?.jsonObject?.get("summary")?.jsonPrimitive?.contentOrNull
+        )
+
+        return LastFmAlbumInfo(
+            name = name,
+            artist = artist,
+            wikiSummary = wikiSummary,
+            releaseDate = albumObject["releasedate"]?.jsonPrimitive?.contentOrNull?.trim()
+                ?.ifBlank { null },
+            tags = parseTags(albumObject["toptags"] ?: albumObject["tags"]),
+            listeners = albumObject["listeners"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+                ?: 0L,
+            playcount = albumObject["playcount"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+                ?: 0L,
+            url = albumObject["url"]?.jsonPrimitive?.contentOrNull
         )
     }
 
@@ -301,6 +356,7 @@ class LastFmClient(
         val rawWiki = trackObj["wiki"]?.jsonObject?.get("summary")?.jsonPrimitive?.contentOrNull
         val wikiSummary = cleanBio(rawWiki)
         val tags = parseTags(trackObj["toptags"] ?: trackObj["tags"])
+        val listeners = trackObj["listeners"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 0L
         val playcount = trackObj["playcount"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 0L
 
         return LastFmTrackInfo(
@@ -308,6 +364,7 @@ class LastFmClient(
             artist = artistName,
             wikiSummary = wikiSummary,
             tags = tags,
+            listeners = listeners,
             playcount = playcount
         )
     }
@@ -431,8 +488,7 @@ class LastFmClient(
                     LastFmTag("Lossless", 95),
                     LastFmTag("Electronic", 85),
                     LastFmTag("Audiophile", 75)
-                ),
-                playcount = 1_420_000L
+                )
             )
         }
 
@@ -449,4 +505,8 @@ class LastFmClient(
             LastFmTag("Lossless", 1_500_000)
         )
     }
+}
+
+internal val LocalLastFmClient = staticCompositionLocalOf<LastFmClient> {
+    error("LastFmClient was not provided")
 }

@@ -4,8 +4,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
@@ -66,6 +68,7 @@ import org.shilpo.peerless.theme.WindowWidthSizeClass
 import org.shilpo.peerless.ui.components.lyrics.VisualLyricsConfig
 import org.shilpo.peerless.ui.components.lyrics.VisualLyricsLine
 import org.shilpo.peerless.ui.components.lyrics.WaitingDotsView
+import org.shilpo.peerless.ui.components.lyrics.isInstrumentalLineVisible
 
 /**
  * Modern visual lyrics viewport reproducing XMusic's signature visual presentation
@@ -252,6 +255,12 @@ private fun VisualLyricsLines(
     }
 
     val listState = rememberLazyListState()
+    val lineSpacing = when {
+        compact && desktopText -> 22.dp
+        compact -> 18.dp
+        desktopText -> 32.dp
+        else -> 26.dp
+    }
     var isFollowingPlayback by remember(lyrics.track_id) { mutableStateOf(true) }
     var isUserInteracting by remember(lyrics.track_id) { mutableStateOf(false) }
     var showResumeButton by remember(lyrics.track_id) { mutableStateOf(false) }
@@ -332,19 +341,13 @@ private fun VisualLyricsLines(
                 bottom = if (lyrics.attribution.isNullOrBlank()) 64.dp else 96.dp
             ),
             horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(
-                when {
-                    compact && desktopText -> 22.dp
-                    compact -> 18.dp
-                    desktopText -> 32.dp
-                    else -> 26.dp
-                }
-            )
+            verticalArrangement = Arrangement.Top
         ) {
             itemsIndexed(
                 items = lines,
                 key = { index, line -> "${lyrics.track_id}_${index}_${line.start_ms}" }
             ) { index, line ->
+                val rowBottomSpacing = if (index < lines.lastIndex) lineSpacing else 0.dp
                 val distance = if (activeLineIndex >= 0) {
                     kotlin.math.abs(index - activeLineIndex)
                 } else {
@@ -433,30 +436,68 @@ private fun VisualLyricsLines(
                             } else {
                                 Modifier
                             }
-                        ),
+                        )
+                        .padding(bottom = if (line.is_instrumental) 0.dp else rowBottomSpacing),
                     horizontalAlignment = Alignment.Start
                 ) {
                     if (line.is_instrumental) {
-                        // Rhythmic instrumental waiting dots ported from XMusic
-                        if (config.enableWaitingDots) {
-                            WaitingDotsView(
-                                startTime = line.start_ms,
-                                endTime = line.end_ms,
-                                currentProgressMs = effectivePositionMs,
-                                primaryColor = voiceAccent
-                            )
-                        } else {
-                            Text(
-                                text = "♫  Instrumental  ♫",
-                                style = if (desktopText) {
-                                    ExpressiveTypography.bodyLarge
+                        val instrumentalEndMs = remember(lines, index, lyrics.duration_ms) {
+                            lines.drop(index + 1)
+                                .firstOrNull { it.start_ms > line.start_ms }
+                                ?.start_ms
+                                ?: lyrics.duration_ms.takeIf { it > line.start_ms }
+                        }
+                        AnimatedVisibility(
+                            visible = isInstrumentalLineVisible(
+                                line = line,
+                                fallbackEndMs = instrumentalEndMs,
+                                positionMs = effectivePositionMs
+                            ),
+                            enter = expandVertically(
+                                expandFrom = Alignment.CenterVertically,
+                                animationSpec = tween(220, easing = FastOutSlowInEasing)
+                            ) + fadeIn(
+                                animationSpec = tween(180, easing = FastOutSlowInEasing)
+                            ) + slideInVertically(
+                                animationSpec = tween(220, easing = FastOutSlowInEasing)
+                            ) { height -> height / 3 },
+                            exit = shrinkVertically(
+                                shrinkTowards = Alignment.CenterVertically,
+                                animationSpec = tween(180, easing = FastOutSlowInEasing)
+                            ) + fadeOut(
+                                animationSpec = tween(140, easing = FastOutSlowInEasing)
+                            ) + slideOutVertically(
+                                animationSpec = tween(180, easing = FastOutSlowInEasing)
+                            ) { height -> -height / 4 }
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = rowBottomSpacing)
+                            ) {
+                                if (config.enableWaitingDots) {
+                                    WaitingDotsView(
+                                        startTime = line.start_ms,
+                                        endTime = line.end_ms.takeIf { it > line.start_ms }
+                                            ?: instrumentalEndMs
+                                            ?: line.end_ms,
+                                        currentProgressMs = effectivePositionMs,
+                                        primaryColor = voiceAccent
+                                    )
                                 } else {
-                                    ExpressiveTypography.bodyMedium
-                                },
-                                fontWeight = FontWeight.Medium,
-                                color = lineColor,
-                                textAlign = TextAlign.Start
-                            )
+                                    Text(
+                                        text = "♫  Instrumental  ♫",
+                                        style = if (desktopText) {
+                                            ExpressiveTypography.bodyLarge
+                                        } else {
+                                            ExpressiveTypography.bodyMedium
+                                        },
+                                        fontWeight = FontWeight.Medium,
+                                        color = lineColor,
+                                        textAlign = TextAlign.Start
+                                    )
+                                }
+                            }
                         }
                     } else {
                         val mainText = line.text.ifBlank { line.words.joinToString("") { it.text } }

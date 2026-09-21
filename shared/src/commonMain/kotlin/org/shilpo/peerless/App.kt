@@ -14,6 +14,7 @@ import org.shilpo.peerless.auth.createPlatformTokenStorage
 import org.shilpo.peerless.config.AppConfig
 import org.shilpo.peerless.home.HomeFeedRepository
 import org.shilpo.peerless.lastfm.LastFmClient
+import org.shilpo.peerless.lastfm.LocalLastFmClient
 import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.network.PeerlessApiClient
 import org.shilpo.peerless.player.LocalPlayerConnection
@@ -52,13 +53,16 @@ fun App(
             attachSync(syncManager)
         }
     }
-    val homeFeedRepository = remember(apiClient, lastFmConfig?.apiKey) {
+    val lastFmClient = remember(apiClient, lastFmConfig?.apiKey) {
+        LastFmClient(
+            apiKey = lastFmConfig?.apiKey ?: AppConfig.DEFAULT_LASTFM_API_KEY,
+            httpClient = apiClient.httpClient,
+            enableFallback = false
+        )
+    }
+    val homeFeedRepository = remember(apiClient, lastFmClient) {
         HomeFeedRepository(
-            lastFmClient = LastFmClient(
-                apiKey = lastFmConfig?.apiKey ?: AppConfig.DEFAULT_LASTFM_API_KEY,
-                httpClient = apiClient.httpClient,
-                enableFallback = false
-            ),
+            lastFmClient = lastFmClient,
             apiClient = apiClient
         )
     }
@@ -137,6 +141,7 @@ fun App(
             LocalPlayerConnection provides playerConnection,
             LocalPlaybackSyncManager provides syncManager,
             LocalPeerlessApiClient provides apiClient,
+            LocalLastFmClient provides lastFmClient,
             LocalSessionManager provides sessionManager,
             org.shilpo.peerless.home.LocalHomeFeedRepository provides homeFeedRepository,
             org.shilpo.peerless.library.LocalFavoritesManager provides favoritesManager,

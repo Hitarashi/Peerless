@@ -15,8 +15,7 @@ streams native **Apple Lossless (ALAC up to 24-bit/192kHz)**, **FLAC (up to 24-b
 
 The interface is inspired by **Material 3 Expressive**, featuring liquid glass surfaces, an adaptive
 layout conforming to Google Large Screen Guidelines, kinetic synchronized lyrics, real-time FFT
-spectrum visualizer, Poweramp-style audio signal path inspection, and Spotify Connect-style
-cross-device synchronization.
+spectrum visualizer, and Spotify Connect-style cross-device synchronization.
 
 ---
 
@@ -28,9 +27,6 @@ cross-device synchronization.
   server transcoding overhead.
 - **Dolby Atmos Spatial Audio**: Native E-AC-3 JOC playback on Android via bundled
   `media3-ffmpeg-decoder` (Jellyfin FFmpeg JNI), AVPlayer on iOS, and libmpv on Desktop.
-- **Poweramp-Style Signal Path (Audio Details Modal)**: Interactive vertical flow inspection mapping
-  every stage:
-  `Source → Track Specs → Engine Decoder → Stream Cache/Pipe → Hardware Output Sink & DAC`.
 - **Gapless Preloading**: Multi-track buffer pre-fetching (`prepareNext`) ensuring continuous
   transition across album tracks.
 

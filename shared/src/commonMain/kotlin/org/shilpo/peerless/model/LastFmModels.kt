@@ -10,7 +10,20 @@ data class LastFmArtist(
     val name: String,
     val bioSummary: String? = null,
     val tags: List<LastFmTag> = emptyList(),
-    val similarArtists: List<String> = emptyList()
+    val similarArtists: List<String> = emptyList(),
+    val url: String? = null
+)
+
+@Serializable
+internal data class LastFmAlbumInfo(
+    val name: String,
+    val artist: String,
+    val wikiSummary: String? = null,
+    val releaseDate: String? = null,
+    val tags: List<LastFmTag> = emptyList(),
+    val listeners: Long = 0L,
+    val playcount: Long = 0L,
+    val url: String? = null
 )
 
 @Serializable
@@ -19,6 +32,7 @@ data class LastFmTrackInfo(
     val artist: String,
     val wikiSummary: String? = null,
     val tags: List<LastFmTag> = emptyList(),
+    val listeners: Long = 0L,
     val playcount: Long = 0L
 )
 

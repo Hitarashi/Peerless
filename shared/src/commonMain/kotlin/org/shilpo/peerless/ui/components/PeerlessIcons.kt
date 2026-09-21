@@ -14,7 +14,48 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
-import peerless.shared.generated.resources.*
+import peerless.shared.generated.resources.Res
+import peerless.shared.generated.resources.peerless_check_circle
+import peerless.shared.generated.resources.peerless_close
+import peerless.shared.generated.resources.peerless_cloud_done
+import peerless.shared.generated.resources.peerless_content_paste
+import peerless.shared.generated.resources.peerless_devices
+import peerless.shared.generated.resources.peerless_dns
+import peerless.shared.generated.resources.peerless_download
+import peerless.shared.generated.resources.peerless_expand_more
+import peerless.shared.generated.resources.peerless_explore
+import peerless.shared.generated.resources.peerless_explore_filled
+import peerless.shared.generated.resources.peerless_favorite
+import peerless.shared.generated.resources.peerless_favorite_filled
+import peerless.shared.generated.resources.peerless_graphic_eq
+import peerless.shared.generated.resources.peerless_info_filled
+import peerless.shared.generated.resources.peerless_info_outline
+import peerless.shared.generated.resources.peerless_library_music
+import peerless.shared.generated.resources.peerless_library_music_filled
+import peerless.shared.generated.resources.peerless_lock
+import peerless.shared.generated.resources.peerless_logout
+import peerless.shared.generated.resources.peerless_lyrics
+import peerless.shared.generated.resources.peerless_memory
+import peerless.shared.generated.resources.peerless_more_vert
+import peerless.shared.generated.resources.peerless_music_note
+import peerless.shared.generated.resources.peerless_open_in_new
+import peerless.shared.generated.resources.peerless_person
+import peerless.shared.generated.resources.peerless_play_arrow
+import peerless.shared.generated.resources.peerless_queue_music
+import peerless.shared.generated.resources.peerless_repeat
+import peerless.shared.generated.resources.peerless_repeat_one
+import peerless.shared.generated.resources.peerless_search
+import peerless.shared.generated.resources.peerless_settings
+import peerless.shared.generated.resources.peerless_shuffle
+import peerless.shared.generated.resources.peerless_skip_next
+import peerless.shared.generated.resources.peerless_skip_previous
+import peerless.shared.generated.resources.peerless_speed
+import peerless.shared.generated.resources.peerless_stars
+import peerless.shared.generated.resources.peerless_tune
+import peerless.shared.generated.resources.peerless_visibility
+import peerless.shared.generated.resources.peerless_visibility_off
+import peerless.shared.generated.resources.peerless_vpn_key
+import peerless.shared.generated.resources.peerless_warning
 
 object PeerlessIcons {
     val Play: DrawableResource get() = Res.drawable.peerless_play_arrow
@@ -44,6 +85,8 @@ object PeerlessIcons {
     val Sparkle: DrawableResource get() = Res.drawable.peerless_stars
     val Compass: DrawableResource get() = Res.drawable.peerless_explore
     val Person: DrawableResource get() = Res.drawable.peerless_person
+    val InfoOutline: DrawableResource get() = Res.drawable.peerless_info_outline
+    val InfoFilled: DrawableResource get() = Res.drawable.peerless_info_filled
     val Speed: DrawableResource get() = Res.drawable.peerless_speed
     val Dns: DrawableResource get() = Res.drawable.peerless_dns
     val Memory: DrawableResource get() = Res.drawable.peerless_memory
@@ -186,7 +229,8 @@ fun PeerlessIcon(
     modifier: Modifier = Modifier,
     tint: Color = LocalContentColor.current,
 ) {
-    val needsRtlMirror = LocalLayoutDirection.current == LayoutDirection.Rtl && icon.isAutoMirrored()
+    val needsRtlMirror =
+        LocalLayoutDirection.current == LayoutDirection.Rtl && icon.isAutoMirrored()
     Icon(
         painter = painterResource(icon),
         contentDescription = contentDescription,

@@ -1461,8 +1461,6 @@ private fun SupportingPaneContainer(
     onResetWidth: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val apiClient = LocalPeerlessApiClient.current
-    val playbackInfo by playerConnection.playbackInfo.collectAsState()
     val queue by playerConnection.queue.collectAsState()
     val queueDtos = remember(queue) { queue.map { it.toSummaryDto() } }
     val outputLatencyMs by playerConnection.outputLatencyMs.collectAsState()
@@ -1513,7 +1511,7 @@ private fun SupportingPaneContainer(
                         val paneIcon = when (paneType) {
                             SupportingPaneType.QUEUE -> PeerlessIcons.Queue
                             SupportingPaneType.LYRICS -> PeerlessIcons.Lyrics
-                            SupportingPaneType.SIGNAL_PATH -> PeerlessIcons.SignalPath
+                            SupportingPaneType.TRACK_CONTEXT -> PeerlessIcons.InfoFilled
                         }
 
                         PeerlessIcon(
@@ -1601,11 +1599,10 @@ private fun SupportingPaneContainer(
                         )
                     }
 
-                    SupportingPaneType.SIGNAL_PATH -> {
-                        SignalPathPaneContent(
-                            track = currentTrackDto,
-                            playbackInfo = playbackInfo,
-                            serverUrl = apiClient.baseUrl
+                    SupportingPaneType.TRACK_CONTEXT -> {
+                        TrackContextPaneContent(
+                            currentTrack = currentTrackDto,
+                            playerConnection = playerConnection
                         )
                     }
                 }

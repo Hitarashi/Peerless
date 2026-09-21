@@ -67,14 +67,14 @@ fun SupportingPaneQuickSwitcherPill(
         listOf(
             SupportingPaneType.QUEUE to PeerlessIcons.Queue,
             SupportingPaneType.LYRICS to PeerlessIcons.Lyrics,
-            SupportingPaneType.SIGNAL_PATH to PeerlessIcons.SignalPath
+            SupportingPaneType.TRACK_CONTEXT to PeerlessIcons.InfoOutline
         )
     }
 
     val targetIndex = when (activeSupportingPane) {
         SupportingPaneType.QUEUE -> 0
         SupportingPaneType.LYRICS -> 1
-        SupportingPaneType.SIGNAL_PATH -> 2
+        SupportingPaneType.TRACK_CONTEXT -> 2
         null -> null
     }
 
@@ -259,7 +259,11 @@ fun SupportingPaneQuickSwitcherPill(
                             )
                         } else {
                             PeerlessIcon(
-                                icon = icon,
+                                icon = if (type == SupportingPaneType.TRACK_CONTEXT && isSelected) {
+                                    PeerlessIcons.InfoFilled
+                                } else {
+                                    icon
+                                },
                                 contentDescription = type.title,
                                 tint = iconTint,
                                 modifier = Modifier

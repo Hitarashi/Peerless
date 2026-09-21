@@ -2,7 +2,6 @@ package org.shilpo.peerless.ui.shell
 
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,9 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,14 +22,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import org.shilpo.peerless.lyrics.LyricsLoader
-import org.shilpo.peerless.model.PlaybackInfo
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.PlaybackStatus
@@ -41,8 +33,6 @@ import org.shilpo.peerless.player.PlayerConnection
 import org.shilpo.peerless.preferences.LocalAppPreferences
 import org.shilpo.peerless.preferences.LyricsPresentation
 import org.shilpo.peerless.theme.ExpressiveTypography
-import org.shilpo.peerless.theme.SpecBadgeTypography
-import org.shilpo.peerless.theme.SquircleShapeSmall
 import org.shilpo.peerless.theme.rememberArtworkSeedColor
 import org.shilpo.peerless.theme.rememberMiniPlayerGlowPalette
 import org.shilpo.peerless.ui.components.LyricsPresentationControl
@@ -222,140 +212,6 @@ internal fun LyricsPaneContent(
                     config = lyricsPresentation.visualConfig(effectiveOffset),
                     modifier = Modifier.weight(1f),
                     compact = true
-                )
-            }
-        }
-    }
-}
-
-@Composable
-internal fun SignalPathPaneContent(
-    track: TrackSummaryDto?,
-    playbackInfo: PlaybackInfo?,
-    serverUrl: String
-) {
-    if (track == null) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "No active audio stream to inspect",
-                style = ExpressiveTypography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    } else {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            SignalPathStageCard(
-                stageNumber = "1",
-                stageName = "SOURCE ORIGIN",
-                primaryInfo = if (track.is_cached) "Telegram Dump Channel (Instant)" else "${track.provider.uppercase()} Mirror",
-                secondaryInfo = "Endpoint: $serverUrl • HMAC Signed Ticket",
-                accentColor = MaterialTheme.colorScheme.secondary
-            )
-
-            val codec = playbackInfo?.codec ?: track.codec
-            val bitDepth = playbackInfo?.bit_depth ?: track.bit_depth
-            val sampleRate = playbackInfo?.sample_rate ?: track.sample_rate
-            SignalPathStageCard(
-                stageNumber = "2",
-                stageName = "CONTAINER & CODEC",
-                primaryInfo = "${codec.uppercase()} Lossless",
-                secondaryInfo = "${bitDepth ?: 24}-Bit • ${((sampleRate ?: 96000) / 1000.0)} kHz • 2.0 Stereo",
-                accentColor = MaterialTheme.colorScheme.tertiary
-            )
-
-            SignalPathStageCard(
-                stageNumber = "3",
-                stageName = "PLATFORM DECODER",
-                primaryInfo = "Native Multiplatform Audio Engine",
-                secondaryInfo = "Bit-perfect PCM Uncompressed Buffer",
-                accentColor = MaterialTheme.colorScheme.primary
-            )
-
-            SignalPathStageCard(
-                stageNumber = "4",
-                stageName = "STREAM PIPE / CACHE",
-                primaryInfo = "HTTP Chunk Buffer (Chunked Transfer)",
-                secondaryInfo = "Latency: <120ms • Gapless Engine Active",
-                accentColor = MaterialTheme.colorScheme.secondary
-            )
-
-            SignalPathStageCard(
-                stageNumber = "5",
-                stageName = "OUTPUT & SINK",
-                primaryInfo = "Hardware Audio Sink",
-                secondaryInfo = "High-Res Direct Path • No Resampling",
-                accentColor = MaterialTheme.colorScheme.tertiary
-            )
-        }
-    }
-}
-
-@Composable
-private fun SignalPathStageCard(
-    stageNumber: String,
-    stageName: String,
-    primaryInfo: String,
-    secondaryInfo: String,
-    accentColor: Color
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(SquircleShapeSmall)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(
-                1.dp,
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                SquircleShapeSmall
-            )
-            .padding(12.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(accentColor.copy(alpha = 0.2f))
-                    .border(1.dp, accentColor, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = stageNumber,
-                    style = SpecBadgeTypography.copy(fontSize = 11.sp),
-                    fontWeight = FontWeight.Bold,
-                    color = accentColor
-                )
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stageName,
-                    style = SpecBadgeTypography.copy(fontSize = 8.5.sp),
-                    color = accentColor,
-                    letterSpacing = 1.sp
-                )
-                Text(
-                    text = primaryInfo,
-                    style = ExpressiveTypography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = secondaryInfo,
-                    style = ExpressiveTypography.bodySmall.copy(fontSize = 10.5.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
