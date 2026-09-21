@@ -1,7 +1,11 @@
 package org.shilpo.peerless
 
 import org.shilpo.peerless.network.PeerlessApiClient
-import org.shilpo.peerless.player.*
+import org.shilpo.peerless.player.InMemoryQueueStorage
+import org.shilpo.peerless.player.MprisServer
+import org.shilpo.peerless.player.PlaybackStatus
+import org.shilpo.peerless.player.RealPlayerConnection
+import org.shilpo.peerless.player.createAudioEngine
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -15,6 +19,7 @@ class SharedLogicDesktopTest {
         assertEquals(PlaybackStatus.IDLE, engine.state.value.status)
         engine.release()
     }
+
 
     @Test
     fun testMprisServerDbus() = kotlinx.coroutines.test.runTest {
@@ -44,7 +49,11 @@ class SharedLogicDesktopTest {
         val exitCode = proc.waitFor()
         println("busctl introspect output:\n$output")
         mpris.stop()
-        assertEquals(0, exitCode, "busctl introspect failed with exitCode $exitCode. Output:\n$output")
+        assertEquals(
+            0,
+            exitCode,
+            "busctl introspect failed with exitCode $exitCode. Output:\n$output"
+        )
         kotlin.test.assertTrue(
             output.contains("org.mpris.MediaPlayer2"),
             "Output should contain org.mpris.MediaPlayer2: $output"

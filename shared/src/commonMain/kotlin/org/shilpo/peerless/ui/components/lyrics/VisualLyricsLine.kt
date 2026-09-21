@@ -13,8 +13,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
@@ -57,6 +62,7 @@ fun VisualLyricsLine(
 ) {
     var textLayout by remember(text, style) { mutableStateOf<TextLayoutResult?>(null) }
     val particleEmitter = remember { SparkleParticleEmitter() }
+    val layerPaint = remember { Paint() }
 
     // Map words to character indices and compute "heavy" sustained syllable properties
     val clusters = remember(text, words) {
@@ -230,6 +236,87 @@ fun VisualLyricsLine(
 
                         val needleStart = headX.coerceAtLeast(lLeft)
                         val needleEnd = needleStart + needleWidthPx
+
+                        // Character-conforming glyph-shaped ambient glow behind the active singing syllable/word
+                        val activeCluster = lineClusters.firstOrNull { cluster ->
+                            cluster.word.end_ms > cluster.word.start_ms &&
+                                    positionMs >= cluster.word.start_ms &&
+                                    positionMs < cluster.word.end_ms
+                        } ?: lineClusters.firstOrNull { cluster ->
+                            cluster.word.end_ms > cluster.word.start_ms &&
+                                    positionMs == cluster.word.end_ms
+                        }
+
+                        if (activeCluster != null) {
+                            val word = activeCluster.word
+                            val duration = (word.end_ms - word.start_ms).coerceAtLeast(1L).toFloat()
+                            val p =
+                                ((positionMs - word.start_ms).toFloat() / duration).coerceIn(0f, 1f)
+                            val vocalPulse = kotlin.math.sin(p * kotlin.math.PI.toFloat())
+                            val shadowAlpha = (0.6f + 0.4f * vocalPulse).coerceIn(0f, 1f)
+
+                            val textLen = layout.layoutInput.text.length
+                            if (textLen > 0 && activeCluster.startIndex < activeCluster.endIndex) {
+                                val sIdx = activeCluster.startIndex.coerceIn(0, textLen - 1)
+                                val eIdx = (activeCluster.endIndex - 1).coerceIn(sIdx, textLen - 1)
+                                val clusterStart = layout.getBoundingBox(sIdx).left
+                                val clusterEnd = layout.getBoundingBox(eIdx).right
+                                val blurRadius = 3.5.dp.toPx()
+
+                                val bounds = Rect(
+                                    left = (clusterStart - blurRadius).coerceAtLeast(0f),
+                                    top = lTop - blurRadius,
+                                    right = clusterEnd + blurRadius,
+                                    bottom = lBottom + blurRadius
+                                )
+
+                                if (bounds.width > 0f && bounds.height > 0f) {
+                                    val canvas = drawContext.canvas
+                                    canvas.saveLayer(bounds, layerPaint)
+
+                                    // 1. Render character glyph shadow
+                                    drawText(
+                                        textLayoutResult = layout,
+                                        color = Color.Transparent,
+                                        shadow = Shadow(
+                                            color = activeColor.copy(alpha = shadowAlpha),
+                                            offset = Offset.Zero,
+                                            blurRadius = blurRadius
+                                        )
+                                    )
+
+                                    // 2. Feather the right edge to transparent with DstIn (no hard vertical cut)
+                                    val fadeStart = needleStart.coerceIn(bounds.left, bounds.right)
+                                    val fadeEnd = (needleEnd + blurRadius).coerceIn(
+                                        fadeStart + 1f,
+                                        bounds.right
+                                    )
+
+                                    val stopStart =
+                                        ((fadeStart - bounds.left) / bounds.width).coerceIn(0f, 1f)
+                                    val stopEnd =
+                                        ((fadeEnd - bounds.left) / bounds.width).coerceIn(0f, 1f)
+
+                                    drawRect(
+                                        brush = Brush.horizontalGradient(
+                                            colorStops = arrayOf(
+                                                0f to Color.Black,
+                                                stopStart to Color.Black,
+                                                stopEnd to Color.Transparent,
+                                                1f to Color.Transparent
+                                            ),
+                                            startX = bounds.left,
+                                            endX = bounds.right
+                                        ),
+                                        topLeft = Offset(bounds.left, bounds.top),
+                                        size = Size(bounds.width, bounds.height),
+                                        blendMode = BlendMode.DstIn
+                                    )
+
+                                    canvas.restore()
+                                }
+                            }
+                        }
 
                         // 3a. Solid highlight behind the needle (100% solid activeColor)
                         if (needleStart > lLeft) {

@@ -22,6 +22,7 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 @Suppress("FunctionName")
@@ -188,9 +189,22 @@ class DesktopAudioEngine : AudioEngine {
     private var libMpvInstance: LibMpv? = null
     private var eventLoopJob: Job? = null
 
+    private data class DesktopSinkSnapshot(
+        val description: String = "Built-in Audio",
+        val isBluetooth: Boolean = false,
+        val isUsb: Boolean = false,
+        val driverLatencyMs: Long = 0L
+    )
+
+    @Volatile
+    private var detectedSink = DesktopSinkSnapshot()
+    private var sinkMonitorJob: Job? = null
+
     init {
         scope.launch {
             initMpv()
+            refreshAudioSinkSnapshot()
+            startSinkMonitor()
         }
     }
 
@@ -233,7 +247,6 @@ class DesktopAudioEngine : AudioEngine {
             lib.mpv_observe_property(ctx, 7L, "audio-bitrate", MpvConstants.FORMAT_NONE)
             lib.mpv_observe_property(ctx, 8L, "demuxer-cache-time", MpvConstants.FORMAT_NONE)
             lib.mpv_observe_property(ctx, 9L, "demuxer-cache-duration", MpvConstants.FORMAT_NONE)
-            lib.mpv_observe_property(ctx, 10L, "audio-out-delay", MpvConstants.FORMAT_NONE)
 
             setVolume(currentVolume)
             startEventLoop()
@@ -294,6 +307,7 @@ class DesktopAudioEngine : AudioEngine {
                     }
 
                     MpvConstants.EVENT_FILE_LOADED -> {
+                        refreshAudioSinkSnapshot()
                         updateSignalPathSnapshot()
                         val durSec = getProperty("duration")?.toDoubleOrNull()
                         if (durSec != null) {
@@ -334,15 +348,96 @@ class DesktopAudioEngine : AudioEngine {
         }
     }
 
-    private fun calculateOutputLatencyMs(): Long {
-        val basePipelineLeadMs = 650L
-        val audioOutDelaySec = getProperty("audio-out-delay")?.toDoubleOrNull() ?: 0.0
-        val dynamicHardwareDelayMs = if (audioOutDelaySec > 0.0) {
-            (audioOutDelaySec * 1000.0).toLong().coerceIn(0L, 500L)
-        } else {
-            if (Platform.isLinux()) 100L else 50L
+    private fun startSinkMonitor() {
+        sinkMonitorJob?.cancel()
+        sinkMonitorJob = scope.launch(Dispatchers.IO) {
+            while (isActive && !isReleased.get()) {
+                delay(4000)
+                refreshAudioSinkSnapshot()
+            }
         }
-        return -(basePipelineLeadMs + dynamicHardwareDelayMs)
+    }
+
+    private fun refreshAudioSinkSnapshot() {
+        if (!Platform.isLinux()) return
+        try {
+            val defaultSinkProcess = ProcessBuilder("pactl", "get-default-sink")
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start()
+            val defaultSinkName =
+                defaultSinkProcess.inputStream.bufferedReader().use { it.readText().trim() }
+            defaultSinkProcess.waitFor(500, TimeUnit.MILLISECONDS)
+            if (defaultSinkName.isEmpty()) return
+
+            val listProcess = ProcessBuilder("pactl", "list", "sinks")
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start()
+            val listOutput = listProcess.inputStream.bufferedReader().use { it.readText() }
+            listProcess.waitFor(1000, TimeUnit.MILLISECONDS)
+
+            var desc = defaultSinkName
+            var isBt = defaultSinkName.contains("bluez", ignoreCase = true)
+            var isUsb = defaultSinkName.contains("usb", ignoreCase = true)
+            var configuredLatMs = 0L
+
+            val blocks = listOutput.split("Sink #")
+            for (block in blocks) {
+                if (block.contains(defaultSinkName)) {
+                    if (block.contains("device.bus = \"bluetooth\"")) {
+                        isBt = true
+                    }
+                    if (block.contains("device.bus = \"usb\"")) {
+                        isUsb = true
+                    }
+                    val descLine =
+                        block.lines().firstOrNull { it.trimStart().startsWith("Description:") }
+                    if (descLine != null) {
+                        desc = descLine.substringAfter("Description:").trim()
+                    }
+                    val latLine =
+                        block.lines().firstOrNull { it.trimStart().startsWith("Latency:") }
+                    if (latLine != null) {
+                        val configuredUsec =
+                            latLine.substringAfter("configured").trim().substringBefore(" ")
+                                .toLongOrNull() ?: 0L
+                        if (configuredUsec > 0L) {
+                            configuredLatMs = configuredUsec / 1000L
+                        }
+                    }
+                    break
+                }
+            }
+
+            detectedSink = DesktopSinkSnapshot(
+                description = desc,
+                isBluetooth = isBt,
+                isUsb = isUsb,
+                driverLatencyMs = configuredLatMs
+            )
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun calculateOutputLatencyMs(): Long {
+        val audioBufferSec = getProperty("audio-buffer")?.toDoubleOrNull() ?: 0.2
+        val audioBufferMs = (audioBufferSec * 1000.0).toLong().coerceIn(50L, 500L)
+
+        val basePipelineLeadMs = if (Platform.isLinux()) 550L else 500L
+
+        val mpvDevice = getProperty("audio-device") ?: ""
+        val isBluetooth = detectedSink.isBluetooth ||
+                mpvDevice.contains("bluetooth", ignoreCase = true) ||
+                mpvDevice.contains("bluez", ignoreCase = true) ||
+                mpvDevice.contains("airpod", ignoreCase = true)
+
+        val hardwareLatencyMs = when {
+            detectedSink.driverLatencyMs > 0L -> detectedSink.driverLatencyMs
+            isBluetooth -> 200L
+            detectedSink.isUsb -> 20L
+            else -> 0L
+        }
+
+        return -(basePipelineLeadMs + audioBufferMs + hardwareLatencyMs)
     }
 
     private fun handlePropertyChange() {
@@ -375,13 +470,10 @@ class DesktopAudioEngine : AudioEngine {
         }
 
         val pauseVal = getProperty("pause")
-        if (pauseVal == "yes") {
-            isPlaying = false
-            stopProgressUpdates()
+        if (pauseVal == "yes" && !isPlaying) {
             stopSpectrumCapture()
             _state.value = _state.value.copy(status = PlaybackStatus.PAUSED)
-        } else if (pauseVal == "no") {
-            isPlaying = true
+        } else if (pauseVal == "no" && isPlaying) {
             _state.value = _state.value.copy(status = PlaybackStatus.PLAYING)
             startProgressUpdates()
             startSpectrumCapture()
@@ -411,9 +503,11 @@ class DesktopAudioEngine : AudioEngine {
         val hrChannels = getProperty("audio-params/hr-channels") ?: ""
         val format = getProperty("audio-params/format") ?: ""
         val bitrate = getProperty("audio-bitrate")?.toIntOrNull()?.let { it / 1000 }
-        val outputDevice = getProperty("audio-out-detected-device")
-            ?: getProperty("audio-device")
-            ?: "System Default"
+        val outputDevice = if (detectedSink.description.isNotBlank()) {
+            detectedSink.description
+        } else {
+            getProperty("audio-device") ?: "System Default"
+        }
 
         if (sampleRate == 0 && codec.isEmpty()) return
 
@@ -532,36 +626,38 @@ class DesktopAudioEngine : AudioEngine {
     private fun startProgressUpdates() {
         if (progressJob?.isActive == true) return
         progressJob = scope.launch(Dispatchers.IO) {
-            while (isActive && isPlaying) {
-                val timePosSec = getProperty("time-pos")?.toDoubleOrNull()
-                val durSec = getProperty("duration")?.toDoubleOrNull()
-                val cacheDurSec = getProperty("demuxer-cache-duration")?.toDoubleOrNull()
-                val cacheTimeSec = getProperty("demuxer-cache-time")?.toDoubleOrNull()
+            while (isActive) {
+                if (isPlaying) {
+                    val timePosSec = getProperty("time-pos")?.toDoubleOrNull()
+                    val durSec = getProperty("duration")?.toDoubleOrNull()
+                    val cacheDurSec = getProperty("demuxer-cache-duration")?.toDoubleOrNull()
+                    val cacheTimeSec = getProperty("demuxer-cache-time")?.toDoubleOrNull()
 
-                if (timePosSec != null) {
-                    val ms = (timePosSec * 1000.0).toLong()
-                    val durMs =
-                        if (durSec != null && durSec > 0.0) (durSec * 1000.0).toLong() else _state.value.durationMs
-                    val bufferedMs = when {
-                        cacheDurSec != null && cacheDurSec > 0.0 -> ((timePosSec + cacheDurSec) * 1000.0).toLong()
-                            .coerceAtLeast(ms)
+                    if (timePosSec != null) {
+                        val ms = (timePosSec * 1000.0).toLong()
+                        val durMs =
+                            if (durSec != null && durSec > 0.0) (durSec * 1000.0).toLong() else _state.value.durationMs
+                        val bufferedMs = when {
+                            cacheDurSec != null && cacheDurSec > 0.0 -> ((timePosSec + cacheDurSec) * 1000.0).toLong()
+                                .coerceAtLeast(ms)
 
-                        cacheTimeSec != null && cacheTimeSec > 0.0 -> (cacheTimeSec * 1000.0).toLong()
-                            .coerceAtLeast(ms)
+                            cacheTimeSec != null && cacheTimeSec > 0.0 -> (cacheTimeSec * 1000.0).toLong()
+                                .coerceAtLeast(ms)
 
-                        durMs > 0L && _state.value.bufferedPositionMs >= durMs -> durMs
-                        else -> maxOf(ms, _state.value.bufferedPositionMs)
+                            durMs > 0L && _state.value.bufferedPositionMs >= durMs -> durMs
+                            else -> maxOf(ms, _state.value.bufferedPositionMs)
+                        }
+
+                        _state.value = _state.value.copy(
+                            positionMs = ms,
+                            durationMs = if (durMs > 0L) durMs else _state.value.durationMs,
+                            bufferedPositionMs = bufferedMs,
+                            outputLatencyMs = calculateOutputLatencyMs(),
+                            status = PlaybackStatus.PLAYING
+                        )
                     }
-
-                    _state.value = _state.value.copy(
-                        positionMs = ms,
-                        durationMs = if (durMs > 0L) durMs else _state.value.durationMs,
-                        bufferedPositionMs = bufferedMs,
-                        outputLatencyMs = calculateOutputLatencyMs(),
-                        status = PlaybackStatus.PLAYING
-                    )
                 }
-                delay(100)
+                delay(40)
             }
         }
     }
@@ -709,6 +805,8 @@ class DesktopAudioEngine : AudioEngine {
         stopSpectrumCapture()
         spectrumAnalyzer.reset()
         eventLoopJob?.cancel()
+        sinkMonitorJob?.cancel()
+        sinkMonitorJob = null
 
         val ctx = mpvContext
         val lib = libMpvInstance
