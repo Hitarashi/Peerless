@@ -100,6 +100,9 @@ class RealPlayerConnection(
     private val _bufferedPositionMs = MutableStateFlow(0L)
     override val bufferedPositionMs: StateFlow<Long> = _bufferedPositionMs.asStateFlow()
 
+    private val _outputLatencyMs = MutableStateFlow(0L)
+    override val outputLatencyMs: StateFlow<Long> = _outputLatencyMs.asStateFlow()
+
     override val currentPositionMs: Long
         get() = _positionMs.value
 
@@ -319,6 +322,7 @@ class RealPlayerConnection(
                     notifySyncState()
                 }
                 _positionMs.value = engState.positionMs
+                _outputLatencyMs.value = engState.outputLatencyMs
 
                 val dur = engState.durationMs.takeIf { it > 0L }
                     ?: (_currentTrack.value?.durationMs ?: 0L)

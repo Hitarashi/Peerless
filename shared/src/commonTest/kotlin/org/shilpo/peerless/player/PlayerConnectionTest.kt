@@ -3,14 +3,23 @@ package org.shilpo.peerless.player
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.test.runTest
 import org.shilpo.peerless.model.Codec
 import org.shilpo.peerless.model.Provider
 import org.shilpo.peerless.model.RepeatMode
 import org.shilpo.peerless.model.Track
 import org.shilpo.peerless.network.PeerlessApiClient
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 private class TestFakeAudioEngine : AudioEngine {
     val _state = MutableStateFlow(AudioEngineState())
@@ -361,10 +370,38 @@ class PlayerConnectionTest {
             scope = backgroundScope
         )
 
-        fakeEngine._state.value = AudioEngineState(status = PlaybackStatus.PAUSED, durationMs = 180_000L)
+        fakeEngine._state.value =
+            AudioEngineState(status = PlaybackStatus.PAUSED, durationMs = 180_000L)
 
         kotlinx.coroutines.delay(100)
         assertEquals(t1, player.currentTrack.value)
         assertEquals(32_000L, player.positionMs.value)
+    }
+
+    @Test
+    fun testOutputLatencyMsPropagation() = runTest {
+        val fakeEngine = TestFakeAudioEngine()
+        val storage = InMemoryQueueStorage()
+        val client = PeerlessApiClient("http://127.0.0.1:4444")
+        val player = RealPlayerConnection(
+            apiClient = client,
+            audioEngine = fakeEngine,
+            storage = storage,
+            scope = backgroundScope
+        )
+
+        fakeEngine._state.value = AudioEngineState(
+            status = PlaybackStatus.PLAYING,
+            positionMs = 5000L,
+            durationMs = 100000L,
+            outputLatencyMs = -750L
+        )
+
+        kotlinx.coroutines.delay(100)
+        assertEquals(-750L, player.outputLatencyMs.value)
+
+        fakeEngine._state.value = fakeEngine._state.value.copy(outputLatencyMs = -800L)
+        kotlinx.coroutines.delay(100)
+        assertEquals(-800L, player.outputLatencyMs.value)
     }
 }

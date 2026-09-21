@@ -73,7 +73,7 @@ object AndroidMediaSessionHolder {
 class AndroidAudioEngine(
     private val contextProvider: () -> Context? = { AndroidAudioContextHolder.context }
 ) : AudioEngine {
-    private val _state = MutableStateFlow(AudioEngineState())
+    private val _state = MutableStateFlow(AudioEngineState(outputLatencyMs = -200L))
     override val state: StateFlow<AudioEngineState> = _state.asStateFlow()
 
     private val _events = MutableSharedFlow<AudioEngineEvent>(extraBufferCapacity = 64)
@@ -221,12 +221,32 @@ class AndroidAudioEngine(
         )
     }
 
+    private fun calculateOutputLatencyMs(): Long {
+        val basePipelineLeadMs = 150L
+        val ctx = contextProvider() ?: return -200L
+        val audioManager =
+            ctx.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+        val isBluetooth =
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M && audioManager != null) {
+                val devices =
+                    audioManager.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
+                devices.any { dev ->
+                    dev.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                            dev.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                            (android.os.Build.VERSION.SDK_INT >= 31 && dev.type == android.media.AudioDeviceInfo.TYPE_BLE_HEADSET)
+                }
+            } else {
+                false
+            }
+        val sinkLatencyMs = if (isBluetooth) 200L else 50L
+        return -(basePipelineLeadMs + sinkLatencyMs)
+    }
+
     private fun updatePlayerStatus() {
         val player = AndroidMediaSessionHolder.player ?: return
-        val playbackState = player.playbackState
         val isPlaying = player.isPlaying
 
-        val status = when (playbackState) {
+        val status = when (player.playbackState) {
             Player.STATE_IDLE -> PlaybackStatus.IDLE
             Player.STATE_BUFFERING -> PlaybackStatus.BUFFERING
             Player.STATE_READY -> if (isPlaying) PlaybackStatus.PLAYING else PlaybackStatus.PAUSED
@@ -241,7 +261,8 @@ class AndroidAudioEngine(
             status = status,
             positionMs = position,
             durationMs = duration,
-            bufferedPositionMs = player.bufferedPosition.coerceAtLeast(0L)
+            bufferedPositionMs = player.bufferedPosition.coerceAtLeast(0L),
+            outputLatencyMs = calculateOutputLatencyMs()
         )
 
         if (status == PlaybackStatus.PLAYING) {
@@ -260,7 +281,8 @@ class AndroidAudioEngine(
                     _state.value = _state.value.copy(
                         positionMs = player.currentPosition,
                         durationMs = if (player.duration > 0) player.duration else _state.value.durationMs,
-                        bufferedPositionMs = player.bufferedPosition.coerceAtLeast(0L)
+                        bufferedPositionMs = player.bufferedPosition.coerceAtLeast(0L),
+                        outputLatencyMs = calculateOutputLatencyMs()
                     )
                 }
                 delay(250)
@@ -492,6 +514,7 @@ private class SpectrumAudioProcessor(
     }
 
     override fun queueInput(inputBuffer: ByteBuffer) {
+        if (!inputBuffer.hasRemaining()) return
         val format = inputAudioFormat
         val frameSize = format.bytesPerFrame
         val channels = format.channelCount

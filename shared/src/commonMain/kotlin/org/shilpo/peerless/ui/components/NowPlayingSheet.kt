@@ -32,6 +32,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -78,6 +79,7 @@ import org.shilpo.peerless.theme.SpecBadgeTypography
 import org.shilpo.peerless.theme.SquircleShapeMedium
 import org.shilpo.peerless.theme.rememberArtworkSeedColor
 import org.shilpo.peerless.theme.rememberMiniPlayerGlowPalette
+import org.shilpo.peerless.ui.components.lyrics.VisualLyricsConfig
 
 internal enum class LyricsSpectrumStyle {
     Curve,
@@ -98,6 +100,7 @@ fun NowPlayingSheet(
     positionMs: Long,
     durationMs: Long,
     bufferedPositionMs: Long = 0L,
+    outputLatencyMs: Long = 0L,
     artworkUrl: String,
     serverUrl: String,
     onTogglePlayPause: () -> Unit,
@@ -181,32 +184,19 @@ fun NowPlayingSheet(
     )
 
     Box(modifier = modifier.fillMaxSize().statusBarsPadding()) {
-        if (isLyricsView) {
-            LyricsArtworkGlowBackground(
-                artworkUrl = artworkUrl,
-                palette = artworkPalette,
-                spectrumFrame = spectrumFrame,
-                showSpectrum = showSpectrum,
-                spectrumStyle = spectrumStyle,
-                spectrumPlacement = spectrumPlacement,
-                spectrumGlowEnabled = spectrumGlowEnabled,
-                isPlaying = isPlaying
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                colorScheme.surfaceContainerLowest,
-                                colorScheme.surface,
-                                colorScheme.background
-                            )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            colorScheme.surfaceContainerLowest,
+                            colorScheme.surface,
+                            colorScheme.background
                         )
                     )
-            )
-        }
+                )
+        )
 
         if (isLyricsView) {
             LyricsPlayerLayout(
@@ -216,6 +206,7 @@ fun NowPlayingSheet(
                 positionMs = positionMs,
                 durationMs = durationMs,
                 bufferedPositionMs = bufferedPositionMs,
+                outputLatencyMs = outputLatencyMs,
                 progressFraction = { smoothProgressFraction.value },
                 elapsedText = elapsedText,
                 remainingText = remainingText,
@@ -835,6 +826,7 @@ private fun LyricsPlayerLayout(
     positionMs: Long,
     durationMs: Long,
     bufferedPositionMs: Long,
+    outputLatencyMs: Long = 0L,
     progressFraction: () -> Float,
     elapsedText: String,
     remainingText: String,
@@ -885,6 +877,9 @@ private fun LyricsPlayerLayout(
         label = "LyricsPlayScale"
     )
     var spectrumOptionsExpanded by remember { mutableStateOf(false) }
+    var manualNudgeMs by remember(track.id) { mutableStateOf(0L) }
+    var showSyncTuner by remember(track.id) { mutableStateOf(false) }
+    val effectiveOffset = (if (outputLatencyMs != 0L) outputLatencyMs else -750L) + manualNudgeMs
     val effectiveBufferedMs =
         if (track.is_cached && durationMs > 0L) durationMs else maxOf(
             bufferedPositionMs,
@@ -1063,10 +1058,14 @@ private fun LyricsPlayerLayout(
         } == true
         val hasRomanization =
             availableLyrics?.lines?.any { !it.romanization.isNullOrBlank() } == true
-        if (hasTranslations || hasRomanization) {
+        val isSynced = availableLyrics != null &&
+                !availableLyrics.format.equals("plain", ignoreCase = true) &&
+                availableLyrics.lines.any { it.end_ms > it.start_ms || it.is_instrumental }
+
+        if (hasTranslations || hasRomanization || isSynced) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (hasTranslations) {
@@ -1083,6 +1082,67 @@ private fun LyricsPlayerLayout(
                         label = { Text("Romanization") }
                     )
                 }
+                if (isSynced) {
+                    FilterChip(
+                        selected = showSyncTuner,
+                        onClick = { showSyncTuner = !showSyncTuner },
+                        label = {
+                            Text(
+                                if (manualNudgeMs == 0L) "Sync ${effectiveOffset}ms"
+                                else "Sync ${effectiveOffset}ms (${if (manualNudgeMs > 0) "+$manualNudgeMs" else "$manualNudgeMs"})"
+                            )
+                        }
+                    )
+                }
+            }
+
+            AnimatedVisibility(visible = showSyncTuner && isSynced) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(
+                        8.dp,
+                        Alignment.CenterHorizontally
+                    ),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { manualNudgeMs -= 50L },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Text(
+                            "-50",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(
+                        text = "Offset: ${effectiveOffset}ms",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    IconButton(
+                        onClick = { manualNudgeMs += 50L },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Text(
+                            "+50",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    if (manualNudgeMs != 0L) {
+                        TextButton(
+                            onClick = { manualNudgeMs = 0L },
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                horizontal = 8.dp,
+                                vertical = 2.dp
+                            ),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("Reset", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
             }
         }
 
@@ -1094,6 +1154,7 @@ private fun LyricsPlayerLayout(
             showTranslations = showTranslations,
             showRomanization = showRomanization,
             accentColors = lyricAccentColors,
+            config = VisualLyricsConfig(syncOffsetMs = effectiveOffset),
             modifier = Modifier.weight(1f).fillMaxWidth()
         )
 

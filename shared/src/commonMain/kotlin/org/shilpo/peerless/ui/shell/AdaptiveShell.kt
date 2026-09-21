@@ -165,6 +165,7 @@ fun AdaptiveShell(
     val spectrumFrame by playerConnection.spectrum.collectAsState()
     val durationMs by playerConnection.durationMs.collectAsState()
     val bufferedPositionMs by playerConnection.bufferedPositionMs.collectAsState()
+    val outputLatencyMs by playerConnection.outputLatencyMs.collectAsState()
 
     var currentDestination by remember { mutableStateOf(NavigationDestination.HOME) }
     var activeSupportingPane by remember { mutableStateOf<SupportingPaneType?>(SupportingPaneType.QUEUE) }
@@ -384,6 +385,7 @@ fun AdaptiveShell(
                             positionMs = positionMs,
                             durationMs = durationMs,
                             bufferedPositionMs = bufferedPositionMs,
+                            outputLatencyMs = outputLatencyMs,
                             artworkUrl = apiClient.getArtworkUrl(trackDto, 600),
                             serverUrl = currentServerUrl,
                             onTogglePlayPause = { playerConnection.togglePlayPause() },
@@ -1048,6 +1050,7 @@ private fun SupportingPaneContainer(
     val playbackInfo by playerConnection.playbackInfo.collectAsState()
     val queue by playerConnection.queue.collectAsState()
     val queueDtos = remember(queue) { queue.map { it.toSummaryDto() } }
+    val outputLatencyMs by playerConnection.outputLatencyMs.collectAsState()
 
     Row(
         modifier = modifier,
@@ -1178,7 +1181,8 @@ private fun SupportingPaneContainer(
                             lyricsLoader = lyricsLoader,
                             positionMs = positionMs,
                             onSeekTo = playerConnection::seekTo,
-                            isPlaying = isPlaying
+                            isPlaying = isPlaying,
+                            outputLatencyMs = outputLatencyMs
                         )
                     }
 

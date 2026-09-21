@@ -14,7 +14,7 @@ import platform.Foundation.NSURL
 import platform.MediaPlayer.*
 
 class IosAudioEngine : AudioEngine {
-    private val _state = MutableStateFlow(AudioEngineState())
+    private val _state = MutableStateFlow(AudioEngineState(outputLatencyMs = -65L))
     override val state: StateFlow<AudioEngineState> = _state.asStateFlow()
 
     private val _events = MutableSharedFlow<AudioEngineEvent>(extraBufferCapacity = 64)
@@ -217,15 +217,11 @@ class IosAudioEngine : AudioEngine {
                     val status = when {
                         p.error != null -> PlaybackStatus.ERROR
                         p.rate > 0f -> PlaybackStatus.PLAYING
-                        _state.value.status == PlaybackStatus.BUFFERING -> PlaybackStatus.BUFFERING
-                        _state.value.status == PlaybackStatus.COMPLETED -> PlaybackStatus.COMPLETED
-                        else -> PlaybackStatus.PAUSED
-                    }
-
                     _state.value = _state.value.copy(
                         status = status,
                         positionMs = posMs,
                         durationMs = durMs,
+                        outputLatencyMs = calculateOutputLatencyMs(),
                         errorMessage = p.error?.localizedDescription
                     )
                 }
@@ -233,6 +229,16 @@ class IosAudioEngine : AudioEngine {
             }
         }
     }
+
+        private fun calculateOutputLatencyMs(): Long {
+            val basePipelineLeadMs = 50L
+            val hardwareLatencyMs = runCatching {
+                val session = AVAudioSession.sharedInstance()
+                val totalSec = session.outputLatency + session.IOBufferDuration
+                (totalSec * 1000.0).toLong()
+            }.getOrDefault(15L)
+            return -(basePipelineLeadMs + hardwareLatencyMs)
+        }
 
     private fun stopProgress() {
         progressJob?.cancel()

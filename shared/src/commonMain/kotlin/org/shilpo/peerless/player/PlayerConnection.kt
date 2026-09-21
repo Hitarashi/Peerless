@@ -24,6 +24,7 @@ interface PlayerConnection {
     val positionMs: StateFlow<Long>
     val durationMs: StateFlow<Long>
     val bufferedPositionMs: StateFlow<Long>
+    val outputLatencyMs: StateFlow<Long>
 
     val currentPositionMs: Long get() = positionMs.value
     val currentDurationMs: Long get() = durationMs.value

@@ -153,7 +153,11 @@ internal object MpvLoader {
 }
 
 class DesktopAudioEngine : AudioEngine {
-    private val _state = MutableStateFlow(AudioEngineState())
+    private val _state = MutableStateFlow(
+        AudioEngineState(
+            outputLatencyMs = if (Platform.isLinux()) -750L else -700L
+        )
+    )
     override val state: StateFlow<AudioEngineState> = _state.asStateFlow()
 
     private val _events = MutableSharedFlow<AudioEngineEvent>(extraBufferCapacity = 64)
@@ -229,6 +233,7 @@ class DesktopAudioEngine : AudioEngine {
             lib.mpv_observe_property(ctx, 7L, "audio-bitrate", MpvConstants.FORMAT_NONE)
             lib.mpv_observe_property(ctx, 8L, "demuxer-cache-time", MpvConstants.FORMAT_NONE)
             lib.mpv_observe_property(ctx, 9L, "demuxer-cache-duration", MpvConstants.FORMAT_NONE)
+            lib.mpv_observe_property(ctx, 10L, "audio-out-delay", MpvConstants.FORMAT_NONE)
 
             setVolume(currentVolume)
             startEventLoop()
@@ -329,12 +334,24 @@ class DesktopAudioEngine : AudioEngine {
         }
     }
 
+    private fun calculateOutputLatencyMs(): Long {
+        val basePipelineLeadMs = 650L
+        val audioOutDelaySec = getProperty("audio-out-delay")?.toDoubleOrNull() ?: 0.0
+        val dynamicHardwareDelayMs = if (audioOutDelaySec > 0.0) {
+            (audioOutDelaySec * 1000.0).toLong().coerceIn(0L, 500L)
+        } else {
+            if (Platform.isLinux()) 100L else 50L
+        }
+        return -(basePipelineLeadMs + dynamicHardwareDelayMs)
+    }
+
     private fun handlePropertyChange() {
         val timePosSec = getProperty("time-pos")?.toDoubleOrNull()
         if (timePosSec != null) {
             val ms = (timePosSec * 1000.0).toLong()
             _state.value = _state.value.copy(
                 positionMs = ms,
+                outputLatencyMs = calculateOutputLatencyMs(),
                 status = if (isPlaying) PlaybackStatus.PLAYING else _state.value.status
             )
         }
@@ -540,6 +557,7 @@ class DesktopAudioEngine : AudioEngine {
                         positionMs = ms,
                         durationMs = if (durMs > 0L) durMs else _state.value.durationMs,
                         bufferedPositionMs = bufferedMs,
+                        outputLatencyMs = calculateOutputLatencyMs(),
                         status = PlaybackStatus.PLAYING
                     )
                 }
