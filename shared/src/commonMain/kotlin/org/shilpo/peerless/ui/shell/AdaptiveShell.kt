@@ -838,17 +838,23 @@ private fun ExpandedLayout(
         displayedSupportingPane = activeSupportingPane
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val playerSlotHeight by animateDpAsState(
+            targetValue = if (currentTrackDto != null) 122.dp else 0.dp,
+            label = "BottomPlayerSlotHeight"
+        )
+        val sidebarHeight = maxHeight - playerSlotHeight
+
         Row(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
+                .fillMaxSize()
         ) {
             ExpressiveWideNavigationRail(
                 selectedDestination = currentDestination,
                 onSelectDestination = onSelectDestination,
                 initialExpanded = true,
-                modifier = Modifier.fillMaxHeight().padding(start = 4.dp, top = 4.dp, bottom = 2.dp)
+                modifier = Modifier.height(sidebarHeight)
+                    .padding(start = 4.dp, top = 4.dp, bottom = 2.dp)
             )
 
             Box(
@@ -872,7 +878,7 @@ private fun ExpandedLayout(
                     onOpenSettings = onOpenSettings,
                     onOpenProfile = onOpenProfile,
                     onOpenNowPlaying = onOpenNowPlaying,
-                    contentBottomPadding = 16.dp,
+                    contentBottomPadding = 16.dp + playerSlotHeight,
                     onRipClick = onRipClick
                 )
             }
@@ -931,7 +937,7 @@ private fun ExpandedLayout(
                         },
                         modifier = Modifier
                             .width(supportingPaneWidth + 48.dp)
-                            .fillMaxHeight()
+                            .height(sidebarHeight)
                     )
                 }
             }
@@ -940,7 +946,10 @@ private fun ExpandedLayout(
         AnimatedVisibility(
             visible = currentTrackDto != null,
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
         ) {
             PersistentBottomPlayer(
                 track = currentTrackDto,
@@ -1482,7 +1491,6 @@ private fun SupportingPaneContainer(
                 .padding(top = 4.dp, bottom = 2.dp, end = 4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // Floating Header Card
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1563,7 +1571,6 @@ private fun SupportingPaneContainer(
                 }
             }
 
-            // Floating Content Card
             Box(
                 modifier = Modifier
                     .weight(1f)

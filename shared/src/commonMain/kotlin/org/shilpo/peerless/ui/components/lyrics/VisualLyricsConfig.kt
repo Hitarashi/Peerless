@@ -3,10 +3,6 @@ package org.shilpo.peerless.ui.components.lyrics
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.text.font.FontWeight
 
-/**
- * Configuration data model for the Visual Lyrics engine, directly matching XMusic's
- * default presentation parameters.
- */
 @Immutable
 data class VisualLyricsConfig(
     val enableSparkles: Boolean = false,

@@ -41,7 +41,6 @@ data class HomeFeedState(
     val emptyReason: HomeFeedEmptyReason? = null
 )
 
-/** Blends Last.fm listening windows and resolves recommendations through Peerless. */
 class HomeFeedRepository(
     private val lastFmClient: LastFmClient,
     private val apiClient: PeerlessApiClient

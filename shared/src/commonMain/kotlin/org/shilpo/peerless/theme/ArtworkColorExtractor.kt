@@ -6,7 +6,12 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Canvas
@@ -87,9 +92,6 @@ fun extractArtworkSeedColor(painter: Painter, fallback: Color): Color {
         painter.toSampledImageBitmap(sampleWidth = 64, sampleHeight = 64)
     }.getOrNull() ?: return fallback
 
-    // Prefer pixels sampled from the rendered cover. MaterialKolor can return a
-    // plausible but unrelated theme seed for poster-style artwork, which makes
-    // the mini-player appear to keep the app's default color.
     val sampledColor = extractDominantArtworkColor(bitmap, fallback)
     if (sampledColor != fallback) return sampledColor
 
@@ -123,7 +125,6 @@ fun rememberArtworkSeedColor(
             }
         )
 
-        // Attach the probe painter so Coil starts loading the image for color sampling.
         Image(
             painter = painter,
             contentDescription = null,
@@ -201,13 +202,37 @@ fun rememberMiniPlayerGlowPalette(seedColor: Color): MiniPlayerGlowPalette {
         stiffness = Spring.StiffnessLow
     )
 
-    val targetFirst = remember(seedColor) { tuneColorForGlow(seedColor, saturationMin = 0.55f, valueTarget = 0.80f) }
+    val targetFirst = remember(seedColor) {
+        tuneColorForGlow(
+            seedColor,
+            saturationMin = 0.55f,
+            valueTarget = 0.80f
+        )
+    }
     val targetSecond =
-        remember(seedColor) { tuneColorForGlow(hueShift(seedColor, 18f), saturationMin = 0.65f, valueTarget = 0.72f) }
+        remember(seedColor) {
+            tuneColorForGlow(
+                hueShift(seedColor, 18f),
+                saturationMin = 0.65f,
+                valueTarget = 0.72f
+            )
+        }
     val targetThird =
-        remember(seedColor) { tuneColorForGlow(hueShift(seedColor, -15f), saturationMin = 0.45f, valueTarget = 0.88f) }
+        remember(seedColor) {
+            tuneColorForGlow(
+                hueShift(seedColor, -15f),
+                saturationMin = 0.45f,
+                valueTarget = 0.88f
+            )
+        }
     val targetFourth =
-        remember(seedColor) { tuneColorForGlow(hueShift(seedColor, 8f), saturationMin = 0.60f, valueTarget = 0.60f) }
+        remember(seedColor) {
+            tuneColorForGlow(
+                hueShift(seedColor, 8f),
+                saturationMin = 0.60f,
+                valueTarget = 0.60f
+            )
+        }
 
     val first by animateColorAsState(targetFirst, animationSpec = spec, label = "glowFirst")
     val second by animateColorAsState(targetSecond, animationSpec = spec, label = "glowSecond")

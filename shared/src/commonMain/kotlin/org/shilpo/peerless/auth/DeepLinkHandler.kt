@@ -40,7 +40,6 @@ object DeepLinkHandler {
             return null
         }
 
-        // Query string part
         val queryStart = trimmed.indexOf('?')
         if (queryStart < 0) return null
 
@@ -68,27 +67,22 @@ object DeepLinkHandler {
         val trimmed = encodedPayload.trim()
         if (trimmed.isBlank()) return null
 
-        // If it's a full URI, redirect to parseDeepLink
         if (trimmed.startsWith("peerless://", ignoreCase = true)) {
             return parseDeepLink(trimmed)
         }
 
-        // Check if raw JSON directly
         if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
             val creds = extractCredentialsFromJson(trimmed)
             if (creds != null) return creds
         }
 
-        // Clean URL-encoding if present
         val unescaped = urlDecodeSafe(trimmed)
 
-        // If after unescaping it's JSON:
         if (unescaped.startsWith("{") && unescaped.endsWith("}")) {
             val creds = extractCredentialsFromJson(unescaped)
             if (creds != null) return creds
         }
 
-        // Try Base64 decoding
         val decodedJson = decodeBase64Safe(unescaped) ?: decodeBase64Safe(trimmed)
         if (decodedJson != null) {
             val creds = extractCredentialsFromJson(decodedJson)
@@ -130,19 +124,16 @@ object DeepLinkHandler {
         val trimmed = raw.trim()
         if (trimmed.isBlank()) return null
 
-        // 1. Try standard Base64
         try {
             return kotlin.io.encoding.Base64.decode(trimmed).decodeToString()
         } catch (_: Exception) {
         }
 
-        // 2. Try URL-safe Base64
         try {
             return kotlin.io.encoding.Base64.UrlSafe.decode(trimmed).decodeToString()
         } catch (_: Exception) {
         }
 
-        // 3. Try adding missing padding
         val padLen = (4 - (trimmed.length % 4)) % 4
         if (padLen > 0) {
             val padded = trimmed + "=".repeat(padLen)

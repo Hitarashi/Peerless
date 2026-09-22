@@ -82,13 +82,8 @@ import org.shilpo.peerless.ui.components.PeerlessIcon
 import org.shilpo.peerless.ui.components.PeerlessIcons
 import kotlin.math.roundToInt
 
-// Iconic Last.fm brand color
 val LastFmRed = Color(0xFFD51007)
 
-/**
- * Animated real-time scrobbler audio waveform graphic.
- * Emulates pulsating equalizer spectrum bars tuned for audiophile aesthetic.
- */
 @Composable
 fun ScrobbleWaveformGraphic(
     modifier: Modifier = Modifier,
@@ -159,10 +154,6 @@ fun ScrobbleWaveformGraphic(
     }
 }
 
-/**
- * Last.fm Login Gate Screen for Peerless.
- * Authentic Material 3 Expressive (M3E) design using official Compose Material 3 components.
- */
 @Composable
 fun LastFmLoginScreen(
     modifier: Modifier = Modifier,
@@ -189,12 +180,10 @@ fun LastFmLoginScreen(
 
     val isFormValid = username.isNotBlank() && password.isNotBlank()
 
-    // Request autofocus on the username field upon entering the gate
     LaunchedEffect(Unit) {
         usernameFocusRequester.requestFocus()
     }
 
-    // Shake animation trigger whenever an error occurs
     LaunchedEffect(errorMessage) {
         if (errorMessage != null) {
             shakeOffset.snapTo(0f)
@@ -227,7 +216,6 @@ fun LastFmLoginScreen(
                     val result = if (onLogin != null) {
                         onLogin(submittedUsername, submittedPassword)
                     } else {
-                        // Default simulation if no callback is supplied
                         delay(600)
                         Result.success(Unit)
                     }
@@ -258,8 +246,6 @@ fun LastFmLoginScreen(
         ) {
             val isExpanded = maxWidth >= 900.dp
 
-            // A quiet tonal backdrop gives the focused card depth without introducing
-            // decorative imagery that competes with the sign-in task.
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -367,7 +353,6 @@ fun LastFmLoginScreen(
                             modifier = Modifier.fillMaxWidth().padding(24.dp),
                             verticalArrangement = Arrangement.spacedBy(18.dp)
                         ) {
-                            // Username / Email Field
                             OutlinedTextField(
                                 value = username,
                                 onValueChange = { value ->
@@ -413,7 +398,6 @@ fun LastFmLoginScreen(
                                 shape = MaterialTheme.shapes.large
                             )
 
-                            // Password Field
                             OutlinedTextField(
                                 value = password,
                                 onValueChange = { value ->
@@ -458,7 +442,6 @@ fun LastFmLoginScreen(
                                 shape = MaterialTheme.shapes.large
                             )
 
-                            // Primary Connect Button (M3 Filled Button)
                             Button(
                                 onClick = submitLogin,
                                 enabled = isFormValid && !isLoggingIn,

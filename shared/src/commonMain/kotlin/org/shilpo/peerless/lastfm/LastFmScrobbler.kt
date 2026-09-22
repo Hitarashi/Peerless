@@ -1,13 +1,20 @@
 package org.shilpo.peerless.lastfm
 
-import io.ktor.client.*
-import io.ktor.client.request.forms.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import kotlinx.coroutines.*
+import io.ktor.client.HttpClient
+import io.ktor.client.request.forms.submitForm
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.isSuccess
+import io.ktor.http.parameters
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.shilpo.peerless.model.Track
@@ -31,11 +38,6 @@ private data class LastFmErrorResponse(
     val message: String = ""
 )
 
-/**
- * Client-side Last.fm scrobbler engine.
- * Computes RFC 1321 MD5 signatures and handles track.updateNowPlaying and track.scrobble.
- * Invariant: Only the active audio rendering device dispatches scrobbles to prevent duplication.
- */
 class LastFmScrobbler(
     private val httpClient: HttpClient = createDefaultPeerlessHttpClient(),
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
@@ -59,12 +61,9 @@ class LastFmScrobbler(
         _config.value = config
     }
 
-    fun isConfigured(): Boolean = _config.value != null && _config.value?.sessionKey?.isNotBlank() == true
+    fun isConfigured(): Boolean =
+        _config.value != null && _config.value?.sessionKey?.isNotBlank() == true
 
-    /**
-     * Compute Last.fm API method signature:
-     * MD5(sorted_key_value_pairs + api_secret)
-     */
     fun calculateApiSig(params: Map<String, String>, secret: String): String {
         val sortedPairs = params.entries.sortedBy { it.key }
         val concatenated = buildString {
@@ -94,7 +93,8 @@ class LastFmScrobbler(
             "track" to track.trim()
         )
         if (!album.isNullOrBlank()) params["album"] = album.trim()
-        if (durationSeconds != null && durationSeconds > 0) params["duration"] = durationSeconds.toString()
+        if (durationSeconds != null && durationSeconds > 0) params["duration"] =
+            durationSeconds.toString()
 
         val sig = calculateApiSig(params, cfg.apiSecret)
         params["api_sig"] = sig
@@ -130,7 +130,8 @@ class LastFmScrobbler(
             "timestamp[0]" to timestampEpochSeconds.toString()
         )
         if (!album.isNullOrBlank()) params["album[0]"] = album.trim()
-        if (durationSeconds != null && durationSeconds > 0) params["duration[0]"] = durationSeconds.toString()
+        if (durationSeconds != null && durationSeconds > 0) params["duration[0]"] =
+            durationSeconds.toString()
 
         val sig = calculateApiSig(params, cfg.apiSecret)
         params["api_sig"] = sig
@@ -149,9 +150,6 @@ class LastFmScrobbler(
         }
     }
 
-    /**
-     * Start observing PlayerConnection playback lifecycle to trigger nowPlaying and scrobble.
-     */
     fun attachToPlayer(playerConnection: PlayerConnection) {
         trackingJob?.cancel()
         trackingJob = scope.launch {
@@ -180,7 +178,6 @@ class LastFmScrobbler(
             }
         }
 
-        // Ticker for accumulating play time and scrobbling
         scope.launch {
             while (isActive) {
                 delay(1000)
@@ -197,7 +194,6 @@ class LastFmScrobbler(
 
                     val totalDurationSec = track.durationMs / 1000L
                     if (totalDurationSec >= 30 && lastScrobbledTrackId != track.id) {
-                        // Criteria: 50% or 4 minutes (240s)
                         val requiredMs = min(track.durationMs / 2, 240_000L)
                         if (accumulatedPlayedMs >= requiredMs) {
                             lastScrobbledTrackId = track.id

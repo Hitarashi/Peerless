@@ -28,12 +28,6 @@ import kotlin.math.PI
 import kotlin.math.min
 import kotlin.math.sin
 
-/**
- * An expressive morphing Settings icon that smoothly transitions between
- * an outlined mechanical gear and a solid filled gear with spring dynamics and rotation.
- *
- * Modeled using exact Material Symbols vector path data and centered geometric aperture morphing.
- */
 @Composable
 fun SettingsMorphIcon(
     selected: Boolean,
@@ -86,7 +80,6 @@ private fun DrawScope.drawSettingsMorph(
 ) {
     val p = progress.coerceIn(0f, 1f)
 
-    // Subtle elastic squash-and-stretch during state transition
     val elasticScale = 1f - 0.04f * sin(p * PI.toFloat())
 
     val baseSize = min(this.size.width, this.size.height)
@@ -98,7 +91,6 @@ private fun DrawScope.drawSettingsMorph(
     path.fillType = PathFillType.EvenOdd
     path.addPath(solidGearPath)
 
-    // Moat cutout: hollows out the gear body when unselected (p=0), contracts shut when selected (p=1)
     val holeScale = (1f - p).coerceIn(0f, 1f)
     if (holeScale > 0.001f) {
         fun moatX(x: Float) = 482f + (x - 482f) * holeScale

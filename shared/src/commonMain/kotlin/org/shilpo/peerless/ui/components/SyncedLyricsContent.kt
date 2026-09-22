@@ -70,18 +70,6 @@ import org.shilpo.peerless.ui.components.lyrics.VisualLyricsLine
 import org.shilpo.peerless.ui.components.lyrics.WaitingDotsView
 import org.shilpo.peerless.ui.components.lyrics.isInstrumentalLineVisible
 
-/**
- * Modern visual lyrics viewport reproducing XMusic's signature visual presentation
- * in pure Compose Multiplatform.
- *
- * Implements:
- * 1. Left-aligned Apple Music / XMusic typography with dynamic responsive scaling
- * 2. Syllable-by-syllable spring-driven gradient sweep karaoke
- * 3. Held-vocal ("heavy") syllable elevation, elastic perspective stretch, and ambient glow
- * 4. Luminous sparkle particle simulation trailing the active brush sweep head
- * 5. Dynamic depth-of-field blur on inactive lines with instant touch clearing and 2s auto-recovery
- * 6. Rhythmic 3-dot musical waiting pulse for instrumental intervals
- */
 @Composable
 fun SyncedLyricsContent(
     state: LyricsLoadState,
@@ -247,7 +235,6 @@ private fun VisualLyricsLines(
         if (directIndex >= 0) {
             directIndex
         } else {
-            // Keep the most recently completed line active during inter-line pauses until next line begins
             lines.indexOfLast { line -> effectivePositionMs >= line.start_ms }
         }
     } else {
@@ -266,7 +253,6 @@ private fun VisualLyricsLines(
     var showResumeButton by remember(lyrics.track_id) { mutableStateOf(false) }
     val isProgrammaticScroll = remember(lyrics.track_id) { mutableStateOf(false) }
 
-    // Touch interaction and idle recovery model directly matching XMusic's behavior
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress to isProgrammaticScroll.value }
             .distinctUntilChanged()
@@ -276,7 +262,6 @@ private fun VisualLyricsLines(
                     isFollowingPlayback = false
                     showResumeButton = true
                 } else if (!isScrolling && !isFollowingPlayback && showResumeButton) {
-                    // Idle recovery: after user stops dragging, wait config.idleRecoveryMs and auto-snap back
                     delay(config.idleRecoveryMs)
                     isUserInteracting = false
                     isFollowingPlayback = true
@@ -285,7 +270,6 @@ private fun VisualLyricsLines(
             }
     }
 
-    // Auto-scroll centering with spring easing on active line changes
     LaunchedEffect(activeLineIndex, isFollowingPlayback) {
         if (!isFollowingPlayback || activeLineIndex < 0) return@LaunchedEffect
 
@@ -301,7 +285,6 @@ private fun VisualLyricsLines(
         }
     }
 
-    // Edge feathering vignette gradient
     val lyricsListModifier = Modifier
         .fillMaxSize()
         .graphicsLayer {
@@ -355,7 +338,6 @@ private fun VisualLyricsLines(
                 }
                 val isActive = distance == 0
 
-                // Derive singer voice accent color from multi-singer agent or artwork palette
                 val voiceAccent = when {
                     line.agent != null -> accentColors.getOrNull(voiceAgents.indexOf(line.agent))
                         ?: when (voiceAgents.indexOf(line.agent) % 3) {
@@ -372,7 +354,6 @@ private fun VisualLyricsLines(
 
                 val lineColor = MaterialTheme.colorScheme.onSurface
 
-                // Depth-of-field blur directly matching XMusic (minDistance * 4px)
                 val effectiveBlur = when {
                     isUserInteracting || !config.enableBlur || !animationOptions.blur -> 0f
                     activeLineIndex < 0 || distance == 0 -> 0f
@@ -386,7 +367,6 @@ private fun VisualLyricsLines(
                     label = "VisualLineBlur"
                 )
 
-                // Uniform opacity matching XMusic (active = 1.0f, inactive = 0.35f)
                 val lineAlpha by animateFloatAsState(
                     targetValue = when {
                         readableMode || activeLineIndex < 0 || !animationOptions.fadeOut -> 1f
@@ -397,7 +377,6 @@ private fun VisualLyricsLines(
                     label = "VisualLineAlpha"
                 )
 
-                // Subtle scale matching XMusic (1.01f : 1.0f)
                 val lineScale by animateFloatAsState(
                     targetValue = when {
                         activeLineIndex < 0 || !animationOptions.outOfSightScale -> 1f
@@ -544,7 +523,6 @@ private fun VisualLyricsLines(
                             }
                         }
 
-                        // Subordinate background vocal line
                         val backgroundText = remember(line) {
                             line.background_words.joinToString("") { it.text }
                         }
@@ -587,7 +565,6 @@ private fun VisualLyricsLines(
                             }
                         }
 
-                        // Subordinate romanization line
                         if (showRomanization) {
                             line.romanization?.takeIf(String::isNotBlank)?.let { romanization ->
                                 Text(
@@ -606,7 +583,6 @@ private fun VisualLyricsLines(
                             }
                         }
 
-                        // Subordinate translation line
                         if (showTranslations) {
                             line.translations.forEach { translation ->
                                 Text(
@@ -629,7 +605,6 @@ private fun VisualLyricsLines(
             }
         }
 
-        // Bottom floating recovery pill and attribution bar
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)

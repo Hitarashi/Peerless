@@ -22,13 +22,6 @@ import kotlin.math.PI
 import kotlin.math.min
 import kotlin.math.sin
 
-/**
- * Expressive morphing Lyrics icon — outlined chat bubble with text‑line pills
- * transitions to a solid filled chat bubble with engraved text cutouts.
- *
- * Uses EvenOdd aperture technique identical to SearchMorphIcon / LibraryMorphIcon.
- * Coordinates from Material Symbols viewBox (0 −960 960 960).
- */
 @Composable
 fun LyricsMorphIcon(
     selected: Boolean,
@@ -70,7 +63,6 @@ private fun DrawScope.drawLyricsMorph(
 ) {
     val p = progress.coerceIn(0f, 1f)
 
-    // Subtle elastic squash-and-stretch during state transition
     val elasticScale = 1f - 0.04f * sin(p * PI.toFloat())
 
     val baseSize = min(this.size.width, this.size.height)
@@ -84,19 +76,12 @@ private fun DrawScope.drawLyricsMorph(
     path.reset()
     path.fillType = PathFillType.EvenOdd
 
-    // ── 1. Text line pill 1 (short, at y≈-440) ──
-    // SVG: M280-400 h80 q...T400-440 q...T360-480 h-80 q...T240-440 q...T280-400 Z
-    // Approximated as round rect (240,-480)→(400,-400), corner radius 28.5
     addRoundPill(path, 240f, -480f, 400f, -400f, 28.5f, ::tx, ::ty)
 
-    // ── 2. Text line pill 2 (medium, at y≈-560) ──
     addRoundPill(path, 240f, -600f, 520f, -520f, 28.5f, ::tx, ::ty)
 
-    // ── 3. Text line pill 3 (medium, at y≈-680) ──
     addRoundPill(path, 240f, -720f, 520f, -640f, 28.5f, ::tx, ::ty)
 
-    // ── 4. Music note (circle head + stem + flag) ──
-    // Parsed from: m480-80 q-50,0... (shared between both SVGs)
     path.moveTo(tx(760f), ty(-480f))
     path.quadraticTo(tx(710f), ty(-480f), tx(675f), ty(-515f))
     path.quadraticTo(tx(640f), ty(-550f), tx(640f), ty(-600f))
@@ -118,8 +103,6 @@ private fun DrawScope.drawLyricsMorph(
     path.quadraticTo(tx(810f), ty(-480f), tx(760f), ty(-480f))
     path.close()
 
-    // ── 5. Chat bubble outer (filled version's solid contour) ──
-    // Parsed from filled SVG: m-40,400 -92,92 q... → organic right edge
     path.moveTo(tx(240f), ty(-240f))
     path.lineTo(tx(148f), ty(-148f))
     path.quadraticTo(tx(142f), ty(-142f), tx(135f), ty(-139f))
@@ -145,22 +128,14 @@ private fun DrawScope.drawLyricsMorph(
     path.lineTo(tx(240f), ty(-240f))
     path.close()
 
-    // ── 6. Inner aperture (contracts toward centre as p → 1) ──
-    // At p=0: punches out the bubble interior → outlined look, text pills visible.
-    // At p=1: collapsed to zero → filled look, text pills become engraved cutouts.
     val ap = (1f - p).coerceIn(0f, 1f)
     if (ap > 0.001f) {
-        // Centre of contraction (inner area midpoint)
         val holeCx = 360f
         val holeCy = -555f
 
         fun hx(x: Float): Float = tx(holeCx + (x - holeCx) * ap)
         fun hy(y: Float): Float = ty(holeCy + (y - holeCy) * ap)
 
-        // Inner area traced from outlined version's inner wall:
-        // (160,-795) top-left → (160,-280) bottom-left → (205,-320) tail junction
-        // → (550,-320) bottom-right → (550,-795) top-right
-        // Uses rounded corners to match bubble's inner curvature.
         val cornerR = 20f * ap
 
         path.moveTo(hx(160f + cornerR), hy(-795f))
@@ -178,9 +153,6 @@ private fun DrawScope.drawLyricsMorph(
     drawPath(path = path, color = tint)
 }
 
-/**
- * Adds a rounded-rectangle pill subpath using quadratic arcs at corners.
- */
 private fun addRoundPill(
     path: Path,
     left: Float, top: Float, right: Float, bottom: Float,
@@ -188,7 +160,6 @@ private fun addRoundPill(
     tx: (Float) -> Float,
     ty: (Float) -> Float,
 ) {
-    // Start at top-left + r, trace clockwise
     path.moveTo(tx(left + r), ty(top))
     path.lineTo(tx(right - r), ty(top))
     path.quadraticTo(tx(right), ty(top), tx(right), ty(top + r))

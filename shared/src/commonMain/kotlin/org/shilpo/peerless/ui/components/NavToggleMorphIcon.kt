@@ -24,13 +24,6 @@ import kotlin.math.PI
 import kotlin.math.min
 import kotlin.math.sin
 
-/**
- * An expressive, morphing navigation toggle icon that smoothly transitions between
- * a Hamburger Menu (collapsed state) and a MenuOpen/Collapse Arrow (expanded state).
- *
- * Modeled after [PlayPauseMorphIcon], it utilizes physics-based spring animation,
- * elastic squash-and-stretch anticipation, and continuous vector morphing.
- */
 @Composable
 fun NavToggleMorphIcon(
     isExpanded: Boolean,
@@ -76,7 +69,6 @@ private fun DrawScope.drawNavToggleMorph(
 ) {
     val p = progress.coerceIn(0f, 1f)
 
-    // Subtle elastic squash-and-stretch during transition
     val elasticScale = 1f - 0.05f * sin(p * PI.toFloat())
 
     val baseSize = min(size.width, size.height)
@@ -95,7 +87,6 @@ private fun DrawScope.drawNavToggleMorph(
 
     val leftBarStartX = 4f
 
-    // 1. Top bar: smoothly retracts from x = 20f at p=0 down to x = 11.5f at p=1
     val topBarEndX = lerp(20f, 11.5f, p)
     drawLine(
         color = tint,
@@ -105,7 +96,6 @@ private fun DrawScope.drawNavToggleMorph(
         cap = StrokeCap.Round
     )
 
-    // 2. Middle bar: smoothly retracts from x = 20f at p=0 down to x = 9.5f at p=1
     val middleBarEndX = lerp(20f, 9.5f, p)
     drawLine(
         color = tint,
@@ -115,7 +105,6 @@ private fun DrawScope.drawNavToggleMorph(
         cap = StrokeCap.Round
     )
 
-    // 3. Bottom bar: smoothly retracts from x = 20f at p=0 down to x = 11.5f at p=1
     val bottomBarEndX = lerp(20f, 11.5f, p)
     drawLine(
         color = tint,
@@ -125,8 +114,6 @@ private fun DrawScope.drawNavToggleMorph(
         cap = StrokeCap.Round
     )
 
-    // 4. Chevron Arrow ('<'):
-    // Glides and unfolds from the right edge into the left-pointing chevron at (14.5f, 12f)
     if (p > 0.005f) {
         val wingAlpha = (p * 1.5f).coerceIn(0f, 1f)
         val chevronColor = tint.copy(alpha = tint.alpha * wingAlpha)

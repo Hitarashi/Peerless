@@ -1,14 +1,38 @@
 package org.shilpo.peerless.sync
 
 import androidx.compose.runtime.staticCompositionLocalOf
-import io.ktor.client.*
-import io.ktor.client.plugins.websocket.*
-import io.ktor.websocket.*
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
+import io.ktor.client.plugins.websocket.WebSockets
+import io.ktor.client.plugins.websocket.webSocket
+import io.ktor.websocket.Frame
+import io.ktor.websocket.close
+import io.ktor.websocket.readText
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.shilpo.peerless.auth.TokenStorage
 import org.shilpo.peerless.getDeviceDisplayName
 import org.shilpo.peerless.getPlatform
@@ -53,10 +77,6 @@ data class CommandPayload(val action: String, val data: JsonElement? = null)
 @Serializable
 data class TransferPlaybackPayload(val target_device_id: String)
 
-/**
- * Serializes through the sealed base type so kotlinx.serialization includes the
- * `type` discriminator required by the server's adjacently tagged enum.
- */
 internal fun Json.encodeClientSyncMessage(message: ClientSyncMessage): String =
     encodeToString<ClientSyncMessage>(message)
 
@@ -94,13 +114,13 @@ data class ExecuteCommandPayload(
     val data: JsonElement? = null
 )
 
-/**
- * High-leverage client for Spotify Connect-style real-time cross-device playback sync.
- * Maintains full-duplex WebSocket connection to peerless-server.
- */
 class PlaybackSyncManager(
     val tokenStorage: TokenStorage,
-    private val httpClient: HttpClient = createDefaultPeerlessHttpClient().config { install(WebSockets) },
+    private val httpClient: HttpClient = createDefaultPeerlessHttpClient().config {
+        install(
+            WebSockets
+        )
+    },
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
@@ -114,8 +134,9 @@ class PlaybackSyncManager(
     private val _activeDeviceId = MutableStateFlow<String?>(null)
     val activeDeviceId: StateFlow<String?> = _activeDeviceId.asStateFlow()
 
-    val isSelfActiveDevice: StateFlow<Boolean> = _activeDeviceId.map { it == null || it == selfDeviceId }
-        .stateIn(scope, SharingStarted.Eagerly, true)
+    val isSelfActiveDevice: StateFlow<Boolean> =
+        _activeDeviceId.map { it == null || it == selfDeviceId }
+            .stateIn(scope, SharingStarted.Eagerly, true)
 
     private val _connectedDevices = MutableStateFlow<List<ConnectedDevice>>(emptyList())
     val connectedDevices: StateFlow<List<ConnectedDevice>> = _connectedDevices.asStateFlow()
@@ -140,7 +161,7 @@ class PlaybackSyncManager(
                     throw e
                 } catch (e: Throwable) {
                     _isConnected.value = false
-                    delay(3000) // reconnect backoff
+                    delay(3000)
                 }
             }
         }
@@ -174,7 +195,6 @@ class PlaybackSyncManager(
             _isConnected.value = true
 
             try {
-                // Send Hello
                 val hello = ClientSyncMessage.Hello(
                     HelloPayload(
                         device_id = selfDeviceId,
@@ -184,7 +204,6 @@ class PlaybackSyncManager(
                 )
                 send(Frame.Text(json.encodeClientSyncMessage(hello)))
 
-                // Listen loop
                 for (frame in incoming) {
                     if (frame is Frame.Text) {
                         val text = frame.readText()

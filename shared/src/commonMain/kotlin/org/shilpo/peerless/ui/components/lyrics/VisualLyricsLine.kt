@@ -28,9 +28,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.shilpo.peerless.model.LyricsWordDto
 
-/**
- * Word cluster visual metadata computed from lyrics timing.
- */
 private class VisualWordCluster(
     val word: LyricsWordDto,
     val startIndex: Int,
@@ -39,13 +36,6 @@ private class VisualWordCluster(
     val intensity: Float
 )
 
-/**
- * High-fidelity kinetic lyric line component directly implementing XMusic's signature
- * visual effects:
- * 1. Fluid gradient sweep karaoke with spring physics
- * 2. Held-vocal ("heavy") syllable elevation, elastic perspective scaling, and ambient glow
- * 3. Luminous sparkle particle emitter
- */
 @Composable
 fun VisualLyricsLine(
     text: String,
@@ -64,7 +54,6 @@ fun VisualLyricsLine(
     val particleEmitter = remember { SparkleParticleEmitter() }
     val layerPaint = remember { Paint() }
 
-    // Map words to character indices and compute "heavy" sustained syllable properties
     val clusters = remember(text, words) {
         var searchFrom = 0
         words.map { word ->
@@ -109,14 +98,12 @@ fun VisualLyricsLine(
         }
     }
 
-    // Active word determination
     val currentCluster = clusters.firstOrNull { cluster ->
         cluster.word.end_ms > cluster.word.start_ms &&
                 positionMs >= cluster.word.start_ms &&
                 positionMs < cluster.word.end_ms
     }
 
-    // High-frequency frame ticker for particle updates and smooth elastic deformations
     var frameTick by remember { mutableStateOf(0L) }
     LaunchedEffect(isActive, config.enableSparkles) {
         if (!isActive) {
@@ -133,7 +120,6 @@ fun VisualLyricsLine(
         }
     }
 
-    // If no word timestamps are provided (line-synced or plain LRC), render crisp text
     val isSimpleLrc = words.isEmpty()
     if (isSimpleLrc) {
         val displayColor = if (isActive || isPast) activeColor else baseColor
@@ -148,9 +134,6 @@ fun VisualLyricsLine(
     }
 
     Box(modifier = modifier.fillMaxWidth()) {
-        // Base text rendering:
-        // When the line has already been sung in the past, render directly in activeColor so it remains
-        // 100% full and unbroken without cutoff artifacts.
         Text(
             text = text,
             style = style,
@@ -163,15 +146,13 @@ fun VisualLyricsLine(
         Canvas(Modifier.matchParentSize()) {
             if (!isActive) return@Canvas
 
-            // Read frameTick to trigger frame redraw during active singing
             @Suppress("UNUSED_VARIABLE")
             val tick = frameTick
 
             val layout = textLayout ?: return@Canvas
             val density = this.density
-            val gradientWidthPx = 18.dp.toPx() // ~36-45px sweep transition width
+            val gradientWidthPx = 18.dp.toPx()
 
-            // For active lines, render each text line with continuous gradient sweep on top of base text
             for (lineIdx in 0 until layout.lineCount) {
                 val lTop = layout.getLineTop(lineIdx)
                 val lBottom = layout.getLineBottom(lineIdx)
@@ -184,7 +165,6 @@ fun VisualLyricsLine(
                     clusters.filter { it.startIndex < lineEndOffset && it.endIndex > lineStartOffset }
 
                 if (lineClusters.isEmpty()) {
-                    // If no clusters on this line, highlight the entire line in activeColor
                     clipRect(
                         left = -200f,
                         top = lTop,
@@ -203,7 +183,6 @@ fun VisualLyricsLine(
                 val lineEndMs = lineClusters.last().word.end_ms
 
                 when {
-                    // 1. Line already completed singing -> 100% activeColor
                     positionMs >= lineEndMs -> {
                         clipRect(
                             left = -200f,
@@ -218,12 +197,9 @@ fun VisualLyricsLine(
                         }
                     }
 
-                    // 2. Line not yet reached -> base text is already showing underneath
                     positionMs < lineStartMs -> {
-                        // Inactive line ahead: do nothing, underlying baseColor text is already rendered
                     }
 
-                    // 3. Line is currently being sung -> needle with LTR gradient opacity
                     else -> {
                         val needleWidthPx = 14.dp.toPx()
                         val headX = computeLineHeadX(
@@ -237,7 +213,6 @@ fun VisualLyricsLine(
                         val needleStart = headX.coerceAtLeast(lLeft)
                         val needleEnd = needleStart + needleWidthPx
 
-                        // Character-conforming glyph-shaped ambient glow behind the active singing syllable/word
                         val activeCluster = lineClusters.firstOrNull { cluster ->
                             cluster.word.end_ms > cluster.word.start_ms &&
                                     positionMs >= cluster.word.start_ms &&
@@ -274,7 +249,6 @@ fun VisualLyricsLine(
                                     val canvas = drawContext.canvas
                                     canvas.saveLayer(bounds, layerPaint)
 
-                                    // 1. Render character glyph shadow
                                     drawText(
                                         textLayoutResult = layout,
                                         color = Color.Transparent,
@@ -285,7 +259,6 @@ fun VisualLyricsLine(
                                         )
                                     )
 
-                                    // 2. Feather the right edge to transparent with DstIn (no hard vertical cut)
                                     val fadeStart = needleStart.coerceIn(bounds.left, bounds.right)
                                     val fadeEnd = (needleEnd + blurRadius).coerceIn(
                                         fadeStart + 1f,
@@ -318,7 +291,6 @@ fun VisualLyricsLine(
                             }
                         }
 
-                        // 3a. Solid highlight behind the needle (100% solid activeColor)
                         if (needleStart > lLeft) {
                             clipRect(
                                 left = -200f,
@@ -334,7 +306,6 @@ fun VisualLyricsLine(
                             }
                         }
 
-                        // 3b. Needle: LTR gradient from 100% activeColor down to 0% opacity (unclipped right edge)
                         val needleBrush = Brush.linearGradient(
                             colors = listOf(
                                 activeColor,
@@ -356,7 +327,6 @@ fun VisualLyricsLine(
                             )
                         }
 
-                        // Spawn sparkles at the leading brush head during active singing
                         if (config.enableSparkles && headX in lLeft..lRight) {
                             particleEmitter.spawn(
                                 headX = headX,
@@ -369,7 +339,6 @@ fun VisualLyricsLine(
                 }
             }
 
-            // Draw floating sparkles over the active line if enabled
             if (config.enableSparkles) {
                 particleEmitter.draw(this, activeColor)
             }
@@ -377,10 +346,6 @@ fun VisualLyricsLine(
     }
 }
 
-/**
- * Calculates continuous pixel coordinates for the brush head along a line of text,
- * smoothly interpolating across syllable durations and inter-word gaps.
- */
 private fun computeLineHeadX(
     positionMs: Long,
     lineClusters: List<VisualWordCluster>,
@@ -411,7 +376,6 @@ private fun computeLineHeadX(
         return (wordStart + leadOffset) + (wordEnd - wordStart) * progress
     }
 
-    // Between words on this line: smoothly interpolate across the whitespace gap
     val lastWord = lineClusters.lastOrNull { it.word.end_ms <= positionMs }
     val nextWord = lineClusters.firstOrNull { it.word.start_ms > positionMs }
 

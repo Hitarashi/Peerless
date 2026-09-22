@@ -7,10 +7,6 @@ import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.random.Random
 
-/**
- * State and physics simulation for a single floating sparkle particle.
- * Directly translated from XMusic's Sparkle system.
- */
 internal class Sparkle(
     var x: Float = 0f,
     var y: Float = 0f,
@@ -28,9 +24,6 @@ internal class Sparkle(
     var frequency: Float = 8f
 )
 
-/**
- * High-performance sparkle particle emitter and simulation system for active singing lines.
- */
 internal class SparkleParticleEmitter(
     private val maxParticles: Int = 45
 ) {
@@ -95,7 +88,6 @@ internal class SparkleParticleEmitter(
                 center = Offset(s.x, s.y)
             )
 
-            // Draw a subtle diamond cross sparkle glint for larger particles
             if (s.size > 2.2f) {
                 val glintLength = s.size * 2f
                 val glintAlpha = (particleAlpha * 0.7f).coerceIn(0f, 1f)

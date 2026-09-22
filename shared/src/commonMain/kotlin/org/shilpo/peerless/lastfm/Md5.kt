@@ -1,9 +1,5 @@
 package org.shilpo.peerless.lastfm
 
-/**
- * Pure Kotlin Multiplatform RFC 1321 MD5 message digest.
- * Used for Last.fm API signature (`api_sig`) generation across JVM, Android, iOS, and Desktop.
- */
 object Md5 {
     private const val HEX_DIGITS = "0123456789abcdef"
 
@@ -56,7 +52,6 @@ object Md5 {
             var cc = c
             var dd = d
 
-            // Round 1
             aa = ff(aa, bb, cc, dd, buffer[0], 7, 0xD76AA478.toInt())
             dd = ff(dd, aa, bb, cc, buffer[1], 12, 0xE8C7B756.toInt())
             cc = ff(cc, dd, aa, bb, buffer[2], 17, 0x242070DB)
@@ -74,7 +69,6 @@ object Md5 {
             cc = ff(cc, dd, aa, bb, buffer[14], 17, 0xA679438E.toInt())
             bb = ff(bb, cc, dd, aa, buffer[15], 22, 0x49B40821)
 
-            // Round 2
             aa = gg(aa, bb, cc, dd, buffer[1], 5, 0xF61E2562.toInt())
             dd = gg(dd, aa, bb, cc, buffer[6], 9, 0xC040B340.toInt())
             cc = gg(cc, dd, aa, bb, buffer[11], 14, 0x265E5A51)
@@ -92,7 +86,6 @@ object Md5 {
             cc = gg(cc, dd, aa, bb, buffer[7], 14, 0x676F02D9)
             bb = gg(bb, cc, dd, aa, buffer[12], 20, 0x8D2A4C8A.toInt())
 
-            // Round 3
             aa = hh(aa, bb, cc, dd, buffer[5], 4, 0xFFFA3942.toInt())
             dd = hh(dd, aa, bb, cc, buffer[8], 11, 0x8771F681.toInt())
             cc = hh(cc, dd, aa, bb, buffer[11], 16, 0x6D9D6122)
@@ -110,7 +103,6 @@ object Md5 {
             cc = hh(cc, dd, aa, bb, buffer[15], 16, 0x1FA27CF8)
             bb = hh(bb, cc, dd, aa, buffer[2], 23, 0xC4AC5665.toInt())
 
-            // Round 4
             aa = ii(aa, bb, cc, dd, buffer[0], 6, 0xF4292244.toInt())
             dd = ii(dd, aa, bb, cc, buffer[7], 10, 0x432AFF97)
             cc = ii(cc, dd, aa, bb, buffer[14], 15, 0xAB9423A7.toInt())

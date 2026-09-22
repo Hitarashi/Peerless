@@ -16,7 +16,6 @@ object CanonicalDeduplicator {
     )
 
     fun matches(firstTrack: DeduplicationItem, secondTrack: DeduplicationItem): Boolean {
-        // 1) Same provider & providerTrackId
         for (firstSource in firstTrack.sources) {
             for (secondSource in secondTrack.sources) {
                 if (firstSource.provider != Provider.Unknown &&
@@ -29,7 +28,6 @@ object CanonicalDeduplicator {
             }
         }
 
-        // 2) Same ISRC (when available and non-blank)
         val firstIsrc = firstTrack.isrc?.trim()
         val secondIsrc = secondTrack.isrc?.trim()
         if (!firstIsrc.isNullOrBlank() && !secondIsrc.isNullOrBlank() &&
@@ -38,7 +36,6 @@ object CanonicalDeduplicator {
             return true
         }
 
-        // 3) Normalized title + normalized artist + duration within 3 seconds.
         val firstTitle = normalize(firstTrack.title)
         val secondTitle = normalize(secondTrack.title)
         val firstArtist = normalize(firstTrack.artist)

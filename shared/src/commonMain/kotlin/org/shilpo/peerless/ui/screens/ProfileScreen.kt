@@ -1,12 +1,42 @@
 package org.shilpo.peerless.ui.screens
 
 
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,7 +54,14 @@ import org.shilpo.peerless.model.MeResponse
 import org.shilpo.peerless.model.ServerHealthDto
 import org.shilpo.peerless.model.SessionDto
 import org.shilpo.peerless.network.LocalPeerlessApiClient
-import org.shilpo.peerless.theme.*
+import org.shilpo.peerless.theme.ExpressiveTypography
+import org.shilpo.peerless.theme.LiquidGlassDefaults
+import org.shilpo.peerless.theme.LiquidGlassSurface
+import org.shilpo.peerless.theme.PillShape
+import org.shilpo.peerless.theme.SpecBadgeLargeTypography
+import org.shilpo.peerless.theme.SpecBadgeTypography
+import org.shilpo.peerless.theme.SquircleShapeSmall
+import org.shilpo.peerless.theme.ambientGlow
 import org.shilpo.peerless.ui.components.PeerlessIcon
 import org.shilpo.peerless.ui.components.PeerlessIcons
 
@@ -111,7 +148,6 @@ fun ProfileScreen(
                 .fillMaxSize()
                 .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
-            // Header Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -170,7 +206,6 @@ fun ProfileScreen(
                 }
             }
 
-            // Scrollable Body
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -178,7 +213,6 @@ fun ProfileScreen(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // User Profile Header Card
                 LiquidGlassSurface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(22.dp),
@@ -192,7 +226,6 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Avatar
                         val initial = currentUser?.displayName?.firstOrNull()?.uppercase() ?: "P"
                         Box(
                             modifier = Modifier
@@ -298,7 +331,6 @@ fun ProfileScreen(
                     }
                 }
 
-                // Live Server Health Telemetry Card
                 LiquidGlassSurface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
@@ -347,8 +379,14 @@ fun ProfileScreen(
                                     )
                                 } else {
                                     val isHealthy =
-                                        serverHealth?.status?.equals("healthy", ignoreCase = true) == true ||
-                                                serverHealth?.status?.equals("ok", ignoreCase = true) == true
+                                        serverHealth?.status?.equals(
+                                            "healthy",
+                                            ignoreCase = true
+                                        ) == true ||
+                                                serverHealth?.status?.equals(
+                                                    "ok",
+                                                    ignoreCase = true
+                                                ) == true
                                     val badgeColor =
                                         if (isHealthy) Color(0xFF69F0AE) else MaterialTheme.colorScheme.tertiary
                                     val badgeText = if (isHealthy) "HEALTHY" else "DEGRADED"
@@ -391,9 +429,7 @@ fun ProfileScreen(
                             }
                         }
 
-                        // Telemetry Grid
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            // Row 1: Audio Workers & Chunk Cache
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -417,7 +453,6 @@ fun ProfileScreen(
                                 )
                             }
 
-                            // Row 2: Server Uptime
                             TelemetryMetricCard(
                                 title = "SERVER UPTIME",
                                 value = formatUptime(serverHealth?.uptime_seconds ?: 0L),
@@ -430,7 +465,6 @@ fun ProfileScreen(
                     }
                 }
 
-                // Active Device Sessions List
                 LiquidGlassSurface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
@@ -472,7 +506,11 @@ fun ProfileScreen(
                                 modifier = Modifier
                                     .clip(PillShape)
                                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f))
-                                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), PillShape)
+                                    .border(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                                        PillShape
+                                    )
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
                                 Text(
@@ -486,7 +524,6 @@ fun ProfileScreen(
 
                         val sessions = meResponse?.sessions ?: emptyList()
                         if (sessions.isEmpty()) {
-                            // Current fallback session
                             SessionRowItem(
                                 session = SessionDto(
                                     id = "current",
@@ -507,13 +544,15 @@ fun ProfileScreen(
                     }
                 }
 
-                // Danger Zone: Disconnect & Forget Server
                 LiquidGlassSurface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
                     containerColor = Color(0xFF221113).copy(alpha = 0.85f),
                     borderBrush = Brush.verticalGradient(
-                        listOf(Color(0xFFE57373).copy(alpha = 0.5f), Color(0xFFB71C1C).copy(alpha = 0.2f))
+                        listOf(
+                            Color(0xFFE57373).copy(alpha = 0.5f),
+                            Color(0xFFB71C1C).copy(alpha = 0.2f)
+                        )
                     )
                 ) {
                     Column(
@@ -581,7 +620,6 @@ fun ProfileScreen(
             }
         }
 
-        // Zero-Knowledge Logout Confirmation Dialog
         if (showDisconnectConfirmation) {
             AlertDialog(
                 onDismissRequest = { showDisconnectConfirmation = false },
@@ -658,7 +696,11 @@ private fun TelemetryMetricCard(
         modifier = modifier
             .clip(SquircleShapeSmall)
             .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), SquircleShapeSmall)
+            .border(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                SquircleShapeSmall
+            )
             .padding(12.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -709,7 +751,11 @@ private fun SessionRowItem(
             .fillMaxWidth()
             .clip(SquircleShapeSmall)
             .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), SquircleShapeSmall)
+            .border(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                SquircleShapeSmall
+            )
             .padding(12.dp)
     ) {
         Row(

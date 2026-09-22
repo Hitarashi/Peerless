@@ -12,7 +12,6 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** Captures the default Windows render endpoint with WASAPI loopback. */
 internal class WindowsSpectrumCapture(
     private val analyzer: AudioSpectrumAnalyzer,
     private val onUnavailable: (Throwable) -> Unit

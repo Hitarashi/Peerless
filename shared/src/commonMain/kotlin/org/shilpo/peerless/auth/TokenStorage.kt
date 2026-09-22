@@ -8,7 +8,6 @@ interface TokenStorage {
     val tokenFlow: StateFlow<String?>
     val serverUrlFlow: StateFlow<String?>
 
-    /** Stable for this app installation; intentionally survives sign-out. */
     fun getOrCreateDeviceId(): String
 
     suspend fun getToken(): String?

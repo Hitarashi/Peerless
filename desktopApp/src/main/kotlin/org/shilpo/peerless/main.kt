@@ -20,7 +20,6 @@ fun main(args: Array<String>) {
     val serverSocket: ServerSocket = try {
         ServerSocket(SINGLE_INSTANCE_PORT, 50, InetAddress.getByName("127.0.0.1"))
     } catch (_: Exception) {
-        // Another instance is already running
         if (deepLinkArg != null) {
             try {
                 Socket("127.0.0.1", SINGLE_INSTANCE_PORT).use { socket ->

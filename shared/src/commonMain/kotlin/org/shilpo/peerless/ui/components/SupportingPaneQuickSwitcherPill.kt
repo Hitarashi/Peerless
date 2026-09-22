@@ -50,10 +50,6 @@ import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-/**
- * Quick switcher capsule pill with Shilpo's asymmetric stretch-and-snap indicator physics.
- * Adapted from `shilpo/crates/surfaces/src/bar/element.rs` (`calculate_stretching_geometry`).
- */
 @Composable
 fun SupportingPaneQuickSwitcherPill(
     activeSupportingPane: SupportingPaneType?,
@@ -90,7 +86,6 @@ fun SupportingPaneQuickSwitcherPill(
         previousTargetIndex = targetIndex
 
         if (targetIndex != null && prev != null && targetIndex != prev) {
-            // Switching between tabs: Shilpo asymmetric stretch-and-snap physics!
             fromIndex = prev
             toIndex = targetIndex
             visibilityProgress.snapTo(1f)
@@ -101,7 +96,6 @@ fun SupportingPaneQuickSwitcherPill(
             )
             fromIndex = targetIndex
         } else if (targetIndex != null && prev == null) {
-            // Opening from closed: smooth spring pop-in
             fromIndex = targetIndex
             toIndex = targetIndex
             motionProgress.snapTo(1f)
@@ -110,7 +104,6 @@ fun SupportingPaneQuickSwitcherPill(
                 animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMedium)
             )
         } else if (targetIndex == null && prev != null) {
-            // Closing: shrink cleanly right where it currently sits (prev)
             fromIndex = prev
             toIndex = prev
             motionProgress.snapTo(1f)
@@ -135,14 +128,12 @@ fun SupportingPaneQuickSwitcherPill(
             .background(colorScheme.surfaceContainerHigh.copy(alpha = 0.75f))
             .padding(2.dp)
     ) {
-        // Shilpo Elastic Stretching Pill Indicator
         if (visibilityProgress.value > 0.01f) {
             val visualInset = (hitTargetSizePx - iconSlotSizePx) / 2f
             val fromPos = fromIndex * slotStepPx + visualInset
             val toPos = toIndex * slotStepPx + visualInset
             val p = motionProgress.value.coerceIn(0f, 1f)
 
-            // Sine ease-out progress curve (out_sine in shilpo)
             fun outSine(progress: Float): Float {
                 return sin(progress.coerceIn(0f, 1f) * (PI / 2).toFloat())
             }
@@ -183,7 +174,6 @@ fun SupportingPaneQuickSwitcherPill(
             )
         }
 
-        // Foreground Icons
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(slotGapDp)

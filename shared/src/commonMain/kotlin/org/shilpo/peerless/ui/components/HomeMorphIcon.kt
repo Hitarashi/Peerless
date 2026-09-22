@@ -22,13 +22,6 @@ import kotlin.math.PI
 import kotlin.math.min
 import kotlin.math.sin
 
-/**
- * An expressive morphing Home icon that smoothly transitions between
- * an outlined house and a filled house with physics-based spring dynamics.
- *
- * Modeled using exact Material Symbols vector path data, continuous
- * outer contour interpolation, and centered geometric aperture morphing.
- */
 @Composable
 fun HomeMorphIcon(
     selected: Boolean,
@@ -70,7 +63,6 @@ private fun DrawScope.drawHomeMorph(
 ) {
     val p = progress.coerceIn(0f, 1f)
 
-    // Subtle elastic squash-and-stretch during state transition
     val elasticScale = 1f - 0.04f * sin(p * PI.toFloat())
 
     val baseSize = min(this.size.width, this.size.height)
@@ -84,7 +76,6 @@ private fun DrawScope.drawHomeMorph(
     path.reset()
     path.fillType = PathFillType.EvenOdd
 
-    // 1. Outer House Shell & Roof (shared geometry, with door morphing between p=0 and p=1)
     path.moveTo(toCanvasX(160f), toCanvasY(-200f))
     path.lineTo(toCanvasX(160f), toCanvasY(-560f))
     path.quadraticTo(
@@ -123,7 +114,6 @@ private fun DrawScope.drawHomeMorph(
         toCanvasX(720f), toCanvasY(-120f)
     )
 
-    // Door transition (smoothly interpolating between outlined door p=0 and filled arched door p=1)
     path.lineTo(toCanvasX(lerp(560f, 600f, p)), toCanvasY(-120f))
     path.quadraticTo(
         toCanvasX(lerp(543f, 583f, p)), toCanvasY(-120f),
@@ -171,7 +161,6 @@ private fun DrawScope.drawHomeMorph(
     )
     path.close()
 
-    // 2. Inner Window Cutout: contracts smoothly toward center (480, -470) as p goes 0 -> 1
     val holeScale = (1f - p).coerceIn(0f, 1f)
     if (holeScale > 0.001f) {
         fun holeX(x: Float): Float = toCanvasX(480f + (x - 480f) * holeScale)

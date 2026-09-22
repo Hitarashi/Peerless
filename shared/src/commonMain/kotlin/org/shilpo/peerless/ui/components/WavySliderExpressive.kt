@@ -1,7 +1,3 @@
-/*
- * Peerless (2026)
- * Expressive Wavy Slider & Progress Indicator based on Material3 Expressive & ArchiveTune
- */
 
 package org.shilpo.peerless.ui.components
 
@@ -64,16 +60,6 @@ import kotlinx.coroutines.isActive
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/**
- * Expressive Wavy Slider modeled directly after ArchiveTune's playback scrubber.
- *
- * Features:
- * - Official Material 3 Expressive [LinearWavyProgressIndicator] with dynamic wave animation.
- * - Morphing thumb indicator: circular resting dot that fluidly elongates into a vertical scrub pill line on interaction.
- * - Dynamic gap around the thumb that expands during interaction.
- * - Frame-interpolated smooth progress using [rememberSmoothProgress].
- * - Instant scrubbing with haptic feedback and tap-to-seek support.
- */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun WavySliderExpressive(
@@ -316,7 +302,6 @@ fun WavySliderExpressive(
             val maxThumbCenter = (size.width - currentWidth / 2f).coerceAtLeast(minThumbCenter)
             val thumbX = rawThumbX.coerceIn(minThumbCenter, maxThumbCenter)
 
-            // BUFFERED TRACK (YouTube / mpv style)
             val bufferedProgress = animatedBufferedProgress.coerceIn(0f, 1f)
             if (bufferedProgress > renderedProgress && trackWidth > 0f) {
                 val gapHalfPx = with(density) { dynamicGapSize.value.toPx() }
@@ -335,7 +320,6 @@ fun WavySliderExpressive(
                 }
             }
 
-            // THUMB INDICATOR
             drawRoundRect(
                 color = thumbColor,
                 topLeft = Offset(
@@ -418,10 +402,6 @@ fun WavySliderExpressive(
     }
 }
 
-/**
- * Samples playback position and returns smoothly interpolated progress fraction and position.
- * Directly sourced from ArchiveTune.
- */
 @Composable
 fun rememberSmoothProgress(
     isPlayingProvider: () -> Boolean,

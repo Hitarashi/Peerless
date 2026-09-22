@@ -13,7 +13,6 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/** A normalized, logarithmically spaced spectrum frame produced from decoded or loopback PCM. */
 data class AudioSpectrumFrame(
     val bands: List<Float>,
     val bassEnergy: Float,
@@ -23,11 +22,6 @@ data class AudioSpectrumFrame(
 internal val EmptyAudioSpectrum: StateFlow<AudioSpectrumFrame?> =
     MutableStateFlow<AudioSpectrumFrame?>(null).asStateFlow()
 
-/**
- * Stateful PCM analyzer shared by platform capture adapters. Calls to [acceptInterleavedPcm] must
- * be serialized by the adapter; [reset] may be called from another thread. Emits smoothed bands at
- * a 512-sample hop.
- */
 class AudioSpectrumAnalyzer(
     private val bandCount: Int = 48,
     private val fftSize: Int = 2048,

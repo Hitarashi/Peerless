@@ -22,13 +22,6 @@ import kotlin.math.PI
 import kotlin.math.min
 import kotlin.math.sin
 
-/**
- * An expressive morphing Search icon that smoothly transitions between
- * an outlined magnifying glass and a solid filled magnifying glass.
- *
- * Modeled using exact Material Symbols vector path data, continuous
- * outer contour drawing, and centered geometric aperture morphing.
- */
 @Composable
 fun SearchMorphIcon(
     selected: Boolean,
@@ -70,7 +63,6 @@ private fun DrawScope.drawSearchMorph(
 ) {
     val p = progress.coerceIn(0f, 1f)
 
-    // Subtle elastic squash-and-stretch during state transition
     val elasticScale = 1f - 0.04f * sin(p * PI.toFloat())
 
     val baseSize = min(this.size.width, this.size.height)
@@ -84,7 +76,6 @@ private fun DrawScope.drawSearchMorph(
     path.reset()
     path.fillType = PathFillType.EvenOdd
 
-    // 1. Outer rim of the magnifying glass and handle (solid silhouette)
     path.moveTo(toCanvasX(380f), toCanvasY(-320f))
     path.quadraticTo(
         toCanvasX(271f), toCanvasY(-320f),
@@ -146,7 +137,6 @@ private fun DrawScope.drawSearchMorph(
     )
     path.close()
 
-    // 2. Inner circular aperture: contracts smoothly to center (380, -580) as p goes 0 -> 1
     val holeScale = (1f - p).coerceIn(0f, 1f)
     if (holeScale > 0.001f) {
         fun holeX(x: Float): Float = toCanvasX(380f + (x - 380f) * holeScale)

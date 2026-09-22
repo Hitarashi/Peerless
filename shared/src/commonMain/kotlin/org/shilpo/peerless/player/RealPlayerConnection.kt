@@ -175,7 +175,6 @@ class RealPlayerConnection(
         syncCommandJob?.cancel()
         syncActiveDeviceJob?.cancel()
 
-        // 1. Observe remote snapshots when not the active playback device
         syncSnapshotJob = scope.launch {
             sync.remoteSnapshot.collect { snapshot ->
                 if (snapshot != null && !sync.isSelfActiveDevice.value) {
@@ -195,7 +194,6 @@ class RealPlayerConnection(
             }
         }
 
-        // 2. Observe remote commands directed to this active device
         syncCommandJob = scope.launch {
             sync.incomingCommands.collect { cmd ->
                 if (sync.isSelfActiveDevice.value) {
@@ -271,7 +269,6 @@ class RealPlayerConnection(
             }
         }
 
-        // Explicit device selection is the only operation that moves audio output.
         syncActiveDeviceJob = scope.launch {
             sync.isSelfActiveDevice
                 .drop(1)
@@ -308,7 +305,6 @@ class RealPlayerConnection(
     init {
         scope.launch {
             audioEngine.state.collect { engState ->
-                // A dormant local engine must not overwrite the active remote device's snapshot.
                 if (syncManager?.isSelfActiveDevice?.value == false) return@collect
                 _status.value = engState.status
                 val playing = (engState.status == PlaybackStatus.PLAYING)

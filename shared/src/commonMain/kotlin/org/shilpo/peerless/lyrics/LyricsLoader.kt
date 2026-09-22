@@ -19,7 +19,6 @@ sealed interface LyricsLoadState {
     data class Error(val message: String?) : LyricsLoadState
 }
 
-/** Loads lyrics for the active track once and ignores responses from tracks that are no longer active. */
 class LyricsLoader(
     private val apiClient: PeerlessApiClient,
     private val scope: CoroutineScope

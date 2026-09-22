@@ -58,7 +58,6 @@ fun SettingsScreen(
             color = MaterialTheme.colorScheme.onSurface
         )
 
-        // Telegram Account & Telemetry Card
         Box(
             modifier = Modifier
                 .fillMaxWidth()

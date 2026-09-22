@@ -2,7 +2,6 @@ package org.shilpo.peerless.player
 
 import org.shilpo.peerless.model.Track
 
-/** Supplies playable recommendations for an explicit radio session. */
 fun interface TrackRecommendationProvider {
     suspend fun recommend(
         seed: Track,

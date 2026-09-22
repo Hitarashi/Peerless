@@ -22,13 +22,6 @@ import kotlin.math.PI
 import kotlin.math.min
 import kotlin.math.sin
 
-/**
- * An expressive morphing Library icon that smoothly transitions between
- * an outlined music library card and a solid filled library card.
- *
- * Modeled using exact Material Symbols vector path data, continuous
- * outer contour drawing, and centered geometric aperture morphing.
- */
 @Composable
 fun LibraryMorphIcon(
     selected: Boolean,
@@ -70,7 +63,6 @@ private fun DrawScope.drawLibraryMorph(
 ) {
     val p = progress.coerceIn(0f, 1f)
 
-    // Subtle elastic squash-and-stretch during state transition
     val elasticScale = 1f - 0.04f * sin(p * PI.toFloat())
 
     val baseSize = min(this.size.width, this.size.height)
@@ -84,7 +76,6 @@ private fun DrawScope.drawLibraryMorph(
     path.reset()
     path.fillType = PathFillType.EvenOdd
 
-    // 1. Music Note
     path.moveTo(toCanvasX(500f), toCanvasY(-360f))
     path.quadraticTo(
         toCanvasX(542f), toCanvasY(-360f),
@@ -148,7 +139,6 @@ private fun DrawScope.drawLibraryMorph(
     )
     path.close()
 
-    // 2. Main Card Outer Perimeter
     path.moveTo(toCanvasX(320f), toCanvasY(-240f))
     path.quadraticTo(
         toCanvasX(287f), toCanvasY(-240f),
@@ -188,7 +178,6 @@ private fun DrawScope.drawLibraryMorph(
     path.lineTo(toCanvasX(320f), toCanvasY(-240f))
     path.close()
 
-    // 3. Back Secondary Shelf
     path.moveTo(toCanvasX(160f), toCanvasY(-80f))
     path.quadraticTo(
         toCanvasX(127f), toCanvasY(-80f),
@@ -236,7 +225,6 @@ private fun DrawScope.drawLibraryMorph(
     path.lineTo(toCanvasX(160f), toCanvasY(-80f))
     path.close()
 
-    // 4. Front Card Aperture: 480x480 square window contracts toward center (560, -560) as p goes 0 -> 1
     val holeScale = (1f - p).coerceIn(0f, 1f)
     if (holeScale > 0.001f) {
         fun holeX(x: Float): Float = toCanvasX(560f + (x - 560f) * holeScale)

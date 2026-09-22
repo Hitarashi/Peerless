@@ -1,11 +1,29 @@
 package org.shilpo.peerless
 
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import org.shilpo.peerless.model.*
+import org.shilpo.peerless.model.CanonicalDeduplicator
+import org.shilpo.peerless.model.CanonicalTrack
+import org.shilpo.peerless.model.Codec
+import org.shilpo.peerless.model.Provider
+import org.shilpo.peerless.model.Track
+import org.shilpo.peerless.model.TrackSource
+import org.shilpo.peerless.model.TrackSummaryDto
+import org.shilpo.peerless.model.UncachedTrackDto
 import org.shilpo.peerless.network.PeerlessApiClient
-import org.shilpo.peerless.player.*
+import org.shilpo.peerless.player.AudioEngine
+import org.shilpo.peerless.player.AudioEngineEvent
+import org.shilpo.peerless.player.AudioEngineState
+import org.shilpo.peerless.player.InMemoryQueueStorage
+import org.shilpo.peerless.player.PlaybackStatus
+import org.shilpo.peerless.player.RealPlayerConnection
+import org.shilpo.peerless.player.SignalPathSnapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -122,7 +140,12 @@ class SharedCommonTest {
             providerTrackId = "1",
             isCached = true
         )
-        val t2 = t1.copy(id = 2, title = "Track 2", providerTrackId = "2", artworkUrl = "https://example.com/art2.jpg")
+        val t2 = t1.copy(
+            id = 2,
+            title = "Track 2",
+            providerTrackId = "2",
+            artworkUrl = "https://example.com/art2.jpg"
+        )
 
         player.play(t1, listOf(t1, t2))
         assertEquals(t1, player.currentTrack.value)
@@ -213,10 +236,8 @@ class SharedCommonTest {
             sources = listOf(stereoHiRes, atmos)
         )
 
-        // When spatialSupported = false, stereoHiRes (192kHz > 48kHz) wins
         assertEquals(stereoHiRes, track.resolveBestSource(spatialSupported = false))
 
-        // When spatialSupported = true, Codec.Ec3 wins regardless of sample rate
         assertEquals(atmos, track.resolveBestSource(spatialSupported = true))
     }
 
@@ -248,13 +269,11 @@ class SharedCommonTest {
             sources = listOf(flac, alac)
         )
 
-        // Equal sample rate and bit depth -> ALAC preferred over FLAC
         assertEquals(alac, track.resolveBestSource())
     }
 
     @Test
     fun testInstantPlayAndBackgroundRip() {
-        // Cached 24/48 ALAC
         val cachedSource = TrackSource(
             id = 1,
             provider = Provider.Apple,
@@ -264,7 +283,6 @@ class SharedCommonTest {
             sampleRate = 48000,
             isCached = true
         )
-        // Uncached 24/192 FLAC (superior)
         val uncachedHiRes = TrackSource(
             id = 2,
             provider = Provider.Qobuz,
@@ -284,15 +302,18 @@ class SharedCommonTest {
             sources = listOf(cachedSource, uncachedHiRes)
         )
 
-        // Immediate play source must pick the cached source
         assertEquals(cachedSource, track.immediatePlaySource())
 
-        // Background rip source must return the superior uncached 24/192 source
         assertEquals(uncachedHiRes, track.backgroundRipSource())
 
-        // When spatial is supported and an uncached Atmos exists:
         val uncachedAtmos =
-            TrackSource(id = 3, provider = Provider.Apple, providerTrackId = "3", codec = Codec.Ec3, isCached = false)
+            TrackSource(
+                id = 3,
+                provider = Provider.Apple,
+                providerTrackId = "3",
+                codec = Codec.Ec3,
+                isCached = false
+            )
         val trackWithAtmos = track.copy(sources = listOf(cachedSource, uncachedAtmos))
         assertEquals(uncachedAtmos, trackWithAtmos.backgroundRipSource(spatialSupported = true))
     }
@@ -353,7 +374,7 @@ class SharedCommonTest {
             title = "Song A (Remaster)",
             artist = "Artist A",
             album = "Album B",
-            durationSeconds = 220, // Different duration, but identical ISRC
+            durationSeconds = 220,
             isrc = "USUM71703861",
             sources = listOf(
                 TrackSource(
@@ -387,7 +408,6 @@ class SharedCommonTest {
             )
         )
         val live = listOf(
-            // Duration within 3 seconds (202 vs 200), same normalized title & artist
             UncachedTrackDto(
                 provider = "qobuz",
                 item_id = "2",

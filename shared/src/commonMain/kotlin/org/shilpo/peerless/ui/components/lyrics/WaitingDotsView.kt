@@ -17,10 +17,6 @@ import kotlin.math.roundToInt
 
 private val YosEasing = CubicBezierEasing(0.75f, 0f, 0.25f, 1f)
 
-/**
- * Animated 3-dot musical waiting pulse widget ported from XMusic's XWaitingDotsView.
- * Rhythmically pulses and progressively fills to anticipate vocal entry during instrumental breaks.
- */
 @Composable
 fun WaitingDotsView(
     startTime: Long,

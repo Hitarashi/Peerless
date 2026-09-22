@@ -3,7 +3,6 @@ package org.shilpo.peerless.ui.components
 import org.shilpo.peerless.preferences.LyricsPresentation
 import org.shilpo.peerless.ui.components.lyrics.VisualLyricsConfig
 
-/** Defaults match BetterLyrics' normal word-synced lyrics presentation. */
 data class LyricsAnimationOptions(
     val wordByWord: Boolean = true,
     val blur: Boolean = true,
@@ -19,7 +18,6 @@ data class LyricsAnimationOptions(
     val threeDimensional: Boolean = false
 )
 
-/** Background effects are opt-in except for the artwork-derived fluid color layer. */
 data class LyricsBackgroundOptions(
     val fluid: Boolean = true,
     val snow: Boolean = false,

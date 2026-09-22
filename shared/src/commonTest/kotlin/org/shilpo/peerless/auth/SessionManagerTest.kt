@@ -180,35 +180,30 @@ class SessionManagerTest {
 
     @Test
     fun testDeepLinkHandlerPayloadParsing() {
-        // 1. Compact payload: {"s": "http://192.168.1.100:4444", "c": "123456"}
         val compactEncoded = DeepLinkHandler.encodePayload("http://192.168.1.100:4444", "123456")
         val parsedCompact = DeepLinkHandler.parsePayload(compactEncoded)
         assertNotNull(parsedCompact)
         assertEquals("http://192.168.1.100:4444", parsedCompact.serverUrl)
         assertEquals("123456", parsedCompact.code)
 
-        // 2. Full deep link URI: peerless://auth?data=<base64>
         val uri = "peerless://auth?data=$compactEncoded"
         val parsedUri = DeepLinkHandler.parseDeepLink(uri)
         assertNotNull(parsedUri)
         assertEquals("http://192.168.1.100:4444", parsedUri.serverUrl)
         assertEquals("123456", parsedUri.code)
 
-        // 3. Verbose JSON payload: {"server": "https://music.peerless.io", "code": "ABCDEF"}
         val verboseJson = """{"server":"https://music.peerless.io/","code":"ABCDEF"}"""
         val parsedJson = DeepLinkHandler.parsePayload(verboseJson)
         assertNotNull(parsedJson)
         assertEquals("https://music.peerless.io", parsedJson.serverUrl)
         assertEquals("ABCDEF", parsedJson.code)
 
-        // 4. Query params directly in URI: peerless://auth?s=http://myhost:4444&c=7890
         val directUri = "peerless://auth?s=http://myhost:4444&c=7890"
         val parsedDirect = DeepLinkHandler.parseDeepLink(directUri)
         assertNotNull(parsedDirect)
         assertEquals("http://myhost:4444", parsedDirect.serverUrl)
         assertEquals("7890", parsedDirect.code)
 
-        // 5. Invalid payloads
         assertNull(DeepLinkHandler.parsePayload("not_a_valid_payload"))
         assertNull(DeepLinkHandler.parsePayload(""))
         assertNull(DeepLinkHandler.parseDeepLink("https://notpeerless.com/"))
@@ -223,7 +218,6 @@ class SessionManagerTest {
         assertNull(storage.tokenFlow.value)
         assertNull(storage.serverUrlFlow.value)
 
-        // Save token and server url
         storage.saveToken("token_xyz")
         storage.saveServerUrl("http://10.0.0.1:4444/")
 
@@ -232,13 +226,11 @@ class SessionManagerTest {
         assertEquals("http://10.0.0.1:4444/", storage.getServerUrl())
         assertEquals("http://10.0.0.1:4444/", storage.serverUrlFlow.value)
 
-        // Clear token individually
         storage.clearToken()
         assertNull(storage.getToken())
         assertNull(storage.tokenFlow.value)
         assertEquals("http://10.0.0.1:4444/", storage.getServerUrl())
 
-        // Save again and test Zero-Knowledge clearAll()
         storage.saveToken("new_token")
         assertEquals("new_token", storage.getToken())
 
@@ -278,18 +270,15 @@ class SessionManagerTest {
         assertEquals(987654321L, user.telegram_id)
         assertEquals("PeerlessUser", user.name)
 
-        // Verify storage persisted
         assertEquals("test_token_abc123", storage.getToken())
         assertEquals("http://127.0.0.1:4444", storage.getServerUrl())
         assertEquals("http://127.0.0.1:4444", fakeClient.baseUrl)
 
-        // Verify SessionState.Authenticated
         val state = sessionManager.sessionState.value
         assertTrue(state is SessionState.Authenticated)
         assertEquals(user, state.user)
         assertEquals("http://127.0.0.1:4444", state.serverUrl)
 
-        // Test Zero-Knowledge logout
         sessionManager.logout()
         assertEquals(SessionState.Unauthenticated, sessionManager.sessionState.value)
         assertTrue(fakeClient.logoutCalled)
@@ -297,7 +286,6 @@ class SessionManagerTest {
         assertNull(storage.getServerUrl())
         assertEquals("", fakeClient.baseUrl)
 
-        // Now test connectWithPayload
         val payload = DeepLinkHandler.encodePayload("http://192.168.0.2:4444", "payload_code_555")
         val payloadResult = sessionManager.connectWithPayload(payload)
         assertTrue(payloadResult.isSuccess)
@@ -313,12 +301,10 @@ class SessionManagerTest {
         val fakeClient = FakePeerlessApiClient()
         val sessionManager = RealSessionManager(fakeClient, storage, scope = backgroundScope)
 
-        // 1. Initial launch with no session
         val hasSession = sessionManager.checkExistingSession()
         assertFalse(hasSession)
         assertEquals(SessionState.Unauthenticated, sessionManager.sessionState.value)
 
-        // 2. Launch with valid session saved in storage
         storage.saveServerUrl("http://saved-server:4444")
         storage.saveToken("saved_token_valid")
 
@@ -329,7 +315,6 @@ class SessionManagerTest {
         assertTrue(state is SessionState.Authenticated)
         assertEquals("http://saved-server:4444", state.serverUrl)
 
-        // 3. Saved session that fails authentication (e.g. expired / invalid) -> Zero-Knowledge logout
         val failingClient = FakePeerlessApiClient(
             meResult = Result.failure(ApiHttpException(401, "Token expired"))
         )
@@ -435,7 +420,6 @@ class SessionManagerTest {
     fun testResolveStreamUrlRequiresTicket() {
         val client = PeerlessApiClient(baseUrl = "http://localhost:4444")
 
-        // Passing null or blank ticket must throw IllegalArgumentException
         assertFailsWith<IllegalArgumentException> {
             client.resolveStreamUrl(101, null)
         }
@@ -446,7 +430,6 @@ class SessionManagerTest {
             client.resolveStreamUrl(101, "   ")
         }
 
-        // Passing ticket must return URL with ticket query param
         val streamUrl = client.resolveStreamUrl(101, "ticket_secret_token_123")
         assertEquals(
             "http://localhost:4444/api/v1/stream?ticket=ticket_secret_token_123",

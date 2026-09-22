@@ -53,25 +53,21 @@ class RealFavoritesManager(
     override fun toggleFavorite(track: TrackSummaryDto) {
         val currentlyFavorite = isFavorite(track.id)
         if (currentlyFavorite) {
-            // Optimistically remove
             _favoriteIds.value = _favoriteIds.value - track.id
             _favorites.value = _favorites.value.filter { it.id != track.id }
             scope.launch {
                 val res = apiClient.removeFavorite(track.id)
                 if (res.isFailure) {
-                    // Rollback
                     _favoriteIds.value = _favoriteIds.value + track.id
                     _favorites.value = _favorites.value + track
                 }
             }
         } else {
-            // Optimistically add
             _favoriteIds.value = _favoriteIds.value + track.id
             _favorites.value = listOf(track) + _favorites.value.filter { it.id != track.id }
             scope.launch {
                 val res = apiClient.addFavorite(track.id)
                 if (res.isFailure) {
-                    // Rollback
                     _favoriteIds.value = _favoriteIds.value - track.id
                     _favorites.value = _favorites.value.filter { it.id != track.id }
                 }

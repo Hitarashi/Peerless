@@ -26,17 +26,6 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-/**
- * An expressive, physics-based vector morph icon supporting continuous volume morphing
- * and animated mute states.
- *
- * Modeled using exact Google Material Symbols path geometry (960x960 viewBox):
- * - Cone glides smoothly along X (460 -> 380 -> 300) as volume increases.
- * - Inner wave (Wave 1) blooms smoothly as volume moves from 0 to 0.5, then shifts at higher volumes.
- * - Outer wave (Wave 2) blooms smoothly as volume moves from 0.5 to 1.0.
- * - When muted, animates a diagonal slash across the cone with spring bounce and collapses waves.
- * - Zero allocations on draw frames via remembered geometry.
- */
 @Composable
 fun VolumeMorphIcon(
     volume: Float,
@@ -73,7 +62,6 @@ fun VolumeMorphIcon(
         modifier
     }
 
-    // Pre-allocated paths for zero allocation on draw frames
     val conePath = remember {
         Path().apply {
             moveTo(440f, -360f)
@@ -158,7 +146,6 @@ private fun DrawScope.drawVolumeMorph(
     val v = volume.coerceIn(0f, 1f)
     val mp = muteProgress.coerceIn(0f, 1f)
 
-    // Squash and stretch during mute toggle transition
     val elasticScale = 1f - 0.04f * sin(mp * PI.toFloat())
 
     val baseSize = min(this.size.width, this.size.height)
@@ -166,15 +153,8 @@ private fun DrawScope.drawVolumeMorph(
     val cx = this.size.width / 2f
     val cy = this.size.height / 2f
 
-    // 1. Cone glide:
-    // In SVG 1 (v=0): cone center = 460 (dx = 0)
-    // In SVG 2 (v=0.5): cone center = 380 (dx = -80)
-    // In SVG 3 (v=1.0): cone center = 300 (dx = -160)
     val coneDx = -160f * v
 
-    // 2. Wave 1 bloom and shift:
-    // In 0..0.5: blooms from scale 0.3 to 1.0, alpha 0 to 1
-    // In 0.5..1.0: stays full scale/alpha, shifts from x=640 to x=560 (delta -80)
     val w1Scale: Float
     val w1Alpha: Float
     val w1Dx: Float
@@ -191,9 +171,6 @@ private fun DrawScope.drawVolumeMorph(
         w1Dx = -80f * p
     }
 
-    // 3. Wave 2 bloom:
-    // In 0..0.5: invisible
-    // In 0.5..1.0: blooms from scale 0.3 to 1.0, alpha 0 to 1
     val w2Scale: Float
     val w2Alpha: Float
 
@@ -206,13 +183,11 @@ private fun DrawScope.drawVolumeMorph(
         w2Alpha = (p * 1.5f).coerceIn(0f, 1f) * (1f - mp)
     }
 
-    // Transform coordinate system to 960x960 viewBox centered at (480, -480)
     withTransform({
         translate(left = cx, top = cy)
         scale(scaleX = s, scaleY = s, pivot = Offset.Zero)
         translate(left = -480f, top = 480f)
     }) {
-        // Draw Wave 1 if visible
         if (w1Alpha > 0.001f) {
             withTransform({
                 translate(left = w1Dx, top = 0f)
@@ -222,7 +197,6 @@ private fun DrawScope.drawVolumeMorph(
             }
         }
 
-        // Draw Wave 2 if visible
         if (w2Alpha > 0.001f) {
             withTransform({
                 scale(scaleX = w2Scale, scaleY = w2Scale, pivot = Offset(760f, -481f))
@@ -231,14 +205,12 @@ private fun DrawScope.drawVolumeMorph(
             }
         }
 
-        // Draw Cone with glide translation
         withTransform({
             translate(left = coneDx, top = 0f)
         }) {
             drawPath(conePath, color = tint)
         }
 
-        // Draw Mute Slash across the speaker cone
         if (mp > 0.001f) {
             val slashStartX = 84f
             val slashStartY = -764f
@@ -248,7 +220,6 @@ private fun DrawScope.drawVolumeMorph(
             val slashEndX = lerp(slashStartX, slashTargetEndX, mp)
             val slashEndY = lerp(slashStartY, slashTargetEndY, mp)
 
-            // Optional background cutout gap for crisp SVG-like notch effect
             if (cutoutColor != null && cutoutColor.isSpecified) {
                 drawLine(
                     color = cutoutColor,
@@ -259,7 +230,6 @@ private fun DrawScope.drawVolumeMorph(
                 )
             }
 
-            // Foreground diagonal slash stroke
             drawLine(
                 color = tint,
                 start = Offset(slashStartX, slashStartY),
