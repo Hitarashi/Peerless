@@ -70,6 +70,8 @@ kotlin {
             implementation(libs.coil3.network.ktor3)
             implementation(libs.materialkolor)
 
+            implementation(libs.haze.core)
+            implementation(libs.haze.blur)
             implementation(libs.haze.utils)
         }
         iosMain.dependencies {
@@ -78,6 +80,9 @@ kotlin {
         jvmMain.dependencies {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.jna)
+        }
+        jvmTest.dependencies {
+            implementation(compose.desktop.currentOs)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

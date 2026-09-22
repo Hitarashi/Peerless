@@ -55,6 +55,8 @@ media3-ffmpeg-decoder = { module = "org.jellyfin.media3:media3-ffmpeg-decoder", 
 
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
 
+haze-core = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
+haze-blur = { module = "dev.chrisbanes.haze:haze-blur", version.ref = "haze" }
 haze-utils = { module = "dev.chrisbanes.haze:haze-utils", version.ref = "haze" }
 
 [plugins]
