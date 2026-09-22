@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Matrix
@@ -67,8 +68,12 @@ import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.theme.ExpressiveMotion
 import org.shilpo.peerless.theme.ExpressiveTypography
+import org.shilpo.peerless.theme.LocalLiquidGlassState
 import org.shilpo.peerless.theme.SpecBadgeTypography
 import org.shilpo.peerless.theme.SquircleShapeSmall
+import org.shilpo.peerless.theme.extractArtworkSeedColor
+import org.shilpo.peerless.theme.liquidGlass
+import org.shilpo.peerless.theme.rememberLiquidGlassTint
 import org.shilpo.peerless.ui.shell.SupportingPaneType
 
 @Composable
@@ -129,19 +134,38 @@ fun PersistentBottomPlayer(
         bottomEnd = 24.dp
     )
 
+    // Artwork-tinted glass: seed extracted from the artwork AsyncImage below
+    // (avoids rememberArtworkSeedColor's stray 1.dp Image in the player).
+    var extractedArtworkColor by remember(artworkUrl) { mutableStateOf<Color?>(null) }
+    val liquidGlassEnabled = LocalLiquidGlassState.current?.isEnabled == true
+    val glassTint = rememberLiquidGlassTint(artworkColor = extractedArtworkColor)
+
+
     val playButtonInteractionSource = remember { MutableInteractionSource() }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(116.dp)
-            .clip(containerShape)
-            .background(colorScheme.surfaceContainerLow)
+            .shadow(
+                elevation = if (liquidGlassEnabled) 10.dp else 4.dp,
+                shape = containerShape,
+                ambientColor = Color.Black.copy(alpha = 0.35f),
+                spotColor = Color.Black.copy(alpha = 0.45f)
+            )
+            .then(
+                if (liquidGlassEnabled) {
+                    Modifier.liquidGlass(shape = containerShape, tint = glassTint)
+                } else {
+                    Modifier.background(colorScheme.surfaceContainerLow)
+                }
+            )
     ) {
 
         Row(
             modifier = Modifier
                 .fillMaxSize()
+                .clip(containerShape)
                 .padding(start = 20.dp, end = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -175,7 +199,13 @@ fun PersistentBottomPlayer(
                             model = artworkUrl,
                             contentDescription = "${track.title} artwork",
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize(),
+                            onSuccess = { state ->
+                                extractedArtworkColor = extractArtworkSeedColor(
+                                    painter = state.painter,
+                                    fallback = colorScheme.primary
+                                )
+                            }
                         )
                     } else {
                         PeerlessIcon(

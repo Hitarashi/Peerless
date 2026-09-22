@@ -26,9 +26,20 @@ class AndroidAppPreferences(
         _lyricsPresentation.value = presentation
     }
 
+    private val _liquidGlassEnabled = MutableStateFlow(
+        preferences?.getBoolean(LIQUID_GLASS_KEY, true) ?: true
+    )
+    override val liquidGlassEnabled: StateFlow<Boolean> = _liquidGlassEnabled.asStateFlow()
+
+    override fun setLiquidGlassEnabled(enabled: Boolean) {
+        preferences?.edit()?.putBoolean(LIQUID_GLASS_KEY, enabled)?.apply()
+        _liquidGlassEnabled.value = enabled
+    }
+
     private companion object {
         const val PREFERENCES_FILE = "peerless_app_preferences"
         const val LYRICS_PRESENTATION_KEY = "lyrics_presentation"
+        const val LIQUID_GLASS_KEY = "liquid_glass_enabled"
     }
 }
 

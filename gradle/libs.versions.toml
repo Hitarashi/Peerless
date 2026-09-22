@@ -1,7 +1,7 @@
 [versions]
 agp = "9.1.1"
 android-compileSdk = "37"
-android-minSdk = "24"
+android-minSdk = "33"
 android-targetSdk = "37"
 androidx-activity = "1.13.0"
 androidx-lifecycle = "2.11.0"
@@ -17,6 +17,7 @@ jellyfin-media3-ffmpeg = "1.9.0+1"
 materialkolor = "5.0.1"
 jna = "5.19.1"
 androidx-window = "1.5.1"
+haze = "2.0.0-rc02"
 
 [libraries]
 materialkolor = { module = "com.materialkolor:material-kolor", version.ref = "materialkolor" }
@@ -53,6 +54,8 @@ androidx-media3-session = { module = "androidx.media3:media3-session", version.r
 media3-ffmpeg-decoder = { module = "org.jellyfin.media3:media3-ffmpeg-decoder", version.ref = "jellyfin-media3-ffmpeg" }
 
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
+
+haze-utils = { module = "dev.chrisbanes.haze:haze-utils", version.ref = "haze" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

@@ -56,7 +56,6 @@ import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
 import org.shilpo.peerless.theme.ExpressiveTypography
-import org.shilpo.peerless.theme.LiquidGlassSurface
 import org.shilpo.peerless.theme.LosslessPurple
 import org.shilpo.peerless.theme.PillShape
 import org.shilpo.peerless.theme.SpecBadgeTypography
@@ -591,18 +590,22 @@ private fun TasteMixCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LiquidGlassSurface(
-        shape = SquircleShapeMedium,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.85f),
-        borderBrush = Brush.linearGradient(
-            listOf(
-                mix.primaryColor.copy(alpha = 0.45f),
-                mix.secondaryColor.copy(alpha = 0.25f),
-                MaterialTheme.colorScheme.outlineVariant
-            )
-        ),
+    Box(
         modifier = modifier
             .fillMaxWidth()
+            .clip(SquircleShapeMedium)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(
+                    listOf(
+                        mix.primaryColor.copy(alpha = 0.45f),
+                        mix.secondaryColor.copy(alpha = 0.25f),
+                        MaterialTheme.colorScheme.outlineVariant
+                    )
+                ),
+                shape = SquircleShapeMedium
+            )
             .clickable { onClick() }
     ) {
         Column(
@@ -817,10 +820,11 @@ private fun SearchResultsContent(
                         .padding(vertical = 48.dp, horizontal = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    LiquidGlassSurface(
-                        shape = SquircleShapeLarge,
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier.fillMaxWidth()
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(SquircleShapeLarge)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     ) {
                         Column(
                             modifier = Modifier
@@ -862,17 +866,22 @@ fun ArtistSpotlightCard(
     onSelectArtist: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LiquidGlassSurface(
-        shape = SquircleShapeMedium,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.90f),
-        borderBrush = Brush.linearGradient(
-            listOf(
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-                MaterialTheme.colorScheme.secondary.copy(alpha = 0.20f),
-                MaterialTheme.colorScheme.outlineVariant
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(SquircleShapeMedium)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
+                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.20f),
+                        MaterialTheme.colorScheme.outlineVariant
+                    )
+                ),
+                shape = SquircleShapeMedium
             )
-        ),
-        modifier = modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier

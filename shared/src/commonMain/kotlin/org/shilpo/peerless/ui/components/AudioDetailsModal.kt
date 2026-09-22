@@ -3,7 +3,17 @@ package org.shilpo.peerless.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -23,7 +33,12 @@ import coil3.compose.AsyncImage
 import org.shilpo.peerless.model.AudioSpecs
 import org.shilpo.peerless.model.Codec
 import org.shilpo.peerless.model.TrackSummaryDto
-import org.shilpo.peerless.theme.*
+import org.shilpo.peerless.theme.ArtworkShape
+import org.shilpo.peerless.theme.ExpressiveTypography
+import org.shilpo.peerless.theme.PillShape
+import org.shilpo.peerless.theme.SpecBadgeTypography
+import org.shilpo.peerless.theme.SquircleShapeLarge
+import org.shilpo.peerless.theme.SquircleShapeMedium
 
 @Composable
 fun AudioDetailsModal(
@@ -44,16 +59,20 @@ fun AudioDetailsModal(
     val tierBorder = tierColor.copy(alpha = 0.35f)
 
     Dialog(onDismissRequest = onDismiss) {
-        LiquidGlassSurface(
-            shape = SquircleShapeLarge,
-            containerColor = colorScheme.surfaceContainerHigh.copy(alpha = 0.95f),
-            borderBrush = Brush.verticalGradient(
-                listOf(tierColor.copy(alpha = 0.5f), colorScheme.outlineVariant)
-            ),
+        Box(
             modifier = Modifier
                 .widthIn(min = 320.dp, max = 460.dp)
                 .fillMaxWidth()
                 .padding(8.dp)
+                .clip(SquircleShapeLarge)
+                .background(colorScheme.surfaceContainerHigh)
+                .border(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        listOf(tierColor.copy(alpha = 0.5f), colorScheme.outlineVariant)
+                    ),
+                    shape = SquircleShapeLarge
+                )
         ) {
             Column(
                 modifier = Modifier
@@ -181,7 +200,11 @@ fun AudioDetailsModal(
                         .fillMaxWidth()
                         .clip(SquircleShapeMedium)
                         .background(colorScheme.surfaceContainer)
-                        .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.6f), SquircleShapeMedium)
+                        .border(
+                            1.dp,
+                            colorScheme.outlineVariant.copy(alpha = 0.6f),
+                            SquircleShapeMedium
+                        )
                         .padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {

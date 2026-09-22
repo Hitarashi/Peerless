@@ -3,9 +3,30 @@ package org.shilpo.peerless.ui.components
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBarDefaults
+import androidx.compose.material3.ShortNavigationBar
+import androidx.compose.material3.ShortNavigationBarArrangement
+import androidx.compose.material3.ShortNavigationBarItem
+import androidx.compose.material3.ShortNavigationBarItemDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -14,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import org.shilpo.peerless.theme.LocalLiquidGlassState
+import org.shilpo.peerless.theme.liquidGlass
 import org.shilpo.peerless.ui.navigation.NavigationDestination
 
 val NavigationBarHorizontalPadding = 12.dp
@@ -52,8 +75,13 @@ fun FloatingNavigationToolbar(
         }
     }
 
+    // Glass replaces the opaque container (keeps shadow, drops tonal tint);
+    // pure-black and disabled states keep the current Surface behavior.
+    val useGlass = LocalLiquidGlassState.current?.isEnabled == true && !pureBlack
     val navigationContainerColor =
-        if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
+        if (useGlass) Color.Transparent
+        else if (pureBlack) Color.Black
+        else MaterialTheme.colorScheme.surfaceContainer
     val motionScheme = MaterialTheme.motionScheme
 
     Box(
@@ -66,11 +94,18 @@ fun FloatingNavigationToolbar(
             modifier = Modifier
                 .widthIn(max = NavigationBarMaxWidth)
                 .fillMaxWidth()
-                .height(NavigationBarHeight),
+                .height(NavigationBarHeight)
+                .then(
+                    if (useGlass) {
+                        Modifier.liquidGlass(shape = navigationShape, tint = null)
+                    } else {
+                        Modifier
+                    }
+                ),
             shape = navigationShape,
             color = navigationContainerColor,
-            tonalElevation = NavigationBarDefaults.Elevation,
-            shadowElevation = NavigationBarDefaults.Elevation,
+            tonalElevation = if (useGlass) 0.dp else NavigationBarDefaults.Elevation,
+            shadowElevation = if (useGlass) 10.dp else NavigationBarDefaults.Elevation,
         ) {
             ShortNavigationBar(
                 modifier = Modifier.fillMaxSize(),
@@ -102,8 +137,12 @@ fun FloatingNavigationToolbar(
                                     selectedIndicatorColor = MaterialTheme.colorScheme.secondaryContainer,
                                     selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
                                     selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                        alpha = 0.75f
+                                    ),
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                        alpha = 0.75f
+                                    )
                                 ),
                                 icon = {
                                     val rotation by animateFloatAsState(

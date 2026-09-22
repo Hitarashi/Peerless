@@ -55,8 +55,6 @@ import org.shilpo.peerless.model.ServerHealthDto
 import org.shilpo.peerless.model.SessionDto
 import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.theme.ExpressiveTypography
-import org.shilpo.peerless.theme.LiquidGlassDefaults
-import org.shilpo.peerless.theme.LiquidGlassSurface
 import org.shilpo.peerless.theme.PillShape
 import org.shilpo.peerless.theme.SpecBadgeLargeTypography
 import org.shilpo.peerless.theme.SpecBadgeTypography
@@ -213,11 +211,11 @@ fun ProfileScreen(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                LiquidGlassSurface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(22.dp),
-                    containerColor = LiquidGlassDefaults.ElevatedContainerColor,
-                    borderBrush = LiquidGlassDefaults.AccentBorderBrush
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 ) {
                     Row(
                         modifier = Modifier
@@ -331,11 +329,11 @@ fun ProfileScreen(
                     }
                 }
 
-                LiquidGlassSurface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    containerColor = LiquidGlassDefaults.ElevatedContainerColor,
-                    borderBrush = LiquidGlassDefaults.BorderBrush
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 ) {
                     Column(
                         modifier = Modifier
@@ -465,11 +463,11 @@ fun ProfileScreen(
                     }
                 }
 
-                LiquidGlassSurface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    containerColor = LiquidGlassDefaults.ElevatedContainerColor,
-                    borderBrush = LiquidGlassDefaults.BorderBrush
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 ) {
                     Column(
                         modifier = Modifier
@@ -544,16 +542,21 @@ fun ProfileScreen(
                     }
                 }
 
-                LiquidGlassSurface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    containerColor = Color(0xFF221113).copy(alpha = 0.85f),
-                    borderBrush = Brush.verticalGradient(
-                        listOf(
-                            Color(0xFFE57373).copy(alpha = 0.5f),
-                            Color(0xFFB71C1C).copy(alpha = 0.2f)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color(0xFF221113))
+                        .border(
+                            width = 1.dp,
+                            brush = Brush.verticalGradient(
+                                listOf(
+                                    Color(0xFFE57373).copy(alpha = 0.5f),
+                                    Color(0xFFB71C1C).copy(alpha = 0.2f)
+                                )
+                            ),
+                            shape = RoundedCornerShape(20.dp)
                         )
-                    )
                 ) {
                     Column(
                         modifier = Modifier

@@ -95,8 +95,11 @@ import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
 import org.shilpo.peerless.theme.ExpressiveMotion
 import org.shilpo.peerless.theme.ExpressiveTypography
+import org.shilpo.peerless.theme.LocalLiquidGlassState
 import org.shilpo.peerless.theme.LocalWindowWidthSizeClass
 import org.shilpo.peerless.theme.WindowWidthSizeClass
+import org.shilpo.peerless.theme.liquidGlassSource
+import org.shilpo.peerless.theme.rememberLiquidGlassState
 import org.shilpo.peerless.ui.components.FloatingNavigationToolbar
 import org.shilpo.peerless.ui.components.HomeMorphIcon
 import org.shilpo.peerless.ui.components.LibraryMorphIcon
@@ -292,7 +295,11 @@ fun AdaptiveShell(
             paneLayout.isAvailable && windowPosture.kind == WindowPostureKind.FLAT
         val fullPlayerBounds = fullPlayerRegion(maxWidth, maxHeight, windowPosture)
 
-        CompositionLocalProvider(LocalWindowWidthSizeClass provides windowSizeClass) {
+        val liquidGlassState = rememberLiquidGlassState()
+        CompositionLocalProvider(
+            LocalWindowWidthSizeClass provides windowSizeClass,
+            LocalLiquidGlassState provides liquidGlassState
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1638,49 +1645,57 @@ private fun DestinationContent(
     contentBottomPadding: Dp,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
-    when (destination) {
-        NavigationDestination.HOME -> {
-            HomeScreenContent(
-                playerConnection = playerConnection,
-                searchQuery = searchQuery,
-                onQueryChange = onQueryChange,
-                selectedFilter = selectedFilter,
-                onSelectFilter = onSelectFilter,
-                displayedTracks = displayedTracks,
-                allTracks = allTracks,
-                onNavigateToSearch = { onSelectDestination(NavigationDestination.SEARCH) },
-                onNavigateToSettings = { onSelectDestination(NavigationDestination.SETTINGS) },
-                contentBottomPadding = contentBottomPadding,
-                onRipClick = onRipClick
-            )
-        }
+    // Single backdrop seam: everything behind the bottom players + nav toolbar
+    // is captured here for the liquid glass system (no-op when glass is off).
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .liquidGlassSource(LocalLiquidGlassState.current)
+    ) {
+        when (destination) {
+            NavigationDestination.HOME -> {
+                HomeScreenContent(
+                    playerConnection = playerConnection,
+                    searchQuery = searchQuery,
+                    onQueryChange = onQueryChange,
+                    selectedFilter = selectedFilter,
+                    onSelectFilter = onSelectFilter,
+                    displayedTracks = displayedTracks,
+                    allTracks = allTracks,
+                    onNavigateToSearch = { onSelectDestination(NavigationDestination.SEARCH) },
+                    onNavigateToSettings = { onSelectDestination(NavigationDestination.SETTINGS) },
+                    contentBottomPadding = contentBottomPadding,
+                    onRipClick = onRipClick
+                )
+            }
 
-        NavigationDestination.SEARCH -> {
-            SearchScreen(
-                playerConnection = playerConnection,
-                onOpenSettings = onOpenSettings,
-                contentBottomPadding = contentBottomPadding,
-                onRipClick = onRipClick
-            )
-        }
+            NavigationDestination.SEARCH -> {
+                SearchScreen(
+                    playerConnection = playerConnection,
+                    onOpenSettings = onOpenSettings,
+                    contentBottomPadding = contentBottomPadding,
+                    onRipClick = onRipClick
+                )
+            }
 
-        NavigationDestination.LIBRARY -> {
-            LibraryScreen(
-                playerConnection = playerConnection,
-                currentTrackDto = currentTrackDto,
-                status = status,
-                allTracks = displayedTracks,
-                contentBottomPadding = contentBottomPadding
-            )
-        }
+            NavigationDestination.LIBRARY -> {
+                LibraryScreen(
+                    playerConnection = playerConnection,
+                    currentTrackDto = currentTrackDto,
+                    status = status,
+                    allTracks = displayedTracks,
+                    contentBottomPadding = contentBottomPadding
+                )
+            }
 
-        NavigationDestination.SETTINGS -> {
-            SettingsScreen(
-                serverConnected = serverConnected,
-                onOpenSettingsDialog = onOpenSettings,
-                onOpenProfile = onOpenProfile,
-                contentBottomPadding = contentBottomPadding
-            )
+            NavigationDestination.SETTINGS -> {
+                SettingsScreen(
+                    serverConnected = serverConnected,
+                    onOpenSettingsDialog = onOpenSettings,
+                    onOpenProfile = onOpenProfile,
+                    contentBottomPadding = contentBottomPadding
+                )
+            }
         }
     }
 }

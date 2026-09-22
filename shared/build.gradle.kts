@@ -69,6 +69,8 @@ kotlin {
             implementation(libs.coil3.compose)
             implementation(libs.coil3.network.ktor3)
             implementation(libs.materialkolor)
+
+            implementation(libs.haze.utils)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
