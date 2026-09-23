@@ -6,6 +6,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -19,6 +20,7 @@ import org.shilpo.peerless.model.LastFmArtist
 import org.shilpo.peerless.model.LastFmSimilarTrack
 import org.shilpo.peerless.model.LastFmTag
 import org.shilpo.peerless.model.LastFmTrackInfo
+import org.shilpo.peerless.model.LastFmTrackMatch
 import org.shilpo.peerless.model.LastFmUserTrack
 import org.shilpo.peerless.network.createDefaultPeerlessHttpClient
 
@@ -34,8 +36,8 @@ class LastFmClient(
         coerceInputValues = true
     }
 
-    suspend fun getArtistInfo(artist: String): Result<LastFmArtist> = runCatching {
-        try {
+    suspend fun getArtistInfo(artist: String): Result<LastFmArtist> {
+        return try {
             val response = httpClient.get(baseUrl) {
                 parameter("method", "artist.getinfo")
                 parameter("artist", artist)
@@ -46,21 +48,22 @@ class LastFmClient(
             if (!response.status.isSuccess()) {
                 error("Last.fm artist request failed with HTTP ${response.status}")
             }
-            val text = response.bodyAsText()
-            val root = json.parseToJsonElement(text).jsonObject
+            val root = json.parseToJsonElement(response.bodyAsText()).jsonObject
             if (root.containsKey("error")) {
-                val msg = root["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown Last.fm error"
-                error("Last.fm API error: $msg")
+                val message =
+                    root["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown Last.fm error"
+                error("Last.fm API error: $message")
             }
-            val artistObj = root["artist"]?.jsonObject
+            val artistObject = root["artist"]?.jsonObject
                 ?: error("Missing 'artist' object in response")
-
-            parseArtist(artistObj, artist)
-        } catch (e: Throwable) {
+            Result.success(parseArtist(artistObject, artist))
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
             if (enableFallback) {
-                fallbackArtist(artist)
+                Result.success(fallbackArtist(artist))
             } else {
-                throw e
+                Result.failure(error)
             }
         }
     }
@@ -118,6 +121,58 @@ class LastFmClient(
             } else {
                 throw e
             }
+        }
+    }
+
+    internal suspend fun searchTracks(
+        query: String,
+        limit: Int = 20
+    ): Result<List<LastFmTrackMatch>> {
+        if (query.isBlank()) return Result.success(emptyList())
+
+        return try {
+            val response = httpClient.get(baseUrl) {
+                parameter("method", "track.search")
+                parameter("track", query.trim())
+                parameter("limit", limit.coerceIn(1, 50))
+                parameter("api_key", apiKey)
+                parameter("format", "json")
+            }
+            if (!response.status.isSuccess()) {
+                error("Last.fm track search failed with HTTP ${response.status}")
+            }
+
+            val root = json.parseToJsonElement(response.bodyAsText()).jsonObject
+            if (root.containsKey("error")) {
+                val message =
+                    root["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown Last.fm error"
+                error("Last.fm API error: $message")
+            }
+
+            val matches = root["results"]?.jsonObject
+                ?.get("trackmatches")?.jsonObject?.get("track")
+            val elements = when (matches) {
+                is JsonArray -> matches.toList()
+                is JsonObject -> listOf(matches)
+                else -> emptyList()
+            }
+            val tracks = elements.mapNotNull { element ->
+                val track = element as? JsonObject ?: return@mapNotNull null
+                val title = track["name"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+                val artist = when (val artistValue = track["artist"]) {
+                    is JsonObject -> (artistValue["name"] ?: artistValue["#text"])
+                        ?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+
+                    else -> artistValue?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+                }
+                if (title.isBlank() || artist.isBlank()) return@mapNotNull null
+                LastFmTrackMatch(title = title, artist = artist)
+            }
+            Result.success(tracks)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            Result.failure(error)
         }
     }
 

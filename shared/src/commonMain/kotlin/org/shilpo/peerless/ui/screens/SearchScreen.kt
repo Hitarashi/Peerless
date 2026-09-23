@@ -1,26 +1,32 @@
 package org.shilpo.peerless.ui.screens
 
-
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -31,96 +37,66 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.DrawableResource
 import org.shilpo.peerless.lastfm.LastFmClient
-import org.shilpo.peerless.model.CanonicalDeduplicator
 import org.shilpo.peerless.model.CanonicalTrack
 import org.shilpo.peerless.model.LastFmArtist
 import org.shilpo.peerless.model.LastFmTag
+import org.shilpo.peerless.model.LastFmTrackMatch
 import org.shilpo.peerless.model.SearchFilter
+import org.shilpo.peerless.model.TrackSearchResults
 import org.shilpo.peerless.model.TrackSummaryDto
-import org.shilpo.peerless.model.UncachedTrackDto
 import org.shilpo.peerless.model.toTrack
 import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
 import org.shilpo.peerless.tasks.LocalRipCoordinator
-import org.shilpo.peerless.theme.ExpressiveTypography
-import org.shilpo.peerless.theme.LosslessPurple
-import org.shilpo.peerless.theme.PillShape
-import org.shilpo.peerless.theme.SpecBadgeTypography
-import org.shilpo.peerless.theme.SquircleShapeLarge
-import org.shilpo.peerless.theme.SquircleShapeMedium
 import org.shilpo.peerless.ui.components.ExpressiveSearchBar
 import org.shilpo.peerless.ui.components.PeerlessIcon
 import org.shilpo.peerless.ui.components.PeerlessIcons
 import org.shilpo.peerless.ui.components.TrackRow
 
-data class TasteMixCardData(
+private data class TasteMixCardData(
     val id: String,
     val title: String,
     val subtitle: String,
-    val tagSpecs: String,
-    val artistsSummary: String,
-    val primaryColor: Color,
-    val secondaryColor: Color,
     val queryKeyword: String
 )
 
-val CuratedTasteMixes: List<TasteMixCardData>
-    @Composable get() = listOf(
-        TasteMixCardData(
-            id = "audiophile_ref",
-            title = "Audiophile Reference",
-            subtitle = "Master tapes & wide dynamic range",
-            tagSpecs = "24-BIT / 192KHZ • FLAC",
-            artistsSummary = "Pink Floyd, Miles Davis, Eagles",
-            primaryColor = MaterialTheme.colorScheme.tertiary,
-            secondaryColor = Color(0xFF5322C7),
-            queryKeyword = "Pink Floyd"
-        ),
-        TasteMixCardData(
-            id = "synth_electro",
-            title = "Synthwave & French Touch",
-            subtitle = "Analog synthesizers & punchy transients",
-            tagSpecs = "24-BIT / 96KHZ • ALAC",
-            artistsSummary = "Daft Punk, M83, Kavinsky",
-            primaryColor = MaterialTheme.colorScheme.primary,
-            secondaryColor = MaterialTheme.colorScheme.secondary,
-            queryKeyword = "Daft Punk"
-        ),
-        TasteMixCardData(
-            id = "ambient_focus",
-            title = "Late Night Ambient",
-            subtitle = "Expansive spatial soundscapes",
-            tagSpecs = "24-BIT / 88.2KHZ • FLAC",
-            artistsSummary = "Ambient, Brian Eno, Tycho",
-            primaryColor = MaterialTheme.colorScheme.secondary,
-            secondaryColor = Color(0xFF1E3C72),
-            queryKeyword = "Ambient"
-        ),
-        TasteMixCardData(
-            id = "studio_classics",
-            title = "Studio Master Classics",
-            subtitle = "Legendary multi-track transfers",
-            tagSpecs = "24-BIT / 96KHZ • ALAC",
-            artistsSummary = "The Beatles, Fleetwood Mac, Radiohead",
-            primaryColor = LosslessPurple,
-            secondaryColor = Color(0xFF16222F),
-            queryKeyword = "Radiohead"
-        )
+private val CuratedTasteMixes: List<TasteMixCardData> = listOf(
+    TasteMixCardData(
+        id = "audiophile_ref",
+        title = "Audiophile Reference",
+        subtitle = "Master tapes & wide dynamic range",
+        queryKeyword = "Pink Floyd"
+    ),
+    TasteMixCardData(
+        id = "synth_electro",
+        title = "Synthwave & French Touch",
+        subtitle = "Analog synthesizers & punchy transients",
+        queryKeyword = "Daft Punk"
+    ),
+    TasteMixCardData(
+        id = "ambient_focus",
+        title = "Late Night Ambient",
+        subtitle = "Expansive spatial soundscapes",
+        queryKeyword = "Ambient"
+    ),
+    TasteMixCardData(
+        id = "studio_classics",
+        title = "Studio Master Classics",
+        subtitle = "Legendary multi-track transfers",
+        queryKeyword = "Radiohead"
     )
+)
 
 @Composable
 fun SearchScreen(
@@ -142,8 +118,10 @@ fun SearchScreen(
     var isSearching by remember { mutableStateOf(false) }
 
     var canonicalTracks by remember { mutableStateOf<List<CanonicalTrack>>(emptyList()) }
+    var lastFmMatches by remember { mutableStateOf<List<LastFmTrackMatch>>(emptyList()) }
     var artistSpotlight by remember { mutableStateOf<LastFmArtist?>(null) }
     var zeroStateTags by remember { mutableStateOf<List<LastFmTag>>(emptyList()) }
+    var searchFailed by remember { mutableStateOf(false) }
 
     val lastFmClient = remember { LastFmClient() }
 
@@ -157,307 +135,189 @@ fun SearchScreen(
         if (trimmedQuery.isBlank()) {
             isSearching = false
             canonicalTracks = emptyList()
+            lastFmMatches = emptyList()
             artistSpotlight = null
+            searchFailed = false
             return@LaunchedEffect
         }
 
         isSearching = true
-        delay(300)
+        canonicalTracks = emptyList()
+        lastFmMatches = emptyList()
+        artistSpotlight = null
+        searchFailed = false
+        delay(450)
 
         val providerParam = selectedFilter.providerQuery
 
         coroutineScope {
-            launch {
-                val searchRes = apiClient.search(
+            val backendSearch = async {
+                apiClient.search(
                     query = trimmedQuery,
                     provider = providerParam
                 )
-
-                searchRes.onSuccess { response ->
-                    val filteredCached = when (selectedFilter) {
-                        SearchFilter.CACHED -> response.cached
-                        SearchFilter.APPLE_MUSIC -> response.cached.filter {
-                            it.provider.contains(
-                                "apple",
-                                ignoreCase = true
-                            )
-                        }
-
-                        SearchFilter.QOBUZ -> response.cached.filter {
-                            it.provider.contains(
-                                "qobuz",
-                                ignoreCase = true
-                            )
-                        }
-
-                        SearchFilter.TRACKS -> response.cached.filter {
-                            it.title.contains(
-                                trimmedQuery,
-                                ignoreCase = true
-                            )
-                        }
-
-                        SearchFilter.ALBUMS -> response.cached.filter {
-                            it.album.contains(
-                                trimmedQuery,
-                                ignoreCase = true
-                            )
-                        }
-
-                        SearchFilter.ARTISTS -> response.cached.filter {
-                            it.artist.contains(
-                                trimmedQuery,
-                                ignoreCase = true
-                            )
-                        }
-
-                        else -> response.cached
-                    }
-
-                    val rawLive = when (selectedFilter) {
-                        SearchFilter.CACHED -> emptyList()
-                        SearchFilter.APPLE_MUSIC -> response.live.filter {
-                            it.provider.contains(
-                                "apple",
-                                ignoreCase = true
-                            )
-                        }
-
-                        SearchFilter.QOBUZ -> response.live.filter {
-                            it.provider.contains(
-                                "qobuz",
-                                ignoreCase = true
-                            )
-                        }
-
-                        SearchFilter.TRACKS -> response.live.filter {
-                            it.title.contains(
-                                trimmedQuery,
-                                ignoreCase = true
-                            )
-                        }
-
-                        SearchFilter.ALBUMS -> response.live.filter {
-                            it.album.contains(
-                                trimmedQuery,
-                                ignoreCase = true
-                            )
-                        }
-
-                        SearchFilter.ARTISTS -> response.live.filter {
-                            it.artist.contains(
-                                trimmedQuery,
-                                ignoreCase = true
-                            )
-                        }
-
-                        else -> response.live
-                    }
-
-                    val deduplicated = CanonicalDeduplicator.deduplicate(
-                        cachedTracks = filteredCached,
-                        liveTracks = rawLive,
-                        baseUrl = apiClient.baseUrl
-                    )
-                    canonicalTracks = deduplicated
-                }.onFailure {
-                    val localMatches = SampleLosslessLibrary.filter {
-                        val matchesQuery = it.title.contains(trimmedQuery, ignoreCase = true) ||
-                                it.artist.contains(trimmedQuery, ignoreCase = true) ||
-                                it.album.contains(trimmedQuery, ignoreCase = true)
-                        val matchesFilter = when (selectedFilter) {
-                            SearchFilter.CACHED -> it.is_cached
-                            SearchFilter.APPLE_MUSIC -> it.provider.contains(
-                                "apple",
-                                ignoreCase = true
-                            )
-
-                            SearchFilter.QOBUZ -> it.provider.contains("qobuz", ignoreCase = true)
-                            SearchFilter.TRACKS -> it.title.contains(
-                                trimmedQuery,
-                                ignoreCase = true
-                            )
-
-                            SearchFilter.ALBUMS -> it.album.contains(
-                                trimmedQuery,
-                                ignoreCase = true
-                            )
-
-                            SearchFilter.ARTISTS -> it.artist.contains(
-                                trimmedQuery,
-                                ignoreCase = true
-                            )
-
-                            else -> true
-                        }
-                        matchesQuery && matchesFilter
-                    }
-
-                    val cachedLocal = localMatches.filter { it.is_cached }
-                    val liveLocal = if (selectedFilter == SearchFilter.CACHED) {
-                        emptyList()
-                    } else {
-                        localMatches
-                            .filter { !it.is_cached }
-                            .map {
-                                UncachedTrackDto(
-                                    provider = it.provider,
-                                    item_id = it.track_id,
-                                    track_id = it.track_id,
-                                    title = it.title,
-                                    artist = it.artist,
-                                    album = it.album,
-                                    duration = it.duration,
-                                    is_cached = false
-                                )
-                            }
-                    }
-                    canonicalTracks = CanonicalDeduplicator.deduplicate(
-                        cachedTracks = cachedLocal,
-                        liveTracks = liveLocal,
-                        baseUrl = apiClient.baseUrl
-                    )
-                }
             }
-
-            launch {
-                if (selectedFilter != SearchFilter.TRACKS && selectedFilter != SearchFilter.ALBUMS) {
-                    val artistRes = lastFmClient.getArtistInfo(trimmedQuery)
-                    artistSpotlight = artistRes.getOrNull()
+            val lastFmSearch = async {
+                if (selectedFilter != SearchFilter.CACHED &&
+                    selectedFilter != SearchFilter.ALBUMS &&
+                    selectedFilter != SearchFilter.ARTISTS
+                ) {
+                    lastFmClient.searchTracks(trimmedQuery)
                 } else {
-                    artistSpotlight = null
+                    Result.success(emptyList())
                 }
             }
+            val artistSearch = if (selectedFilter == SearchFilter.ARTISTS) {
+                async { lastFmClient.getArtistInfo(trimmedQuery) }
+            } else {
+                null
+            }
+
+            val response = backendSearch.await().getOrElse {
+                searchFailed = true
+                lastFmSearch.cancel()
+                artistSearch?.cancel()
+                return@coroutineScope
+            }
+            canonicalTracks = TrackSearchResults.merge(
+                response = response,
+                query = trimmedQuery,
+                filter = selectedFilter,
+                baseUrl = apiClient.baseUrl,
+                lastFmMatches = emptyList()
+            )
+
+            lastFmMatches = lastFmSearch.await().getOrDefault(emptyList())
+            canonicalTracks = TrackSearchResults.merge(
+                response = response,
+                query = trimmedQuery,
+                filter = selectedFilter,
+                baseUrl = apiClient.baseUrl,
+                lastFmMatches = lastFmMatches
+            )
+
+            artistSpotlight = artistSearch?.await()?.getOrNull()
         }
 
         isSearching = false
     }
 
-    Box(
-        modifier = modifier.fillMaxSize()
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onSurface
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter
         ) {
-            ExpressiveSearchBar(
-                query = searchQuery,
-                onQueryChange = { searchQuery = it },
-                onClearQuery = { searchQuery = "" },
-                selectedFilter = selectedFilter,
-                onFilterSelect = { selectedFilter = it },
-                onOpenSettings = onOpenSettings,
-                isSearching = isSearching,
-                serverUrl = apiClient.baseUrl
-            )
-
-            if (searchQuery.isBlank()) {
-                ZeroStateDiscovery(
-                    tags = zeroStateTags,
-                    onSelectTag = { tag -> searchQuery = tag.name },
-                    onSelectTasteMix = { mix -> searchQuery = mix.queryKeyword },
-                    cachedSampleTracks = SampleLosslessLibrary.filter { it.is_cached },
-                    playerConnection = playerConnection,
-                    currentTrackDto = currentTrackDto,
-                    status = status,
-                    contentBottomPadding = contentBottomPadding
-                )
-            } else {
-                SearchResultsContent(
+            Column(
+                modifier = Modifier.widthIn(max = 1040.dp).fillMaxWidth().fillMaxSize()
+            ) {
+                ExpressiveSearchBar(
                     query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    onClearQuery = { searchQuery = "" },
+                    selectedFilter = selectedFilter,
+                    onFilterSelect = { selectedFilter = it },
+                    onOpenSettings = onOpenSettings,
                     isSearching = isSearching,
-                    artistSpotlight = artistSpotlight,
-                    canonicalTracks = canonicalTracks,
-                    playerConnection = playerConnection,
-                    currentTrackDto = currentTrackDto,
-                    status = status,
-                    onSelectTag = { tag -> searchQuery = tag },
-                    onSelectArtist = { artist -> searchQuery = artist },
-                    onRipClick = onRipClick,
-                    contentBottomPadding = contentBottomPadding
+                    serverUrl = apiClient.baseUrl
                 )
+
+                if (searchQuery.isBlank()) {
+                    ZeroStateDiscovery(
+                        tags = zeroStateTags,
+                        onSelectTag = { tag -> searchQuery = tag.name },
+                        onSelectTasteMix = { mix -> searchQuery = mix.queryKeyword },
+                        contentBottomPadding = contentBottomPadding
+                    )
+                } else {
+                    SearchResultsContent(
+                        query = searchQuery,
+                        isSearching = isSearching,
+                        searchFailed = searchFailed,
+                        hasLastFmMatches = lastFmMatches.isNotEmpty(),
+                        artistSpotlight = artistSpotlight,
+                        canonicalTracks = canonicalTracks,
+                        playerConnection = playerConnection,
+                        currentTrackDto = currentTrackDto,
+                        status = status,
+                        onSelectTag = { tag -> searchQuery = tag },
+                        onSelectArtist = { artist -> searchQuery = artist },
+                        onOpenSettings = onOpenSettings,
+                        onRipClick = onRipClick,
+                        contentBottomPadding = contentBottomPadding
+                    )
+                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ZeroStateDiscovery(
     tags: List<LastFmTag>,
     onSelectTag: (LastFmTag) -> Unit,
     onSelectTasteMix: (TasteMixCardData) -> Unit,
-    cachedSampleTracks: List<TrackSummaryDto>,
-    playerConnection: PlayerConnection,
-    currentTrackDto: TrackSummaryDto?,
-    status: PlaybackStatus,
     contentBottomPadding: Dp
 ) {
-    val apiClient = LocalPeerlessApiClient.current
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
-            start = 16.dp,
-            end = 16.dp,
-            top = 8.dp,
+            start = 24.dp,
+            end = 24.dp,
+            top = 20.dp,
             bottom = contentBottomPadding
         ),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item(key = "discovery_hero") {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.fillMaxWidth().padding(28.dp),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    PeerlessIcon(
-                        icon = PeerlessIcons.LosslessWave,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = "EXPLORE SOUNDSCAPES",
-                        style = SpecBadgeTypography.copy(
-                            fontSize = 11.sp,
-                            letterSpacing = 1.2.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                    Text(
-                        text = "• LAST.FM INTELLIGENCE",
-                        style = SpecBadgeTypography.copy(
-                            fontSize = 9.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "MUSIC DISCOVERY",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
                         )
-                    )
-                }
-
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(tags, key = { it.name }) { tag ->
-                        Row(
-                            modifier = Modifier
-                                .clip(PillShape)
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, PillShape)
-                                .clickable { onSelectTag(tag) }
-                                .padding(horizontal = 14.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary)
-                            )
-                            Text(
-                                text = tag.name,
-                                style = ExpressiveTypography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
+                        Text(
+                            text = "Find your next favorite.",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.semantics { heading() }
+                        )
+                        Text(
+                            text = "Search your catalog. Last.fm helps bring the closest track matches to the top.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f)
+                        )
+                    }
+                    Surface(
+                        modifier = Modifier.size(104.dp),
+                        shape = MaterialTheme.shapes.extraLarge,
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            PeerlessIcon(
+                                icon = PeerlessIcons.MusicNote,
+                                contentDescription = null,
+                                modifier = Modifier.size(44.dp)
                             )
                         }
                     }
@@ -465,201 +325,112 @@ private fun ZeroStateDiscovery(
             }
         }
 
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    PeerlessIcon(
-                        icon = PeerlessIcons.MusicNote,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.size(16.dp)
-                    )
+        if (tags.isNotEmpty()) {
+            item(key = "popular_genres") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = "FEATURED TASTE MIXES",
-                        style = SpecBadgeTypography.copy(
-                            fontSize = 11.sp,
-                            letterSpacing = 1.2.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = MaterialTheme.colorScheme.tertiary
+                        text = "Popular genres",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.semantics { heading() }
                     )
-                    Text(
-                        text = "• BIT-PERFECT STARTERS",
-                        style = SpecBadgeTypography.copy(
-                            fontSize = 9.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                        )
-                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        tags.forEach { tag ->
+                            AssistChip(
+                                onClick = { onSelectTag(tag) },
+                                label = { Text(tag.name) },
+                                leadingIcon = {
+                                    PeerlessIcon(
+                                        icon = PeerlessIcons.MusicNote,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            )
+                        }
+                    }
                 }
+            }
+        }
 
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    CuratedTasteMixes.chunked(2).forEach { rowMixes ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            rowMixes.forEach { mix ->
-                                Box(modifier = Modifier.weight(1f)) {
-                                    TasteMixCard(
-                                        mix = mix,
-                                        onClick = { onSelectTasteMix(mix) }
+        item(key = "quick_searches_heading") {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Start with a collection",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.semantics { heading() }
+                )
+                CuratedTasteMixes.chunked(2).forEach { rowMixes ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        rowMixes.forEach { mix ->
+                            ElevatedCard(
+                                onClick = { onSelectTasteMix(mix) },
+                                modifier = Modifier.weight(1f).heightIn(min = 104.dp),
+                                shape = MaterialTheme.shapes.extraLarge,
+                                colors = CardDefaults.elevatedCardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                                ),
+                                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(18.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        modifier = Modifier.size(48.dp),
+                                        shape = MaterialTheme.shapes.large,
+                                        color = MaterialTheme.colorScheme.secondaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            PeerlessIcon(
+                                                icon = PeerlessIcons.MusicNote,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
+                                    }
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(
+                                            text = mix.title,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = mix.subtitle,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    PeerlessIcon(
+                                        icon = PeerlessIcons.Sparkle,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
                         }
+                        if (rowMixes.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }
-        }
-
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        PeerlessIcon(
-                            icon = PeerlessIcons.CloudDone,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Text(
-                            text = "INSTANT PLAYBACK CACHE",
-                            style = SpecBadgeTypography.copy(
-                                fontSize = 11.sp,
-                                letterSpacing = 1.2.sp,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    }
-
-                    Text(
-                        text = "<200ms LATENCY",
-                        style = SpecBadgeTypography.copy(
-                            fontSize = 8.5.sp,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    )
-                }
-
-                Text(
-                    text = "Pre-ripped bit-perfect FLAC/ALAC masters verified in the Telegram dump channel.",
-                    style = ExpressiveTypography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
-        }
-
-        items(cachedSampleTracks.take(4), key = { it.id }) { track ->
-            val isPlaying = currentTrackDto?.id == track.id &&
-                    status == PlaybackStatus.PLAYING
-
-            TrackRow(
-                track = track,
-                artworkUrl = apiClient.getArtworkUrl(track, 200),
-                isPlaying = isPlaying,
-                onTrackClick = {
-                    if (currentTrackDto?.id == it.id) {
-                        playerConnection.togglePlayPause()
-                    } else {
-                        playerConnection.play(
-                            it.toTrack(),
-                            cachedSampleTracks.map { t -> t.toTrack() })
-                    }
-                },
-                onPlayNext = { playerConnection.playNextInQueue(track.toTrack()) },
-                onAddToQueue = { playerConnection.addToQueue(track.toTrack()) },
-                onStartRadio = { playerConnection.startRadio(track.toTrack()) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun TasteMixCard(
-    mix: TasteMixCardData,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(SquircleShapeMedium)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .border(
-                width = 1.dp,
-                brush = Brush.linearGradient(
-                    listOf(
-                        mix.primaryColor.copy(alpha = 0.45f),
-                        mix.secondaryColor.copy(alpha = 0.25f),
-                        MaterialTheme.colorScheme.outlineVariant
-                    )
-                ),
-                shape = SquircleShapeMedium
-            )
-            .clickable { onClick() }
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .clip(PillShape)
-                    .background(mix.primaryColor.copy(alpha = 0.16f))
-                    .border(1.dp, mix.primaryColor.copy(alpha = 0.4f), PillShape)
-                    .padding(horizontal = 7.dp, vertical = 2.5.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = mix.tagSpecs,
-                    style = SpecBadgeTypography.copy(
-                        fontSize = 7.5.sp,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = mix.primaryColor
-                )
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = mix.title,
-                    style = ExpressiveTypography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = mix.subtitle,
-                    style = ExpressiveTypography.bodySmall.copy(fontSize = 11.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Text(
-                text = mix.artistsSummary,
-                style = SpecBadgeTypography.copy(
-                    fontSize = 9.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
         }
     }
 }
@@ -668,6 +439,8 @@ private fun TasteMixCard(
 private fun SearchResultsContent(
     query: String,
     isSearching: Boolean,
+    searchFailed: Boolean,
+    hasLastFmMatches: Boolean,
     artistSpotlight: LastFmArtist?,
     canonicalTracks: List<CanonicalTrack>,
     playerConnection: PlayerConnection,
@@ -675,25 +448,27 @@ private fun SearchResultsContent(
     status: PlaybackStatus,
     onSelectTag: (String) -> Unit,
     onSelectArtist: (String) -> Unit,
+    onOpenSettings: () -> Unit,
     onRipClick: ((TrackSummaryDto) -> Unit)?,
     contentBottomPadding: Dp
 ) {
     val apiClient = LocalPeerlessApiClient.current
     val ripCoordinator = LocalRipCoordinator.current
     val coroutineScope = rememberCoroutineScope()
-    val cachedTracks = remember(canonicalTracks) { canonicalTracks.filter { it.isCached } }
-    val liveTracks = remember(canonicalTracks) { canonicalTracks.filter { !it.isCached } }
-    val isEmptyResult = !isSearching && canonicalTracks.isEmpty() && artistSpotlight == null
+    val cachedQueue = remember(canonicalTracks) {
+        canonicalTracks.filter { it.isCached }.map { it.toTrack() }
+    }
+    val isEmptyResult = !isSearching && canonicalTracks.isEmpty()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
-            start = 14.dp,
-            end = 14.dp,
-            top = 4.dp,
+            start = 16.dp,
+            end = 16.dp,
+            top = 8.dp,
             bottom = contentBottomPadding
         ),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         if (artistSpotlight != null && !artistSpotlight.bioSummary.isNullOrBlank()) {
             item(key = "artist_spotlight") {
@@ -705,162 +480,123 @@ private fun SearchResultsContent(
             }
         }
 
-        if (cachedTracks.isNotEmpty()) {
-            item(key = "header_cached") {
-                SectionHeader(
-                    title = "Playable Now (<200ms)",
-                    subtitle = "TELEGRAM DUMP CHANNEL",
-                    badgeColor = MaterialTheme.colorScheme.secondary,
-                    badgeIcon = PeerlessIcons.CloudDone,
-                    countText = "${cachedTracks.size} tracks"
-                )
-            }
-
-            items(cachedTracks, key = { "canonical_cached_${it.id}" }) { canonical ->
-                val activeSource = canonical.immediatePlaySource() ?: canonical.bestSource
-                val trackDto = canonical.toSummaryDto(activeSource)
-                val isPlaying = currentTrackDto?.id == trackDto.id &&
-                        status == PlaybackStatus.PLAYING
-
-                TrackRow(
-                    canonicalTrack = canonical,
-                    artworkUrl = canonical.artworkUrl ?: apiClient.getArtworkUrl(trackDto, 200),
-                    isPlaying = isPlaying,
-                    onTrackClick = { clickedCanonical ->
-                        val playSource =
-                            clickedCanonical.immediatePlaySource() ?: clickedCanonical.bestSource
-                        val playTrack = clickedCanonical.toTrack(playSource)
-                        if (currentTrackDto?.id == playTrack.id) {
-                            playerConnection.togglePlayPause()
-                        } else {
-                            playerConnection.play(playTrack, cachedTracks.map { it.toTrack() })
-                        }
-                        val bgRip = clickedCanonical.backgroundRipSource()
-                        if (bgRip != null) {
-                            coroutineScope.launch {
-                                apiClient.createRipTask(
-                                    provider = bgRip.provider.raw,
-                                    trackId = bgRip.providerTrackId,
-                                    codec = bgRip.codec.raw,
-                                    title = trackDto.title,
-                                    artist = trackDto.artist,
-                                    album = trackDto.album,
-                                    duration = trackDto.duration
-                                ).onSuccess { ripCoordinator?.refreshServerTasks() }
-                            }
-                        }
-                    },
-                    onSelectSource = { source ->
-                        val playTrack = canonical.toTrack(source)
-                        playerConnection.play(playTrack, cachedTracks.map { it.toTrack() })
-                    },
-                    onRipClick = onRipClick,
-                    onPlayNext = if (trackDto.is_cached) {
-                        { clicked -> playerConnection.playNextInQueue(clicked.toTrack()) }
-                    } else null,
-                    onAddToQueue = if (trackDto.is_cached) {
-                        { clicked -> playerConnection.addToQueue(clicked.toTrack()) }
-                    } else null,
-                    onStartRadio = if (trackDto.is_cached) {
-                        { clicked -> playerConnection.startRadio(clicked.toTrack()) }
-                    } else null
-                )
+        if (isSearching && canonicalTracks.isEmpty()) {
+            item(key = "search_progress") {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
         }
 
-        if (liveTracks.isNotEmpty()) {
-            item(key = "header_live") {
-                SectionHeader(
-                    title = "Live Catalog (On-Demand Rip)",
-                    subtitle = "APPLE MUSIC & QOBUZ",
-                    badgeColor = MaterialTheme.colorScheme.tertiary,
-                    badgeIcon = PeerlessIcons.LosslessWave,
-                    countText = "${liveTracks.size} available"
-                )
+        if (canonicalTracks.isNotEmpty()) {
+            item(key = "result_summary") {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${canonicalTracks.size} results",
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (hasLastFmMatches) {
+                        Text(
+                            text = "Last.fm cross-check applied",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
+        }
 
-            items(liveTracks, key = { "canonical_live_${it.id}" }) { canonical ->
-                val activeSource = canonical.immediatePlaySource() ?: canonical.bestSource
-                val trackDto = canonical.toSummaryDto(activeSource)
-                val isPlaying = currentTrackDto?.id == trackDto.id &&
-                        status == PlaybackStatus.PLAYING
+        items(canonicalTracks, key = { "canonical_${it.id}" }) { canonical ->
+            val activeSource = canonical.immediatePlaySource() ?: canonical.bestSource
+            val trackDto = canonical.toSummaryDto(activeSource)
+            val isPlaying = currentTrackDto?.id == trackDto.id &&
+                    status == PlaybackStatus.PLAYING
 
-                TrackRow(
-                    canonicalTrack = canonical,
-                    artworkUrl = canonical.artworkUrl ?: apiClient.getArtworkUrl(trackDto, 200),
-                    isPlaying = isPlaying,
-                    onTrackClick = { clickedCanonical ->
-                        val playSource =
-                            clickedCanonical.immediatePlaySource() ?: clickedCanonical.bestSource
-                        val playTrack = clickedCanonical.toTrack(playSource)
-                        if (currentTrackDto?.id == playTrack.id) {
-                            playerConnection.togglePlayPause()
-                        } else {
-                            playerConnection.play(playTrack, emptyList())
+            TrackRow(
+                canonicalTrack = canonical,
+                artworkUrl = canonical.artworkUrl ?: apiClient.getArtworkUrl(trackDto, 200),
+                isPlaying = isPlaying,
+                onTrackClick = { clickedCanonical ->
+                    val playSource =
+                        clickedCanonical.immediatePlaySource() ?: clickedCanonical.bestSource
+                    val playTrack = clickedCanonical.toTrack(playSource)
+                    if (currentTrackDto?.id == playTrack.id) {
+                        playerConnection.togglePlayPause()
+                    } else {
+                        playerConnection.play(
+                            playTrack,
+                            if (clickedCanonical.isCached) cachedQueue else emptyList()
+                        )
+                    }
+                    val bgRip = clickedCanonical.backgroundRipSource()
+                    if (bgRip != null) {
+                        coroutineScope.launch {
+                            apiClient.createRipTask(
+                                provider = bgRip.provider.raw,
+                                trackId = bgRip.providerTrackId,
+                                codec = bgRip.codec.raw,
+                                title = trackDto.title,
+                                artist = trackDto.artist,
+                                album = trackDto.album,
+                                duration = trackDto.duration
+                            ).onSuccess { ripCoordinator?.refreshServerTasks() }
                         }
-                        val bgRip = clickedCanonical.backgroundRipSource()
-                        if (bgRip != null) {
-                            coroutineScope.launch {
-                                apiClient.createRipTask(
-                                    provider = bgRip.provider.raw,
-                                    trackId = bgRip.providerTrackId,
-                                    codec = bgRip.codec.raw,
-                                    title = trackDto.title,
-                                    artist = trackDto.artist,
-                                    album = trackDto.album,
-                                    duration = trackDto.duration
-                                ).onSuccess { ripCoordinator?.refreshServerTasks() }
-                            }
-                        }
-                    },
-                    onSelectSource = { source ->
-                        val playTrack = canonical.toTrack(source)
-                        playerConnection.play(playTrack, emptyList())
-                    },
-                    onRipClick = onRipClick
-                )
-            }
+                    }
+                },
+                onSelectSource = { source ->
+                    playerConnection.play(canonical.toTrack(source), emptyList())
+                },
+                onRipClick = onRipClick,
+                onPlayNext = if (trackDto.is_cached) {
+                    { clicked -> playerConnection.playNextInQueue(clicked.toTrack()) }
+                } else null,
+                onAddToQueue = if (trackDto.is_cached) {
+                    { clicked -> playerConnection.addToQueue(clicked.toTrack()) }
+                } else null,
+                onStartRadio = if (trackDto.is_cached) {
+                    { clicked -> playerConnection.startRadio(clicked.toTrack()) }
+                } else null
+            )
         }
 
         if (isEmptyResult) {
             item(key = "empty_result") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 48.dp, horizontal = 16.dp),
-                    contentAlignment = Alignment.Center
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                    )
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(SquircleShapeLarge)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            PeerlessIcon(
-                                icon = PeerlessIcons.Search,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                modifier = Modifier.size(44.dp)
-                            )
-                            Text(
-                                text = "No lossless matches for “$query”",
-                                style = ExpressiveTypography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Try searching by exact artist, track title, or choose another provider filter chip above.",
-                                style = ExpressiveTypography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            )
+                        Text(
+                            text = when {
+                                searchFailed -> "Catalog unavailable"
+                                hasLastFmMatches -> "No catalog sources found"
+                                else -> "No matches for “$query”"
+                            },
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = when {
+                                searchFailed -> "Check your server connection, then try the search again."
+                                hasLastFmMatches -> "Last.fm found track matches, but the backend returned no matching track source."
+                                else -> "Try a different title, artist, or provider filter."
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (searchFailed) {
+                            TextButton(onClick = onOpenSettings) {
+                                Text("Server settings")
+                            }
                         }
                     }
                 }
@@ -870,223 +606,61 @@ private fun SearchResultsContent(
 }
 
 @Composable
-fun ArtistSpotlightCard(
+private fun ArtistSpotlightCard(
     artist: LastFmArtist,
     onSelectTag: (String) -> Unit,
     onSelectArtist: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(SquircleShapeMedium)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .border(
-                width = 1.dp,
-                brush = Brush.linearGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.20f),
-                        MaterialTheme.colorScheme.outlineVariant
-                    )
-                ),
-                shape = SquircleShapeMedium
-            )
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
-                    )
-                    Text(
-                        text = "ARTIST SPOTLIGHT",
-                        style = SpecBadgeTypography.copy(
-                            fontSize = 10.sp,
-                            letterSpacing = 1.2.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                Text(
-                    text = "LAST.FM TASTE ENGINE",
-                    style = SpecBadgeTypography.copy(
-                        fontSize = 8.5.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
-                )
-            }
-
+            Text(
+                text = "Artist",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.secondary
+            )
             Text(
                 text = artist.name,
-                style = ExpressiveTypography.titleLarge,
-                fontWeight = FontWeight.Black,
-                color = MaterialTheme.colorScheme.onSurface
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.semantics { heading() }
             )
-
             artist.bioSummary?.let { bio ->
                 Text(
                     text = bio,
-                    style = ExpressiveTypography.bodyMedium.copy(lineHeight = 20.sp),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 3,
+                    maxLines = 4,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-
             if (artist.tags.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    artist.tags.take(6).forEach { tag ->
-                        Row(
-                            modifier = Modifier
-                                .clip(PillShape)
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
-                                .border(
-                                    1.dp,
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
-                                    PillShape
-                                )
-                                .clickable { onSelectTag(tag.name) }
-                                .padding(horizontal = 10.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = tag.name,
-                                style = SpecBadgeTypography.copy(
-                                    fontSize = 8.5.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                ),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(artist.tags.take(6), key = { it.name }) { tag ->
+                        AssistChip(
+                            onClick = { onSelectTag(tag.name) },
+                            label = { Text(tag.name) }
+                        )
                     }
                 }
             }
-
             if (artist.similarArtists.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "SIMILAR:",
-                        style = SpecBadgeTypography.copy(
-                            fontSize = 8.5.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
-
-                    artist.similarArtists.take(5).forEach { simArtist ->
-                        Text(
-                            text = simArtist,
-                            style = SpecBadgeTypography.copy(
-                                fontSize = 8.5.sp,
-                                color = MaterialTheme.colorScheme.secondary
-                            ),
-                            modifier = Modifier
-                                .clip(PillShape)
-                                .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.10f))
-                                .border(
-                                    1.dp,
-                                    MaterialTheme.colorScheme.secondary.copy(alpha = 0.30f),
-                                    PillShape
-                                )
-                                .clickable { onSelectArtist(simArtist) }
-                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(artist.similarArtists, key = { it }) { similarArtist ->
+                        SuggestionChip(
+                            onClick = { onSelectArtist(similarArtist) },
+                            label = { Text(similarArtist) }
                         )
                     }
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun SectionHeader(
-    title: String,
-    subtitle: String,
-    badgeColor: Color,
-    badgeIcon: DrawableResource,
-    countText: String,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = title,
-                style = ExpressiveTypography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Row(
-                modifier = Modifier
-                    .clip(PillShape)
-                    .background(badgeColor.copy(alpha = 0.14f))
-                    .border(1.dp, badgeColor.copy(alpha = 0.40f), PillShape)
-                    .padding(horizontal = 7.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                PeerlessIcon(
-                    icon = badgeIcon,
-                    contentDescription = null,
-                    tint = badgeColor,
-                    modifier = Modifier.size(11.dp)
-                )
-                Text(
-                    text = subtitle,
-                    style = SpecBadgeTypography.copy(
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    ),
-                    color = badgeColor
-                )
-            }
-        }
-
-        Text(
-            text = countText,
-            style = SpecBadgeTypography.copy(fontSize = 9.sp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }

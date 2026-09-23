@@ -131,19 +131,25 @@ open class PeerlessApiClient(
         provider: String? = null,
         page: Int = 1,
         limit: Int = 30
-    ): Result<SearchResponse> = runCatching {
-        val response = httpClient.get("$baseUrl/api/v1/search") {
-            parameter("q", query)
-            if (provider != null) {
-                parameter("provider", provider)
+    ): Result<SearchResponse> {
+        return try {
+            val response = httpClient.get("$baseUrl/api/v1/search") {
+                parameter("q", query)
+                if (provider != null) {
+                    parameter("provider", provider)
+                }
+                parameter("page", page)
+                parameter("limit", limit)
             }
-            parameter("page", page)
-            parameter("limit", limit)
+            if (!response.status.isSuccess()) {
+                error("Search request failed with status: ${response.status}")
+            }
+            Result.success(response.body<SearchResponse>())
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            Result.failure(error)
         }
-        if (!response.status.isSuccess()) {
-            error("Search request failed with status: ${response.status}")
-        }
-        response.body<SearchResponse>()
     }
 
     suspend fun getTrack(trackId: Int): Result<TrackDetailDto> = runCatching {

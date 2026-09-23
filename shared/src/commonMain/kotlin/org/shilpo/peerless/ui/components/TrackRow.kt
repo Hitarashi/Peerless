@@ -279,7 +279,7 @@ fun TrackRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(rowBg)
             .combinedClickable(
                 interactionSource = rowInteractionSource,
@@ -403,7 +403,7 @@ fun TrackRow(
 
             Text(
                 text = "${track.artist} • ${track.album}",
-                style = ExpressiveTypography.bodySmall.copy(fontSize = 13.sp),
+                style = MaterialTheme.typography.bodySmall,
                 color = colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

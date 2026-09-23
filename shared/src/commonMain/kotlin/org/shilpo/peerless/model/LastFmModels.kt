@@ -36,6 +36,11 @@ data class LastFmTrackInfo(
     val playcount: Long = 0L
 )
 
+internal data class LastFmTrackMatch(
+    val title: String,
+    val artist: String
+)
+
 @Serializable
 data class LastFmUserTrack(
     val title: String,
