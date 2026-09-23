@@ -41,12 +41,12 @@ import org.shilpo.peerless.preferences.LocalAppPreferences
 // sites keep their opaque fallback backgrounds.
 // ---------------------------------------------------------------------------
 
-private val BLUR_RADIUS_FROSTED: Dp = 28.dp
-private val BLUR_RADIUS_CLEAR: Dp = 8.dp
-private const val NOISE_FACTOR: Float = 0.05f
+private val BLUR_RADIUS_FROSTED: Dp = 95.dp
+private val BLUR_RADIUS_CLEAR: Dp = 90.dp
+private const val NOISE_FACTOR: Float = 0.10f
 
-private const val DEFAULT_TINT_ALPHA: Float = 0.68f
-private const val ARTWORK_TINT_BLEND: Float = 0.22f
+private const val DEFAULT_TINT_ALPHA: Float = 0.95f
+private const val ARTWORK_TINT_BLEND: Float = 0.0f
 
 @Stable
 class LiquidGlassState internal constructor(

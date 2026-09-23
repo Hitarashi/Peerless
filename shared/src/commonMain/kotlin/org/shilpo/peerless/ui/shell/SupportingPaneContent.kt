@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,6 +46,7 @@ import org.shilpo.peerless.ui.components.TrackRow
 import org.shilpo.peerless.ui.components.animationOptions
 import org.shilpo.peerless.ui.components.visualConfig
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun QueuePaneContent(
     playerConnection: PlayerConnection,
@@ -94,7 +98,8 @@ internal fun QueuePaneContent(
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
             ) {
                 itemsIndexed(
                     items = queueDtos,
@@ -108,6 +113,8 @@ internal fun QueuePaneContent(
                         artworkUrl = apiClient.getArtworkUrl(trackDto, 120),
                         isPlaying = isPlaying,
                         isCurrent = isCurrent,
+                        index = index,
+                        count = queueDtos.size,
                         onTrackClick = { playerConnection.playQueueItem(index) },
                         onMoveQueueItemUp = if (index > 0) {
                             { playerConnection.moveInQueue(index, index - 1) }

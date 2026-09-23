@@ -14,6 +14,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,8 +32,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -704,6 +707,7 @@ fun NowPlayingSheet(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun FullPlayerQueueView(
     queueTracks: List<TrackSummaryDto>,
@@ -754,7 +758,8 @@ private fun FullPlayerQueueView(
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
             ) {
                 itemsIndexed(
                     items = queueTracks,
@@ -765,6 +770,8 @@ private fun FullPlayerQueueView(
                         artworkUrl = apiClient.getArtworkUrl(track, 120),
                         isPlaying = currentQueueIndex == index && status == PlaybackStatus.PLAYING,
                         isCurrent = currentQueueIndex == index,
+                        index = index,
+                        count = queueTracks.size,
                         onTrackClick = { onPlayQueueItem(index) },
                         showArtworkOverlay = false
                     )
@@ -1275,7 +1282,7 @@ private fun LyricsPlayerLayout(
                     if (manualNudgeMs != 0L) {
                         TextButton(
                             onClick = { manualNudgeMs = 0L },
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            contentPadding = PaddingValues(
                                 horizontal = 8.dp,
                                 vertical = 2.dp
                             ),

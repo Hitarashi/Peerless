@@ -1,7 +1,10 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package org.shilpo.peerless.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,11 +19,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedListItem
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,7 +38,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -87,15 +92,17 @@ fun RipActivityPane(
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
             ) {
-                items(
+                itemsIndexed(
                     items = taskList,
-                    key = { it.taskId }
-                ) { task ->
+                    key = { _, task -> task.taskId }
+                ) { index, task ->
                     RipTaskRow(
                         task = task,
                         artworkUrl = apiClient.getArtworkUrl(task.track, 120),
+                        index = index,
+                        count = taskList.size,
                         onCancel = {
                             coroutineScope.launch { ripCoordinator?.cancelRip(task.taskId) }
                         }
@@ -111,6 +118,8 @@ fun RipTaskRow(
     task: ActiveRipTask,
     artworkUrl: String,
     onCancel: () -> Unit,
+    index: Int = 0,
+    count: Int = 1,
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -122,155 +131,187 @@ fun RipTaskRow(
         label = "RipProgressAnim"
     )
 
-    val hasApple = task.track.provider.contains("apple", ignoreCase = true)
-    val hasQobuz = task.track.provider.contains("qobuz", ignoreCase = true)
+    val itemShapes = ListItemDefaults.segmentedShapes(
+        index = index.coerceIn(0, maxOf(0, count - 1)),
+        count = maxOf(count, 1)
+    )
+    val itemColors = ListItemDefaults.segmentedColors(
+        containerColor = colorScheme.surfaceContainer,
+        selectedContainerColor = colorScheme.secondaryContainer
+    )
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(colorScheme.secondaryContainer)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Artwork - identical to TrackRow (52.dp squircle)
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(ArtworkShape)
-                .background(colorScheme.surfaceContainerHighest),
-            contentAlignment = Alignment.Center
-        ) {
-            PeerlessIcon(
-                icon = PeerlessIcons.MusicNote,
-                contentDescription = null,
-                tint = colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                modifier = Modifier.size(24.dp)
-            )
-            AsyncImage(
-                model = artworkUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+    SegmentedListItem(
+        selected = false,
+        onClick = {},
+        shapes = itemShapes,
+        colors = itemColors,
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+        leadingContent = {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.35f)),
+                    .size(52.dp)
+                    .clip(ArtworkShape)
+                    .background(colorScheme.surfaceContainerHighest),
                 contentAlignment = Alignment.Center
             ) {
                 PeerlessIcon(
-                    icon = PeerlessIcons.RipCloudSync,
+                    icon = PeerlessIcons.MusicNote,
                     contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp)
+                    tint = colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.size(24.dp)
+                )
+                AsyncImage(
+                    model = artworkUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
                 )
             }
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        // Center: Title, Artist, Stage badge, Progress indicator
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(
-                text = task.track.title,
-                style = ExpressiveTypography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = colorScheme.primary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Text(
-                text = "${task.track.artist} • ${task.track.album}",
-                style = ExpressiveTypography.bodySmall.copy(fontSize = 13.sp),
-                color = colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
+        },
+        content = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                if (hasApple) {
+                if (task.track.provider.contains("apple", ignoreCase = true)) {
                     PeerlessIcon(
                         icon = PeerlessIcons.AppleLogo,
                         contentDescription = "Apple Music",
                         tint = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
-                        modifier = Modifier.size(12.dp)
+                        modifier = Modifier.size(13.dp)
                     )
-                } else if (hasQobuz) {
+                    Text(
+                        text = "•",
+                        style = ExpressiveTypography.titleMedium,
+                        color = colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                } else if (task.track.provider.contains("qobuz", ignoreCase = true)) {
                     PeerlessIcon(
                         icon = PeerlessIcons.QobuzLogo,
                         contentDescription = "Qobuz",
                         tint = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
-                        modifier = Modifier.height(11.dp).width(28.dp)
+                        modifier = Modifier.height(11.dp).width(26.dp)
                     )
-                } else if (task.track.provider.isNotEmpty()) {
+                    Text(
+                        text = "•",
+                        style = ExpressiveTypography.titleMedium,
+                        color = colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                } else if (task.track.provider.isNotBlank()) {
                     Text(
                         text = formatProviderLabel(task.track.provider),
-                        style = SpecBadgeTypography.copy(
-                            fontSize = 8.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.3.sp
-                        ),
-                        color = colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                        style = ExpressiveTypography.labelMedium,
+                        color = colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
+                    )
+                    Text(
+                        text = "•",
+                        style = ExpressiveTypography.titleMedium,
+                        color = colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
                 }
+                Text(
+                    text = task.track.title,
+                    style = ExpressiveTypography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+            }
+        },
+        supportingContent = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                val subtitleText = buildString {
+                    append(task.track.artist)
+                    if (task.track.album.isNotBlank()) {
+                        append(" • ")
+                        append(task.track.album)
+                    }
+                    if (!task.speed.isNullOrBlank()) {
+                        append(" • ")
+                        append(task.speed)
+                    } else if (task.stage != RipStage.QUEUED && task.stage != RipStage.COMPLETED) {
+                        append(" • ")
+                        append(task.stage.displayName)
+                    }
+                }
+                Text(
+                    text = subtitleText,
+                    style = ExpressiveTypography.bodySmall.copy(fontSize = 13.sp),
+                    color = if (task.stage == RipStage.ERROR) colorScheme.error else colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
 
-                RipStageBadge(stage = task.stage)
+                Spacer(modifier = Modifier.height(2.dp))
 
-                if (!task.speed.isNullOrBlank()) {
+                val isIndeterminate = task.stage == RipStage.QUEUED ||
+                        (task.percent <= 0f && task.stage != RipStage.COMPLETED)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (isIndeterminate) {
+                        LinearWavyProgressIndicator(
+                            modifier = Modifier.weight(1f),
+                            color = colorScheme.primary,
+                            trackColor = colorScheme.surfaceContainerHighest
+                        )
+                    } else {
+                        LinearWavyProgressIndicator(
+                            progress = { animatedProgress },
+                            modifier = Modifier.weight(1f),
+                            amplitude = { 1f },
+                            color = colorScheme.primary,
+                            trackColor = colorScheme.surfaceContainerHighest
+                        )
+                    }
+
                     Text(
-                        text = "• ${task.speed}",
-                        style = SpecBadgeTypography.copy(fontSize = 9.sp),
-                        color = colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        text = "${task.percent.toInt()}%",
+                        style = SpecBadgeTypography.copy(fontSize = 11.sp),
+                        fontWeight = FontWeight.Bold,
+                        color = colorScheme.primary
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(2.dp))
-            LinearProgressIndicator(
-                progress = { animatedProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.5.dp)
-                    .clip(PillShape),
-                color = colorScheme.primary,
-                trackColor = colorScheme.surfaceContainerHighest,
-                strokeCap = StrokeCap.Round
-            )
-        }
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        // Trailing status & actions
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = "${task.percent.toInt()}%",
-                style = SpecBadgeTypography.copy(fontSize = 11.sp),
-                fontWeight = FontWeight.Bold,
-                color = colorScheme.primary
-            )
-
-            if (task.isOwner) {
+        },
+        trailingContent = if (task.isOwner) {
+            {
                 TextButton(
                     onClick = onCancel,
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                    shape = PillShape,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = colorScheme.error
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                 ) {
-                    Text("Cancel", style = ExpressiveTypography.labelSmall)
+                    Text(
+                        text = "Cancel",
+                        style = ExpressiveTypography.labelSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
-        }
-    }
+        } else null
+    )
 }
+
+private data class StageBadgeStyle(
+    val bgColor: Color,
+    val fgColor: Color,
+    val borderColor: Color,
+    val icon: Any
+)
 
 @Composable
 fun RipStageBadge(
@@ -279,42 +320,89 @@ fun RipStageBadge(
 ) {
     val colorScheme = MaterialTheme.colorScheme
 
-    val (bgColor, fgColor) = when (stage) {
-        RipStage.QUEUED -> colorScheme.surfaceContainerHigh to colorScheme.onSurfaceVariant
-        RipStage.DOWNLOADING -> colorScheme.primaryContainer to colorScheme.onPrimaryContainer
-        RipStage.DECRYPTING -> colorScheme.tertiaryContainer to colorScheme.onTertiaryContainer
-        RipStage.TAGGING -> colorScheme.secondaryContainer to colorScheme.onSecondaryContainer
-        RipStage.UPLOADING -> colorScheme.primaryContainer.copy(alpha = 0.7f) to colorScheme.primary
-        RipStage.COMPLETED -> Color(0xFF1B5E20).copy(alpha = 0.2f) to Color(0xFF4CAF50)
-        RipStage.CANCELLED -> colorScheme.surfaceContainerHighest to colorScheme.onSurfaceVariant.copy(
-            alpha = 0.6f
+    val badgeStyle = when (stage) {
+        RipStage.QUEUED -> StageBadgeStyle(
+            bgColor = colorScheme.surfaceContainerHighest,
+            fgColor = colorScheme.onSurfaceVariant,
+            borderColor = colorScheme.outlineVariant.copy(alpha = 0.6f),
+            icon = PeerlessIcons.Queue
         )
 
-        RipStage.ERROR -> colorScheme.errorContainer to colorScheme.onErrorContainer
+        RipStage.DOWNLOADING -> StageBadgeStyle(
+            bgColor = colorScheme.primaryContainer,
+            fgColor = colorScheme.onPrimaryContainer,
+            borderColor = colorScheme.primary.copy(alpha = 0.25f),
+            icon = PeerlessIcons.Download
+        )
+
+        RipStage.DECRYPTING -> StageBadgeStyle(
+            bgColor = colorScheme.tertiaryContainer,
+            fgColor = colorScheme.onTertiaryContainer,
+            borderColor = colorScheme.tertiary.copy(alpha = 0.25f),
+            icon = PeerlessIcons.Key
+        )
+
+        RipStage.TAGGING -> StageBadgeStyle(
+            bgColor = colorScheme.secondaryContainer,
+            fgColor = colorScheme.onSecondaryContainer,
+            borderColor = colorScheme.secondary.copy(alpha = 0.25f),
+            icon = PeerlessIcons.MusicNote
+        )
+
+        RipStage.UPLOADING -> StageBadgeStyle(
+            bgColor = colorScheme.primaryContainer,
+            fgColor = colorScheme.onPrimaryContainer,
+            borderColor = colorScheme.primary.copy(alpha = 0.25f),
+            icon = PeerlessIcons.CloudDone
+        )
+
+        RipStage.COMPLETED -> StageBadgeStyle(
+            bgColor = Color(0xFF1B5E20).copy(alpha = 0.15f),
+            fgColor = Color(0xFF4CAF50),
+            borderColor = Color(0xFF4CAF50).copy(alpha = 0.35f),
+            icon = PeerlessIcons.CheckCircle
+        )
+
+        RipStage.CANCELLED -> StageBadgeStyle(
+            bgColor = colorScheme.surfaceContainerHighest,
+            fgColor = colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            borderColor = colorScheme.outlineVariant.copy(alpha = 0.5f),
+            icon = PeerlessIcons.Close
+        )
+
+        RipStage.ERROR -> StageBadgeStyle(
+            bgColor = colorScheme.errorContainer,
+            fgColor = colorScheme.onErrorContainer,
+            borderColor = colorScheme.error.copy(alpha = 0.3f),
+            icon = PeerlessIcons.Warning
+        )
     }
 
-    Box(
+    Surface(
+        shape = PillShape,
+        color = badgeStyle.bgColor,
+        border = BorderStroke(1.dp, badgeStyle.borderColor),
         modifier = modifier
-            .clip(PillShape)
-            .background(bgColor)
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-        contentAlignment = Alignment.Center
     ) {
         Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(5.dp)
-                    .clip(CircleShape)
-                    .background(fgColor)
+            PeerlessIcon(
+                icon = badgeStyle.icon,
+                contentDescription = null,
+                tint = badgeStyle.fgColor,
+                modifier = Modifier.size(10.dp)
             )
             Text(
                 text = stage.displayName,
-                style = SpecBadgeTypography.copy(fontSize = 9.sp),
-                fontWeight = FontWeight.SemiBold,
-                color = fgColor
+                style = SpecBadgeTypography.copy(
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.3.sp
+                ),
+                color = badgeStyle.fgColor
             )
         }
     }

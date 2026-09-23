@@ -1,6 +1,5 @@
 package org.shilpo.peerless.ui.components
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -20,6 +19,7 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -39,9 +39,12 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.material3.ripple
@@ -57,12 +60,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.compositeOver
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -163,7 +163,7 @@ fun AnimatedEqualizer(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun TrackRow(
     track: TrackSummaryDto,
@@ -184,7 +184,10 @@ fun TrackRow(
     onToggleFavorite: ((TrackSummaryDto) -> Unit)? = null,
     isCurrent: Boolean = isPlaying,
     embedded: Boolean = false,
-    showArtworkOverlay: Boolean = !embedded
+    showArtworkOverlay: Boolean = !embedded,
+    shapes: ListItemShapes? = null,
+    index: Int = 0,
+    count: Int = 1,
 ) {
     val favoritesManager = org.shilpo.peerless.library.LocalFavoritesManager.current
     val favoriteIds by (favoritesManager?.favoriteIds
@@ -258,502 +261,479 @@ fun TrackRow(
 
     val colorScheme = MaterialTheme.colorScheme
 
-    val rowInteractionSource = remember { MutableInteractionSource() }
-    val isRowHovered by rowInteractionSource.collectIsHoveredAsState()
-
-    val rowBg by animateColorAsState(
-        targetValue = when {
-            embedded -> Color.Transparent
-            isCurrent && isRowHovered -> {
-                colorScheme.onSecondaryContainer.copy(alpha = 0.08f)
-                    .compositeOver(colorScheme.secondaryContainer)
-            }
-
-            isCurrent -> colorScheme.secondaryContainer
-            isRowHovered -> colorScheme.onSurfaceVariant.copy(alpha = 0.08f)
-            else -> Color.Transparent
-        },
-        animationSpec = tween(150)
+    val itemShapes = shapes ?: ListItemDefaults.segmentedShapes(
+        index = index.coerceIn(0, maxOf(0, count - 1)),
+        count = maxOf(count, 1)
+    )
+    val itemColors = ListItemDefaults.segmentedColors(
+        containerColor = if (embedded) Color.Transparent else colorScheme.surfaceContainer,
+        selectedContainerColor = if (embedded) colorScheme.secondaryContainer.copy(alpha = 0.5f) else colorScheme.secondaryContainer
     )
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(rowBg)
-            .combinedClickable(
-                interactionSource = rowInteractionSource,
-                indication = ripple(),
-                onClick = {
-                    val clickSummary = canonicalTrack?.toSummaryDto(activeSource) ?: track
-                    if (!isTrackCached) {
-                        if (ripCoordinator != null) {
-                            coroutineScope.launch {
-                                ripCoordinator.ripAndPlay(clickSummary, playerConnection)
-                            }
-                            toastNotifier?.invoke("Ripping ${clickSummary.title}... Playback will begin as soon as upload finishes.")
-                        } else {
-                            onTrackClick(clickSummary)
-                        }
-                    } else {
-                        onTrackClick(clickSummary)
+    SegmentedListItem(
+        selected = isCurrent,
+        onClick = {
+            val clickSummary = canonicalTrack?.toSummaryDto(activeSource) ?: track
+            if (!isTrackCached) {
+                if (ripCoordinator != null) {
+                    coroutineScope.launch {
+                        ripCoordinator.ripAndPlay(clickSummary, playerConnection)
                     }
-                },
-                onLongClick = { showAudioDetails = true }
-            )
-            .semantics(mergeDescendants = true) { }
-            .padding(
-                horizontal = if (embedded) 8.dp else 10.dp,
-                vertical = 6.dp
-            ),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        val artworkInteractionSource = remember { MutableInteractionSource() }
-        val isArtworkHovered by artworkInteractionSource.collectIsHoveredAsState()
-
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(ArtworkShape)
-                .background(colorScheme.surfaceContainerHighest)
-                .hoverable(artworkInteractionSource)
-                .pointerHoverIcon(if (isCurrent) PointerIcon.Hand else PointerIcon.Default)
-                .clickable(
-                    interactionSource = artworkInteractionSource,
-                    indication = null,
-                    enabled = isCurrent
-                ) {
-                    val clickSummary = canonicalTrack?.toSummaryDto(activeSource) ?: track
+                    toastNotifier?.invoke("Ripping ${clickSummary.title}... Playback will begin as soon as upload finishes.")
+                } else {
                     onTrackClick(clickSummary)
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            PeerlessIcon(
-                icon = PeerlessIcons.MusicNote,
-                contentDescription = null,
-                tint = colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                modifier = Modifier.size(24.dp)
-            )
-
-            AsyncImage(
-                model = artworkUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-
-            if (isPlaying && showArtworkOverlay && !isArtworkHovered) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.45f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    AnimatedEqualizer(
-                        isPlaying = true,
-                        color = colorScheme.primary,
-                        barWidth = 3.dp,
-                        maxHeight = 16.dp
-                    )
                 }
-            } else if (isCurrent && isArtworkHovered) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.5f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    PlayPauseMorphIcon(
-                        isPlaying = isPlaying,
-                        size = 20.dp,
-                        tint = Color.White
-                    )
+            } else {
+                onTrackClick(clickSummary)
+            }
+        },
+        shapes = itemShapes,
+        modifier = modifier.fillMaxWidth(),
+        onLongClick = { showAudioDetails = true },
+        colors = itemColors,
+        verticalAlignment = Alignment.CenterVertically,
+        contentPadding = PaddingValues(
+            horizontal = if (embedded) 8.dp else 12.dp,
+            vertical = 6.dp
+        ),
+        leadingContent = {
+            val artworkInteractionSource = remember { MutableInteractionSource() }
+            val isArtworkHovered by artworkInteractionSource.collectIsHoveredAsState()
+
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(ArtworkShape)
+                    .background(colorScheme.surfaceContainerHighest)
+                    .hoverable(artworkInteractionSource)
+                    .pointerHoverIcon(if (isCurrent) PointerIcon.Hand else PointerIcon.Default)
+                    .clickable(
+                        interactionSource = artworkInteractionSource,
+                        indication = null,
+                        enabled = isCurrent
+                    ) {
+                        val clickSummary = canonicalTrack?.toSummaryDto(activeSource) ?: track
+                        onTrackClick(clickSummary)
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                PeerlessIcon(
+                    icon = PeerlessIcons.MusicNote,
+                    contentDescription = null,
+                    tint = colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.size(24.dp)
+                )
+
+                AsyncImage(
+                    model = artworkUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                if (isPlaying && showArtworkOverlay && !isArtworkHovered) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.45f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AnimatedEqualizer(
+                            isPlaying = true,
+                            color = colorScheme.primary,
+                            barWidth = 3.dp,
+                            maxHeight = 16.dp
+                        )
+                    }
+                } else if (isCurrent && isArtworkHovered) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.5f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        PlayPauseMorphIcon(
+                            isPlaying = isPlaying,
+                            size = 20.dp,
+                            tint = Color.White
+                        )
+                    }
                 }
             }
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+        },
+        content = {
+            Text(
+                text = track.title,
+                style = ExpressiveTypography.titleMedium,
+                fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (isPlaying) colorScheme.primary else colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (isPlaying) {
+                            Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                        } else {
+                            Modifier
+                        }
+                    )
+            )
+        },
+        supportingContent = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = track.title,
-                    style = ExpressiveTypography.titleMedium,
-                    fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.SemiBold,
-                    color = if (isPlaying) colorScheme.primary else colorScheme.onSurface,
+                    text = "${track.artist} • ${track.album}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .weight(1f)
-                        .then(
-                            if (isPlaying) {
-                                Modifier.basicMarquee(iterations = Int.MAX_VALUE)
-                            } else {
-                                Modifier
-                            }
-                        )
+                    overflow = TextOverflow.Ellipsis
                 )
-            }
 
-            Text(
-                text = "${track.artist} • ${track.album}",
-                style = MaterialTheme.typography.bodySmall,
-                color = colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+                var showVersionMenu by remember { mutableStateOf(false) }
 
-            var showVersionMenu by remember { mutableStateOf(false) }
-
-            Box {
-                Row(
-                    modifier = Modifier
-                        .pointerHoverIcon(PointerIcon.Hand)
-                        .combinedClickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = {
-                                if (effectiveSources.size > 1) {
-                                    showVersionMenu = true
-                                } else {
+                Box {
+                    Row(
+                        modifier = Modifier
+                            .pointerHoverIcon(PointerIcon.Hand)
+                            .combinedClickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = {
+                                    if (effectiveSources.size > 1) {
+                                        showVersionMenu = true
+                                    } else {
+                                        showAudioDetails = true
+                                    }
+                                },
+                                onLongClick = {
                                     showAudioDetails = true
                                 }
-                            },
-                            onLongClick = {
-                                showAudioDetails = true
-                            }
-                        ),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (hasApple) {
-                        PeerlessIcon(
-                            icon = PeerlessIcons.AppleLogo,
-                            contentDescription = "Apple Music",
-                            tint = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
-                            modifier = Modifier.size(12.dp)
-                        )
-                    }
-                    if (hasQobuz) {
-                        PeerlessIcon(
-                            icon = PeerlessIcons.QobuzLogo,
-                            contentDescription = "Qobuz",
-                            tint = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
-                            modifier = Modifier.height(11.dp).width(28.dp)
-                        )
-                    }
-                    if (!hasApple && !hasQobuz) {
-                        Text(
-                            text = formatProviderLabel(displayProvider),
-                            style = SpecBadgeTypography.copy(
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.3.sp
                             ),
-                            color = colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    if (hasDolby) {
-                        PeerlessIcon(
-                            icon = PeerlessIcons.DolbyAtmos,
-                            contentDescription = "Dolby Atmos",
-                            tint = colorScheme.tertiary,
-                            modifier = Modifier.height(10.dp).width(15.dp)
-                        )
-                    }
-                    if (hasHiRes) {
-                        PeerlessIcon(
-                            icon = PeerlessIcons.HiRes,
-                            contentDescription = "Hi-Res Audio",
-                            tint = colorScheme.tertiary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
-
-                if (effectiveSources.size > 1) {
-                    DropdownMenu(
-                        expanded = showVersionMenu,
-                        onDismissRequest = { showVersionMenu = false },
-                        modifier = Modifier
-                            .background(colorScheme.surfaceContainerHigh)
-                            .border(
-                                1.dp,
-                                colorScheme.outlineVariant.copy(alpha = 0.5f),
-                                RoundedCornerShape(12.dp)
-                            )
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "AVAILABLE VERSIONS",
-                            style = SpecBadgeTypography.copy(
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.8.sp
-                            ),
-                            color = colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
-                        HorizontalDivider(color = colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        effectiveSources.forEach { source ->
-                            val isSelected = activeSource?.let {
-                                it.provider == source.provider &&
-                                        it.providerTrackId == source.providerTrackId &&
-                                        it.codec == source.codec
-                            } == true
-                            DropdownMenuItem(
-                                text = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        if (source.provider.displayName.contains(
-                                                "apple",
-                                                ignoreCase = true
-                                            )
+                        if (hasApple) {
+                            PeerlessIcon(
+                                icon = PeerlessIcons.AppleLogo,
+                                contentDescription = "Apple Music",
+                                tint = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                        if (hasQobuz) {
+                            PeerlessIcon(
+                                icon = PeerlessIcons.QobuzLogo,
+                                contentDescription = "Qobuz",
+                                tint = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                                modifier = Modifier.height(11.dp).width(28.dp)
+                            )
+                        }
+                        if (!hasApple && !hasQobuz) {
+                            Text(
+                                text = formatProviderLabel(displayProvider),
+                                style = SpecBadgeTypography.copy(
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 0.3.sp
+                                ),
+                                color = colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (hasDolby) {
+                            PeerlessIcon(
+                                icon = PeerlessIcons.DolbyAtmos,
+                                contentDescription = "Dolby Atmos",
+                                tint = colorScheme.tertiary,
+                                modifier = Modifier.height(10.dp).width(15.dp)
+                            )
+                        }
+                        if (hasHiRes) {
+                            PeerlessIcon(
+                                icon = PeerlessIcons.HiRes,
+                                contentDescription = "Hi-Res Audio",
+                                tint = colorScheme.tertiary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+
+                    if (effectiveSources.size > 1) {
+                        DropdownMenu(
+                            expanded = showVersionMenu,
+                            onDismissRequest = { showVersionMenu = false },
+                            modifier = Modifier
+                                .background(colorScheme.surfaceContainerHigh)
+                                .border(
+                                    1.dp,
+                                    colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                    RoundedCornerShape(12.dp)
+                                )
+                        ) {
+                            Text(
+                                text = "AVAILABLE VERSIONS",
+                                style = SpecBadgeTypography.copy(
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.8.sp
+                                ),
+                                color = colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                            HorizontalDivider(color = colorScheme.outlineVariant.copy(alpha = 0.3f))
+                            effectiveSources.forEach { source ->
+                                val isSelected = activeSource?.let {
+                                    it.provider == source.provider &&
+                                            it.providerTrackId == source.providerTrackId &&
+                                            it.codec == source.codec
+                                } == true
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.fillMaxWidth()
                                         ) {
-                                            PeerlessIcon(
-                                                icon = PeerlessIcons.AppleLogo,
-                                                contentDescription = "Apple Music",
-                                                tint = colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                                modifier = Modifier.size(12.dp)
-                                            )
-                                        } else if (source.provider.displayName.contains(
-                                                "qobuz",
-                                                ignoreCase = true
-                                            )
-                                        ) {
-                                            PeerlessIcon(
-                                                icon = PeerlessIcons.QobuzLogo,
-                                                contentDescription = "Qobuz",
-                                                tint = colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                                modifier = Modifier.height(11.dp).width(28.dp)
-                                            )
-                                        }
-                                        Text(
-                                            text = formatProviderLabel(source.provider.displayName),
-                                            style = ExpressiveTypography.bodyMedium,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = colorScheme.onSurface
-                                        )
-                                        if (source.codec == Codec.Ec3) {
-                                            PeerlessIcon(
-                                                icon = PeerlessIcons.DolbyAtmos,
-                                                contentDescription = "Dolby Atmos",
-                                                tint = colorScheme.tertiary,
-                                                modifier = Modifier.height(10.dp).width(15.dp)
-                                            )
-                                            Text(
-                                                text = "Dolby Atmos",
-                                                style = ExpressiveTypography.bodySmall,
-                                                color = colorScheme.tertiary
-                                            )
-                                        } else {
-                                            val isSourceHiRes =
-                                                (source.bitDepth ?: 16) >= 24 || (source.sampleRate
-                                                    ?: 44100) >= 88200
-                                            if (isSourceHiRes) {
+                                            if (source.provider.displayName.contains(
+                                                    "apple",
+                                                    ignoreCase = true
+                                                )
+                                            ) {
                                                 PeerlessIcon(
-                                                    icon = PeerlessIcons.HiRes,
-                                                    contentDescription = "Hi-Res Audio",
+                                                    icon = PeerlessIcons.AppleLogo,
+                                                    contentDescription = "Apple Music",
+                                                    tint = colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                            } else if (source.provider.displayName.contains(
+                                                    "qobuz",
+                                                    ignoreCase = true
+                                                )
+                                            ) {
+                                                PeerlessIcon(
+                                                    icon = PeerlessIcons.QobuzLogo,
+                                                    contentDescription = "Qobuz",
+                                                    tint = colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                                    modifier = Modifier.height(11.dp).width(28.dp)
+                                                )
+                                            }
+                                            Text(
+                                                text = formatProviderLabel(source.provider.displayName),
+                                                style = ExpressiveTypography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = colorScheme.onSurface
+                                            )
+                                            if (source.codec == Codec.Ec3) {
+                                                PeerlessIcon(
+                                                    icon = PeerlessIcons.DolbyAtmos,
+                                                    contentDescription = "Dolby Atmos",
                                                     tint = colorScheme.tertiary,
+                                                    modifier = Modifier.height(10.dp).width(15.dp)
+                                                )
+                                                Text(
+                                                    text = "Dolby Atmos",
+                                                    style = ExpressiveTypography.bodySmall,
+                                                    color = colorScheme.tertiary
+                                                )
+                                            } else {
+                                                val isSourceHiRes =
+                                                    (source.bitDepth
+                                                        ?: 16) >= 24 || (source.sampleRate
+                                                        ?: 44100) >= 88200
+                                                if (isSourceHiRes) {
+                                                    PeerlessIcon(
+                                                        icon = PeerlessIcons.HiRes,
+                                                        contentDescription = "Hi-Res Audio",
+                                                        tint = colorScheme.tertiary,
+                                                        modifier = Modifier.size(14.dp)
+                                                    )
+                                                }
+                                                val specLabel = buildString {
+                                                    if (source.bitDepth != null && source.bitDepth >= 24) append(
+                                                        "${source.bitDepth}-bit "
+                                                    )
+                                                    if (source.sampleRate != null) {
+                                                        val khz =
+                                                            if (source.sampleRate % 1000 == 0) "${source.sampleRate / 1000}" else "${source.sampleRate / 1000.0}"
+                                                        append("${khz}kHz ")
+                                                    }
+                                                    append(source.codec.displayName)
+                                                }.trim()
+                                                Text(
+                                                    text = "• $specLabel",
+                                                    style = ExpressiveTypography.bodySmall,
+                                                    color = colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.weight(1f))
+                                            if (source.isCached) {
+                                                PeerlessIcon(
+                                                    icon = PeerlessIcons.CloudDone,
+                                                    contentDescription = "Cached",
+                                                    tint = colorScheme.secondary.copy(alpha = 0.85f),
                                                     modifier = Modifier.size(14.dp)
                                                 )
                                             }
-                                            val specLabel = buildString {
-                                                if (source.bitDepth != null && source.bitDepth >= 24) append(
-                                                    "${source.bitDepth}-bit "
-                                                )
-                                                if (source.sampleRate != null) {
-                                                    val khz =
-                                                        if (source.sampleRate % 1000 == 0) "${source.sampleRate / 1000}" else "${source.sampleRate / 1000.0}"
-                                                    append("${khz}kHz ")
-                                                }
-                                                append(source.codec.displayName)
-                                            }.trim()
-                                            Text(
-                                                text = "• $specLabel",
-                                                style = ExpressiveTypography.bodySmall,
-                                                color = colorScheme.onSurfaceVariant
-                                            )
                                         }
-                                        Spacer(modifier = Modifier.weight(1f))
-                                        if (source.isCached) {
+                                    },
+                                    onClick = {
+                                        showVersionMenu = false
+                                        selectedSource = source
+                                        if (onSelectSource != null) {
+                                            onSelectSource(source)
+                                        } else {
+                                            val sourceSummary =
+                                                canonicalTrack?.toSummaryDto(source) ?: track
+                                            onTrackClick(sourceSummary)
+                                        }
+                                    },
+                                    leadingIcon = if (isSelected) {
+                                        {
                                             PeerlessIcon(
-                                                icon = PeerlessIcons.CloudDone,
-                                                contentDescription = "Cached",
-                                                tint = colorScheme.secondary.copy(alpha = 0.85f),
-                                                modifier = Modifier.size(14.dp)
+                                                icon = PeerlessIcons.CheckCircle,
+                                                contentDescription = "Active",
+                                                tint = colorScheme.primary,
+                                                modifier = Modifier.size(16.dp)
                                             )
                                         }
-                                    }
-                                },
-                                onClick = {
-                                    showVersionMenu = false
-                                    selectedSource = source
-                                    if (onSelectSource != null) {
-                                        onSelectSource(source)
-                                    } else {
-                                        val sourceSummary =
-                                            canonicalTrack?.toSummaryDto(source) ?: track
-                                        onTrackClick(sourceSummary)
-                                    }
-                                },
-                                leadingIcon = if (isSelected) {
-                                    {
-                                        PeerlessIcon(
-                                            icon = PeerlessIcons.CheckCircle,
-                                            contentDescription = "Active",
-                                            tint = colorScheme.primary,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                } else null
-                            )
+                                    } else null
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
-
-        Spacer(modifier = Modifier.width(4.dp))
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(1.dp)
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+        },
+        trailingContent = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(1.dp)
             ) {
+                if (!isTrackCached || activeTask != null) {
+                    RipMorphBadge(
+                        activeTask = activeTask,
+                        isCached = isTrackCached,
+                        onRipClick = {
+                            val ripTarget = canonicalTrack?.toSummaryDto(activeSource) ?: track
+                            if (onRipClick != null) {
+                                onRipClick(ripTarget)
+                            } else {
+                                coroutineScope.launch {
+                                    ripCoordinator?.ripTrack(ripTarget)
+                                }
+                            }
+                        },
+                        onOpenDetails = { showRipDetailSheet = true }
+                    )
+                }
+
+                IconButton(
+                    onClick = {
+                        val favTrack = canonicalTrack?.toSummaryDto(activeSource) ?: track
+                        if (onToggleFavorite != null) {
+                            onToggleFavorite(favTrack)
+                        } else {
+                            favoritesManager?.toggleFavorite(favTrack)
+                        }
+                    },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    PeerlessIcon(
+                        icon = if (isFav) PeerlessIcons.Heart else PeerlessIcons.HeartBorder,
+                        contentDescription = if (isFav) "Remove from favorites" else "Add to favorites",
+                        tint = if (isFav) Color(0xFFFF5252) else colorScheme.onSurfaceVariant.copy(
+                            alpha = 0.65f
+                        ),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
                 Text(
                     text = formatDuration(track.duration),
                     style = ExpressiveTypography.labelSmall.copy(fontSize = 11.sp),
                     color = if (isPlaying) colorScheme.primary else colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    softWrap = false
+                    softWrap = false,
+                    modifier = Modifier.padding(horizontal = 4.dp)
                 )
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (!isTrackCached || activeTask != null) {
-                        RipMorphBadge(
-                            activeTask = activeTask,
-                            isCached = isTrackCached,
-                            onRipClick = {
-                                val ripTarget = canonicalTrack?.toSummaryDto(activeSource) ?: track
-                                if (onRipClick != null) {
-                                    onRipClick(ripTarget)
-                                } else {
-                                    coroutineScope.launch {
-                                        ripCoordinator?.ripTrack(ripTarget)
-                                    }
-                                }
-                            },
-                            onOpenDetails = { showRipDetailSheet = true }
+                IconButton(
+                    onClick = {
+                        if (onPlayNext != null || onAddToQueue != null || onStartRadio != null ||
+                            onRemoveFromQueue != null || onMoveQueueItemUp != null || onMoveQueueItemDown != null
+                        ) {
+                            showTrackMenu = true
+                        } else {
+                            showAudioDetails = true
+                        }
+                    },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    PeerlessIcon(
+                        icon = PeerlessIcons.MoreVert,
+                        contentDescription = "Track options",
+                        tint = colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                DropdownMenu(
+                    expanded = showTrackMenu,
+                    onDismissRequest = { showTrackMenu = false }
+                ) {
+                    val actionTrack = canonicalTrack?.toSummaryDto(activeSource) ?: track
+                    onPlayNext?.let { action ->
+                        DropdownMenuItem(
+                            text = { Text("Play next") },
+                            onClick = { showTrackMenu = false; action(actionTrack) }
                         )
                     }
-
-                    IconButton(
-                        onClick = {
-                            val favTrack = canonicalTrack?.toSummaryDto(activeSource) ?: track
-                            if (onToggleFavorite != null) {
-                                onToggleFavorite(favTrack)
-                            } else {
-                                favoritesManager?.toggleFavorite(favTrack)
-                            }
-                        },
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        PeerlessIcon(
-                            icon = if (isFav) PeerlessIcons.Heart else PeerlessIcons.HeartBorder,
-                            contentDescription = if (isFav) "Remove from favorites" else "Add to favorites",
-                            tint = if (isFav) Color(0xFFFF5252) else colorScheme.onSurfaceVariant.copy(
-                                alpha = 0.65f
-                            ),
-                            modifier = Modifier.size(16.dp)
+                    onAddToQueue?.let { action ->
+                        DropdownMenuItem(
+                            text = { Text("Add to queue") },
+                            onClick = { showTrackMenu = false; action(actionTrack) }
                         )
                     }
-                }
-            }
-
-            IconButton(
-                onClick = {
-                    if (onPlayNext != null || onAddToQueue != null || onStartRadio != null ||
-                        onRemoveFromQueue != null || onMoveQueueItemUp != null || onMoveQueueItemDown != null
-                    ) {
-                        showTrackMenu = true
-                    } else {
-                        showAudioDetails = true
+                    onStartRadio?.let { action ->
+                        DropdownMenuItem(
+                            text = { Text("Start radio") },
+                            onClick = { showTrackMenu = false; action(actionTrack) }
+                        )
                     }
-                },
-                modifier = Modifier.size(48.dp)
-            ) {
-                PeerlessIcon(
-                    icon = PeerlessIcons.MoreVert,
-                    contentDescription = "Track options",
-                    tint = colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-            DropdownMenu(
-                expanded = showTrackMenu,
-                onDismissRequest = { showTrackMenu = false }
-            ) {
-                val actionTrack = canonicalTrack?.toSummaryDto(activeSource) ?: track
-                onPlayNext?.let { action ->
+                    onMoveQueueItemUp?.let { action ->
+                        DropdownMenuItem(
+                            text = { Text("Move up") },
+                            onClick = { showTrackMenu = false; action() }
+                        )
+                    }
+                    onMoveQueueItemDown?.let { action ->
+                        DropdownMenuItem(
+                            text = { Text("Move down") },
+                            onClick = { showTrackMenu = false; action() }
+                        )
+                    }
+                    onRemoveFromQueue?.let { action ->
+                        DropdownMenuItem(
+                            text = { Text("Remove from queue") },
+                            onClick = { showTrackMenu = false; action() }
+                        )
+                    }
                     DropdownMenuItem(
-                        text = { Text("Play next") },
-                        onClick = { showTrackMenu = false; action(actionTrack) }
+                        text = { Text("Audio details") },
+                        onClick = { showTrackMenu = false; showAudioDetails = true }
                     )
                 }
-                onAddToQueue?.let { action ->
-                    DropdownMenuItem(
-                        text = { Text("Add to queue") },
-                        onClick = { showTrackMenu = false; action(actionTrack) }
-                    )
-                }
-                onStartRadio?.let { action ->
-                    DropdownMenuItem(
-                        text = { Text("Start radio") },
-                        onClick = { showTrackMenu = false; action(actionTrack) }
-                    )
-                }
-                onMoveQueueItemUp?.let { action ->
-                    DropdownMenuItem(
-                        text = { Text("Move up") },
-                        onClick = { showTrackMenu = false; action() }
-                    )
-                }
-                onMoveQueueItemDown?.let { action ->
-                    DropdownMenuItem(
-                        text = { Text("Move down") },
-                        onClick = { showTrackMenu = false; action() }
-                    )
-                }
-                onRemoveFromQueue?.let { action ->
-                    DropdownMenuItem(
-                        text = { Text("Remove from queue") },
-                        onClick = { showTrackMenu = false; action() }
-                    )
-                }
-                DropdownMenuItem(
-                    text = { Text("Audio details") },
-                    onClick = { showTrackMenu = false; showAudioDetails = true }
-                )
             }
         }
-    }
+    )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun TrackRow(
     canonicalTrack: CanonicalTrack,
@@ -773,7 +753,10 @@ fun TrackRow(
     onToggleFavorite: ((TrackSummaryDto) -> Unit)? = null,
     isCurrent: Boolean = isPlaying,
     embedded: Boolean = false,
-    showArtworkOverlay: Boolean = !embedded
+    showArtworkOverlay: Boolean = !embedded,
+    shapes: ListItemShapes? = null,
+    index: Int = 0,
+    count: Int = 1,
 ) {
     val activeSource = canonicalTrack.immediatePlaySource() ?: canonicalTrack.bestSource
     val summary =
@@ -797,7 +780,10 @@ fun TrackRow(
         onToggleFavorite = onToggleFavorite,
         isCurrent = isCurrent,
         embedded = embedded,
-        showArtworkOverlay = showArtworkOverlay
+        showArtworkOverlay = showArtworkOverlay,
+        shapes = shapes,
+        index = index,
+        count = count,
     )
 }
 
@@ -815,17 +801,6 @@ fun RipMorphBadge(
 
     when {
         activeTask != null && !activeTask.isFinished -> {
-            val infiniteTransition = rememberInfiniteTransition(label = "RipSpin")
-            val rotation by infiniteTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = 360f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(1200, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart
-                ),
-                label = "RipSpinAngle"
-            )
-
             Box(
                 modifier = modifier
                     .size(touchTarget)
@@ -836,28 +811,15 @@ fun RipMorphBadge(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Box(
+                CircularWavyProgressIndicator(
+                    progress = { (activeTask.percent / 100f).coerceIn(0f, 1f) },
                     modifier = Modifier.size(28.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularWavyProgressIndicator(
-                        progress = { (activeTask.percent / 100f).coerceIn(0f, 1f) },
-                        modifier = Modifier.size(28.dp),
-                        color = colorScheme.primary,
-                        trackColor = colorScheme.primary.copy(alpha = 0.2f),
-                        amplitude = { progress ->
-                            WavyProgressIndicatorDefaults.indicatorAmplitude(progress)
-                        }
-                    )
-                    PeerlessIcon(
-                        icon = PeerlessIcons.RipCloudSync,
-                        contentDescription = "Ripping ${activeTask.percent.roundToInt()}%",
-                        tint = colorScheme.primary,
-                        modifier = Modifier
-                            .size(16.dp)
-                            .graphicsLayer(rotationZ = rotation)
-                    )
-                }
+                    color = colorScheme.primary,
+                    trackColor = colorScheme.primary.copy(alpha = 0.2f),
+                    amplitude = { progress ->
+                        WavyProgressIndicatorDefaults.indicatorAmplitude(progress)
+                    }
+                )
             }
         }
 

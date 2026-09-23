@@ -17,11 +17,14 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
@@ -98,6 +101,7 @@ private val CuratedTasteMixes: List<TasteMixCardData> = listOf(
     )
 )
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SearchScreen(
     playerConnection: PlayerConnection,
@@ -202,54 +206,48 @@ fun SearchScreen(
         isSearching = false
     }
 
-    Surface(
+    Box(
         modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background,
-        contentColor = MaterialTheme.colorScheme.onSurface
+        contentAlignment = Alignment.TopCenter
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.TopCenter
+        Column(
+            modifier = Modifier.widthIn(max = 1040.dp).fillMaxWidth().fillMaxSize()
         ) {
-            Column(
-                modifier = Modifier.widthIn(max = 1040.dp).fillMaxWidth().fillMaxSize()
-            ) {
-                ExpressiveSearchBar(
-                    query = searchQuery,
-                    onQueryChange = { searchQuery = it },
-                    onClearQuery = { searchQuery = "" },
-                    selectedFilter = selectedFilter,
-                    onFilterSelect = { selectedFilter = it },
-                    onOpenSettings = onOpenSettings,
-                    isSearching = isSearching,
-                    serverUrl = apiClient.baseUrl
-                )
+            ExpressiveSearchBar(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                onClearQuery = { searchQuery = "" },
+                selectedFilter = selectedFilter,
+                onFilterSelect = { selectedFilter = it },
+                onOpenSettings = onOpenSettings,
+                isSearching = isSearching,
+                serverUrl = apiClient.baseUrl
+            )
 
-                if (searchQuery.isBlank()) {
-                    ZeroStateDiscovery(
-                        tags = zeroStateTags,
-                        onSelectTag = { tag -> searchQuery = tag.name },
-                        onSelectTasteMix = { mix -> searchQuery = mix.queryKeyword },
-                        contentBottomPadding = contentBottomPadding
-                    )
-                } else {
-                    SearchResultsContent(
-                        query = searchQuery,
-                        isSearching = isSearching,
-                        searchFailed = searchFailed,
-                        hasLastFmMatches = lastFmMatches.isNotEmpty(),
-                        artistSpotlight = artistSpotlight,
-                        canonicalTracks = canonicalTracks,
-                        playerConnection = playerConnection,
-                        currentTrackDto = currentTrackDto,
-                        status = status,
-                        onSelectTag = { tag -> searchQuery = tag },
-                        onSelectArtist = { artist -> searchQuery = artist },
-                        onOpenSettings = onOpenSettings,
-                        onRipClick = onRipClick,
-                        contentBottomPadding = contentBottomPadding
-                    )
-                }
+            if (searchQuery.isBlank()) {
+                ZeroStateDiscovery(
+                    tags = zeroStateTags,
+                    onSelectTag = { tag -> searchQuery = tag.name },
+                    onSelectTasteMix = { mix -> searchQuery = mix.queryKeyword },
+                    contentBottomPadding = contentBottomPadding
+                )
+            } else {
+                SearchResultsContent(
+                    query = searchQuery,
+                    isSearching = isSearching,
+                    searchFailed = searchFailed,
+                    hasLastFmMatches = lastFmMatches.isNotEmpty(),
+                    artistSpotlight = artistSpotlight,
+                    canonicalTracks = canonicalTracks,
+                    playerConnection = playerConnection,
+                    currentTrackDto = currentTrackDto,
+                    status = status,
+                    onSelectTag = { tag -> searchQuery = tag },
+                    onSelectArtist = { artist -> searchQuery = artist },
+                    onOpenSettings = onOpenSettings,
+                    onRipClick = onRipClick,
+                    contentBottomPadding = contentBottomPadding
+                )
             }
         }
     }
@@ -435,6 +433,7 @@ private fun ZeroStateDiscovery(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SearchResultsContent(
     query: String,
@@ -468,28 +467,30 @@ private fun SearchResultsContent(
             top = 8.dp,
             bottom = contentBottomPadding
         ),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
     ) {
         if (artistSpotlight != null && !artistSpotlight.bioSummary.isNullOrBlank()) {
             item(key = "artist_spotlight") {
-                ArtistSpotlightCard(
-                    artist = artistSpotlight,
-                    onSelectTag = onSelectTag,
-                    onSelectArtist = onSelectArtist
-                )
+                Box(modifier = Modifier.padding(bottom = 12.dp)) {
+                    ArtistSpotlightCard(
+                        artist = artistSpotlight,
+                        onSelectTag = onSelectTag,
+                        onSelectArtist = onSelectArtist
+                    )
+                }
             }
         }
 
         if (isSearching && canonicalTracks.isEmpty()) {
             item(key = "search_progress") {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
             }
         }
 
         if (canonicalTracks.isNotEmpty()) {
             item(key = "result_summary") {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -511,7 +512,10 @@ private fun SearchResultsContent(
             }
         }
 
-        items(canonicalTracks, key = { "canonical_${it.id}" }) { canonical ->
+        itemsIndexed(
+            items = canonicalTracks,
+            key = { _, canonical -> "canonical_${canonical.id}" }
+        ) { index, canonical ->
             val activeSource = canonical.immediatePlaySource() ?: canonical.bestSource
             val trackDto = canonical.toSummaryDto(activeSource)
             val isPlaying = currentTrackDto?.id == trackDto.id &&
@@ -521,6 +525,8 @@ private fun SearchResultsContent(
                 canonicalTrack = canonical,
                 artworkUrl = canonical.artworkUrl ?: apiClient.getArtworkUrl(trackDto, 200),
                 isPlaying = isPlaying,
+                index = index,
+                count = canonicalTracks.size,
                 onTrackClick = { clickedCanonical ->
                     val playSource =
                         clickedCanonical.immediatePlaySource() ?: clickedCanonical.bestSource

@@ -1,12 +1,6 @@
 package org.shilpo.peerless.ui.screens
 
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,6 +28,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SplitButtonDefaults
@@ -58,7 +52,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -596,17 +589,6 @@ fun QuickPickCard(
                 contentAlignment = Alignment.Center
             ) {
                 if (isRipping && activeTask != null) {
-                    val infiniteTransition = rememberInfiniteTransition(label = "QuickPickRipSpin")
-                    val rotation by infiniteTransition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(1200, easing = LinearEasing),
-                            repeatMode = RepeatMode.Restart
-                        ),
-                        label = "QuickPickRipSpinAngle"
-                    )
-
                     CircularProgressIndicator(
                         progress = { (activeTask.percent / 100f).coerceIn(0f, 1f) },
                         modifier = Modifier.size(44.dp),
@@ -620,9 +602,7 @@ fun QuickPickCard(
                         icon = PeerlessIcons.RipCloudSync,
                         contentDescription = "Ripping ${track.title} (${activeTask.percent.roundToInt()}%)",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .graphicsLayer(rotationZ = rotation)
+                        modifier = Modifier.size(20.dp)
                     )
                 } else {
                     if (isPlaying || track.is_cached) {
@@ -795,6 +775,7 @@ private fun HomeFeedMessage(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun HomeScreenContent(
     playerConnection: PlayerConnection,
@@ -954,34 +935,39 @@ fun HomeScreenContent(
                 item(key = "listen_again_header") {
                     HomeFeedSectionHeader(title = "Listen again")
                 }
-                items(
-                    items = homeFeed.recentTracks,
-                    key = { "recent_${it.track.provider}_${it.track.track_id}" }
-                ) { item ->
-                    val track = item.track
-                    Box(modifier = Modifier.padding(horizontal = 12.dp)) {
-                        TrackRow(
-                            track = track,
-                            artworkUrl = apiClient.getArtworkUrl(track, 200),
-                            isPlaying = currentTrackDto?.id == track.id && status == PlaybackStatus.PLAYING,
-                            canonicalTrack = item.canonicalTrack,
-                            onTrackClick = { clicked ->
-                                playerConnection.playFromContext(
-                                    clicked.toTrack(),
-                                    homeFeed.recentTracks.map { it.track.toTrack() }
-                                )
-                            },
-                            onPlayNext = if (track.is_cached) {
-                                { clicked -> playerConnection.playNextInQueue(clicked.toTrack()) }
-                            } else null,
-                            onAddToQueue = if (track.is_cached) {
-                                { clicked -> playerConnection.addToQueue(clicked.toTrack()) }
-                            } else null,
-                            onStartRadio = if (track.is_cached) {
-                                { clicked -> playerConnection.startRadio(clicked.toTrack()) }
-                            } else null,
-                            onRipClick = onRipClick
-                        )
+                item(key = "listen_again_card") {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
+                    ) {
+                        val count = homeFeed.recentTracks.size
+                        homeFeed.recentTracks.forEachIndexed { index, item ->
+                            val track = item.track
+                            TrackRow(
+                                track = track,
+                                artworkUrl = apiClient.getArtworkUrl(track, 200),
+                                isPlaying = currentTrackDto?.id == track.id && status == PlaybackStatus.PLAYING,
+                                canonicalTrack = item.canonicalTrack,
+                                index = index,
+                                count = count,
+                                onTrackClick = { clicked ->
+                                    playerConnection.playFromContext(
+                                        clicked.toTrack(),
+                                        homeFeed.recentTracks.map { it.track.toTrack() }
+                                    )
+                                },
+                                onPlayNext = if (track.is_cached) {
+                                    { clicked -> playerConnection.playNextInQueue(clicked.toTrack()) }
+                                } else null,
+                                onAddToQueue = if (track.is_cached) {
+                                    { clicked -> playerConnection.addToQueue(clicked.toTrack()) }
+                                } else null,
+                                onStartRadio = if (track.is_cached) {
+                                    { clicked -> playerConnection.startRadio(clicked.toTrack()) }
+                                } else null,
+                                onRipClick = onRipClick,
+                            )
+                        }
                     }
                 }
             }
@@ -1026,29 +1012,34 @@ fun HomeScreenContent(
                     }
                 }
             } else {
-                items(
-                    items = displayedTracks,
-                    key = { it.id }
-                ) { track ->
-                    val isPlaying = currentTrackDto?.id == track.id &&
-                            status == PlaybackStatus.PLAYING
-
-                    Box(modifier = Modifier.padding(horizontal = 12.dp)) {
-                        TrackRow(
-                            track = track,
-                            artworkUrl = apiClient.getArtworkUrl(track, 200),
-                            isPlaying = isPlaying,
-                            onTrackClick = { clicked ->
-                                if (currentTrackDto?.id == clicked.id) {
-                                    playerConnection.togglePlayPause()
-                                } else {
-                                    playerConnection.play(
-                                        clicked.toTrack(),
-                                        displayedTracks.map { it.toTrack() })
-                                }
-                            },
-                            onRipClick = onRipClick
-                        )
+                item(key = "search_results_card") {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
+                    ) {
+                        val count = displayedTracks.size
+                        displayedTracks.forEachIndexed { index, track ->
+                            val isPlaying = currentTrackDto?.id == track.id &&
+                                    status == PlaybackStatus.PLAYING
+                            TrackRow(
+                                track = track,
+                                artworkUrl = apiClient.getArtworkUrl(track, 200),
+                                isPlaying = isPlaying,
+                                index = index,
+                                count = count,
+                                onTrackClick = { clicked ->
+                                    if (currentTrackDto?.id == clicked.id) {
+                                        playerConnection.togglePlayPause()
+                                    } else {
+                                        playerConnection.play(
+                                            clicked.toTrack(),
+                                            displayedTracks.map { it.toTrack() }
+                                        )
+                                    }
+                                },
+                                onRipClick = onRipClick,
+                            )
+                        }
                     }
                 }
             }

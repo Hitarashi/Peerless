@@ -3,12 +3,7 @@ package org.shilpo.peerless.ui.shell
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
@@ -76,7 +71,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
@@ -119,8 +113,11 @@ import org.shilpo.peerless.theme.liquidGlassSource
 import org.shilpo.peerless.theme.rememberLiquidGlassState
 import org.shilpo.peerless.ui.components.FloatingNavigationToolbar
 import org.shilpo.peerless.ui.components.HomeMorphIcon
+import org.shilpo.peerless.ui.components.InfoMorphIcon
 import org.shilpo.peerless.ui.components.LibraryMorphIcon
+import org.shilpo.peerless.ui.components.LiveRipsMorphIcon
 import org.shilpo.peerless.ui.components.LocalToastNotifier
+import org.shilpo.peerless.ui.components.LyricsMorphIcon
 import org.shilpo.peerless.ui.components.MiniPlayerBar
 import org.shilpo.peerless.ui.components.MiniPlayerBottomSpacing
 import org.shilpo.peerless.ui.components.NavToggleMorphIcon
@@ -131,6 +128,7 @@ import org.shilpo.peerless.ui.components.NowPlayingSheet
 import org.shilpo.peerless.ui.components.PeerlessIcon
 import org.shilpo.peerless.ui.components.PeerlessIcons
 import org.shilpo.peerless.ui.components.PersistentBottomPlayer
+import org.shilpo.peerless.ui.components.QueueMorphIcon
 import org.shilpo.peerless.ui.components.RipActivityPane
 import org.shilpo.peerless.ui.components.SearchMorphIcon
 import org.shilpo.peerless.ui.components.ServerSettingsDialog
@@ -675,6 +673,7 @@ private fun CompactLayout(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
+                .liquidGlassSource(LocalLiquidGlassState.current)
         ) {
             DestinationContent(
                 destination = currentDestination,
@@ -729,17 +728,6 @@ private fun CompactLayout(
                 exit = slideOutVertically(targetOffsetY = { it / 2 }) + fadeOut(),
                 modifier = Modifier.padding(bottom = 6.dp)
             ) {
-                val infiniteTransition = rememberInfiniteTransition(label = "CompactChipSpin")
-                val spinAngle by infiniteTransition.animateFloat(
-                    initialValue = 0f,
-                    targetValue = 360f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1400, easing = LinearEasing),
-                        repeatMode = RepeatMode.Restart
-                    ),
-                    label = "CompactChipRotation"
-                )
-
                 Surface(
                     onClick = { showRipActivitySheet = true },
                     shape = PillShape,
@@ -763,9 +751,7 @@ private fun CompactLayout(
                             icon = PeerlessIcons.RipCloudSync,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .size(16.dp)
-                                .graphicsLayer(rotationZ = spinAngle)
+                            modifier = Modifier.size(16.dp)
                         )
                         Text(
                             text = "Ripping: $activeTasksCount active",
@@ -967,100 +953,116 @@ private fun ExpandedLayout(
         )
         val sidebarHeight = maxHeight - playerSlotHeight
 
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f),
+                            MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.45f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
+                .liquidGlassSource(LocalLiquidGlassState.current)
         ) {
-            ExpressiveWideNavigationRail(
-                selectedDestination = currentDestination,
-                onSelectDestination = onSelectDestination,
-                initialExpanded = true,
-                modifier = Modifier.height(sidebarHeight)
-                    .padding(start = 4.dp, top = 4.dp, bottom = 2.dp)
-            )
-
-            Box(
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
+                    .fillMaxSize()
             ) {
-                DestinationContent(
-                    destination = currentDestination,
+                ExpressiveWideNavigationRail(
+                    selectedDestination = currentDestination,
                     onSelectDestination = onSelectDestination,
-                    playerConnection = playerConnection,
-                    currentTrackDto = currentTrackDto,
-                    status = status,
-                    serverConnected = serverConnected,
-                    searchQuery = searchQuery,
-                    onQueryChange = onQueryChange,
-                    selectedFilter = selectedFilter,
-                    onSelectFilter = onSelectFilter,
-                    displayedTracks = displayedTracks,
-                    allTracks = allTracks,
-                    onOpenSettings = onOpenSettings,
-                    onOpenProfile = onOpenProfile,
-                    onOpenNowPlaying = onOpenNowPlaying,
-                    contentBottomPadding = 16.dp + playerSlotHeight,
-                    onRipClick = onRipClick
+                    initialExpanded = true,
+                    modifier = Modifier.height(sidebarHeight)
+                        .padding(start = 4.dp, top = 4.dp, bottom = 2.dp)
                 )
-            }
 
-            AnimatedVisibility(
-                visible = activeSupportingPane != null,
-                enter = slideInHorizontally(
-                    initialOffsetX = { it },
-                    animationSpec = spring(
-                        dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
-                        stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
-                        visibilityThreshold = IntOffset(1, 1)
-                    )
-                ) + expandHorizontally(
-                    animationSpec = spring(
-                        dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
-                        stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
-                        visibilityThreshold = IntSize(1, 1)
-                    ),
-                    expandFrom = Alignment.End,
-                    clip = false
-                ),
-                exit = slideOutHorizontally(
-                    targetOffsetX = { it },
-                    animationSpec = spring(
-                        dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
-                        stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
-                        visibilityThreshold = IntOffset(1, 1)
-                    )
-                ) + shrinkHorizontally(
-                    animationSpec = spring(
-                        dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
-                        stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
-                        visibilityThreshold = IntSize(1, 1)
-                    ),
-                    shrinkTowards = Alignment.End,
-                    clip = false
-                )
-            ) {
-                val paneType = activeSupportingPane ?: displayedSupportingPane
-                if (paneType != null) {
-                    SupportingPaneContainer(
-                        paneType = paneType,
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                ) {
+                    DestinationContent(
+                        destination = currentDestination,
+                        onSelectDestination = onSelectDestination,
                         playerConnection = playerConnection,
                         currentTrackDto = currentTrackDto,
-                        lyricsLoader = lyricsLoader,
-                        positionMs = positionMs,
                         status = status,
-                        isPlaying = isPlaying,
-                        onClose = { onToggleSupportingPane(paneType) },
-                        onSelectPane = onSelectSupportingPane,
-                        currentWidth = supportingPaneWidth,
-                        onWidthChange = onSupportingPaneWidthChange,
-                        onResetWidth = {
-                            onSupportingPaneWidthChange(340.dp)
-                        },
-                        modifier = Modifier
-                            .width(supportingPaneWidth + 48.dp)
-                            .height(sidebarHeight)
+                        serverConnected = serverConnected,
+                        searchQuery = searchQuery,
+                        onQueryChange = onQueryChange,
+                        selectedFilter = selectedFilter,
+                        onSelectFilter = onSelectFilter,
+                        displayedTracks = displayedTracks,
+                        allTracks = allTracks,
+                        onOpenSettings = onOpenSettings,
+                        onOpenProfile = onOpenProfile,
+                        onOpenNowPlaying = onOpenNowPlaying,
+                        contentBottomPadding = 16.dp + playerSlotHeight,
+                        onRipClick = onRipClick
                     )
+                }
+
+                AnimatedVisibility(
+                    visible = activeSupportingPane != null,
+                    enter = slideInHorizontally(
+                        initialOffsetX = { it },
+                        animationSpec = spring(
+                            dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
+                            stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
+                            visibilityThreshold = IntOffset(1, 1)
+                        )
+                    ) + expandHorizontally(
+                        animationSpec = spring(
+                            dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
+                            stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
+                            visibilityThreshold = IntSize(1, 1)
+                        ),
+                        expandFrom = Alignment.End,
+                        clip = false
+                    ),
+                    exit = slideOutHorizontally(
+                        targetOffsetX = { it },
+                        animationSpec = spring(
+                            dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
+                            stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
+                            visibilityThreshold = IntOffset(1, 1)
+                        )
+                    ) + shrinkHorizontally(
+                        animationSpec = spring(
+                            dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
+                            stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
+                            visibilityThreshold = IntSize(1, 1)
+                        ),
+                        shrinkTowards = Alignment.End,
+                        clip = false
+                    )
+                ) {
+                    val paneType = activeSupportingPane ?: displayedSupportingPane
+                    if (paneType != null) {
+                        SupportingPaneContainer(
+                            paneType = paneType,
+                            playerConnection = playerConnection,
+                            currentTrackDto = currentTrackDto,
+                            lyricsLoader = lyricsLoader,
+                            positionMs = positionMs,
+                            status = status,
+                            isPlaying = isPlaying,
+                            onClose = { onToggleSupportingPane(paneType) },
+                            onSelectPane = onSelectSupportingPane,
+                            currentWidth = supportingPaneWidth,
+                            onWidthChange = onSupportingPaneWidthChange,
+                            onResetWidth = {
+                                onSupportingPaneWidthChange(340.dp)
+                            },
+                            modifier = Modifier
+                                .width(supportingPaneWidth + 48.dp)
+                                .height(sidebarHeight)
+                        )
+                    }
                 }
             }
         }
@@ -1638,19 +1640,35 @@ private fun SupportingPaneContainer(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.weight(1f, fill = false)
                     ) {
-                        val paneIcon = when (paneType) {
-                            SupportingPaneType.QUEUE -> PeerlessIcons.Queue
-                            SupportingPaneType.LYRICS -> PeerlessIcons.Lyrics
-                            SupportingPaneType.TRACK_CONTEXT -> PeerlessIcons.InfoFilled
-                            SupportingPaneType.TASKS -> PeerlessIcons.RipCloudSync
-                        }
+                        when (paneType) {
+                            SupportingPaneType.QUEUE -> QueueMorphIcon(
+                                selected = false,
+                                tint = MaterialTheme.colorScheme.primary,
+                                size = 24.dp,
+                                contentDescription = null,
+                            )
 
-                        PeerlessIcon(
-                            icon = paneIcon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
+                            SupportingPaneType.LYRICS -> LyricsMorphIcon(
+                                selected = false,
+                                tint = MaterialTheme.colorScheme.primary,
+                                size = 24.dp,
+                                contentDescription = null,
+                            )
+
+                            SupportingPaneType.TRACK_CONTEXT -> InfoMorphIcon(
+                                selected = false,
+                                tint = MaterialTheme.colorScheme.primary,
+                                size = 24.dp,
+                                contentDescription = null,
+                            )
+
+                            SupportingPaneType.TASKS -> LiveRipsMorphIcon(
+                                selected = false,
+                                tint = MaterialTheme.colorScheme.primary,
+                                size = 24.dp,
+                                contentDescription = null,
+                            )
+                        }
 
                         Text(
                             text = paneType.title,
@@ -1774,12 +1792,9 @@ private fun DestinationContent(
     contentBottomPadding: Dp,
     onRipClick: ((TrackSummaryDto) -> Unit)? = null
 ) {
-    // Single backdrop seam: everything behind the bottom players + nav toolbar
-    // is captured here for the liquid glass system (no-op when glass is off).
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .liquidGlassSource(LocalLiquidGlassState.current)
     ) {
         when (destination) {
             NavigationDestination.HOME -> {

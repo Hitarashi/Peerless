@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,6 +48,7 @@ import org.shilpo.peerless.ui.components.PeerlessIcon
 import org.shilpo.peerless.ui.components.PeerlessIcons
 import org.shilpo.peerless.ui.components.TrackRow
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LibraryScreen(
     playerConnection: PlayerConnection,
@@ -166,14 +169,17 @@ fun LibraryScreen(
                     .fillMaxWidth()
                     .weight(1f),
                 contentPadding = PaddingValues(
-                    start = 12.dp,
-                    end = 12.dp,
+                    start = 16.dp,
+                    end = 16.dp,
                     top = 4.dp,
                     bottom = contentBottomPadding
                 ),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
             ) {
-                items(tracksToShow, key = { it.id }) { track ->
+                itemsIndexed(
+                    items = tracksToShow,
+                    key = { _, track -> track.id }
+                ) { index, track ->
                     val isCurrent = currentTrackDto?.id == track.id
                     val isPlaying = isCurrent &&
                             status == PlaybackStatus.PLAYING
@@ -183,6 +189,8 @@ fun LibraryScreen(
                         artworkUrl = apiClient.getArtworkUrl(track, 200),
                         isPlaying = isPlaying,
                         isCurrent = isCurrent,
+                        index = index,
+                        count = tracksToShow.size,
                         onTrackClick = { clicked ->
                             if (isCurrent) {
                                 playerConnection.togglePlayPause()
