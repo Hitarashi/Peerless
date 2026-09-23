@@ -63,6 +63,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.graphics.shapes.Morph
 import coil3.compose.AsyncImage
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import org.shilpo.peerless.model.PlaybackInfo
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.player.PlaybackStatus
@@ -139,7 +141,7 @@ fun PersistentBottomPlayer(
     var extractedArtworkColor by remember(artworkUrl) { mutableStateOf<Color?>(null) }
     val liquidGlassEnabled = LocalLiquidGlassState.current?.isEnabled == true
     val glassTint = rememberLiquidGlassTint(artworkColor = extractedArtworkColor)
-
+    val pillHazeState = rememberHazeState()
 
     val playButtonInteractionSource = remember { MutableInteractionSource() }
 
@@ -147,20 +149,28 @@ fun PersistentBottomPlayer(
         modifier = modifier
             .fillMaxWidth()
             .height(116.dp)
-            .shadow(
-                elevation = if (liquidGlassEnabled) 10.dp else 4.dp,
-                shape = containerShape,
-                ambientColor = Color.Black.copy(alpha = 0.35f),
-                spotColor = Color.Black.copy(alpha = 0.45f)
-            )
-            .then(
-                if (liquidGlassEnabled) {
-                    Modifier.liquidGlass(shape = containerShape, tint = glassTint)
-                } else {
-                    Modifier.background(colorScheme.surfaceContainerLow)
-                }
-            )
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .shadow(
+                    elevation = if (liquidGlassEnabled) 10.dp else 4.dp,
+                    shape = containerShape,
+                    ambientColor = Color.Black.copy(alpha = 0.35f),
+                    spotColor = Color.Black.copy(alpha = 0.45f)
+                )
+                .then(
+                    if (liquidGlassEnabled) {
+                        Modifier
+                            .liquidGlass(shape = containerShape, tint = glassTint)
+                            .hazeSource(state = pillHazeState)
+                    } else {
+                        Modifier
+                            .clip(containerShape)
+                            .background(colorScheme.surfaceContainerLow)
+                    }
+                )
+        )
 
         Row(
             modifier = Modifier
@@ -369,8 +379,19 @@ fun PersistentBottomPlayer(
                     Row(
                         modifier = Modifier
                             .height(56.dp)
-                            .clip(CircleShape)
-                            .background(colorScheme.surfaceContainerHigh)
+                            .then(
+                                if (liquidGlassEnabled) {
+                                    Modifier.liquidGlass(
+                                        shape = CircleShape,
+                                        tint = colorScheme.surfaceContainerHighest.copy(alpha = 0.45f),
+                                        hazeState = pillHazeState
+                                    )
+                                } else {
+                                    Modifier
+                                        .clip(CircleShape)
+                                        .background(colorScheme.surfaceContainerHigh)
+                                }
+                            )
                             .padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)

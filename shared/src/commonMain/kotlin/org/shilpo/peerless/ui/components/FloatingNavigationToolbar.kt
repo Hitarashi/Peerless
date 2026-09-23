@@ -3,12 +3,12 @@ package org.shilpo.peerless.ui.components
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
@@ -17,21 +17,23 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarDefaults
-import androidx.compose.material3.ShortNavigationBar
-import androidx.compose.material3.ShortNavigationBarArrangement
 import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.ShortNavigationBarItemDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
@@ -49,7 +51,6 @@ val FloatingBarStandaloneCornerRadius = 32.dp
 val FloatingBarOuterCornerRadius = 28.dp
 val FloatingBarJunctionCornerRadius = 12.dp
 
-private val NavigationItemsMaxWidth = 360.dp
 private val NavigationItemVerticalPadding = 8.dp
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -90,124 +91,120 @@ fun FloatingNavigationToolbar(
             .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal)),
         contentAlignment = Alignment.Center,
     ) {
-        Surface(
-            modifier = Modifier
-                .widthIn(max = NavigationBarMaxWidth)
-                .fillMaxWidth()
-                .height(NavigationBarHeight)
-                .then(
-                    if (useGlass) {
-                        Modifier.liquidGlass(shape = navigationShape, tint = null)
-                    } else {
-                        Modifier
-                    }
-                ),
-            shape = navigationShape,
-            color = navigationContainerColor,
-            tonalElevation = if (useGlass) 0.dp else NavigationBarDefaults.Elevation,
-            shadowElevation = if (useGlass) 10.dp else NavigationBarDefaults.Elevation,
-        ) {
-            ShortNavigationBar(
-                modifier = Modifier.fillMaxSize(),
-                containerColor = Color.Transparent,
-                contentColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurface,
-                windowInsets = WindowInsets(0, 0, 0, 0),
-                arrangement = ShortNavigationBarArrangement.EqualWeight,
+        val contentColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurface
+        CompositionLocalProvider(LocalContentColor provides contentColor) {
+            Box(
+                modifier = Modifier
+                    .widthIn(max = NavigationBarMaxWidth)
+                    .fillMaxWidth()
+                    .height(NavigationBarHeight)
+                    .shadow(
+                        elevation = if (useGlass) 10.dp else NavigationBarDefaults.Elevation,
+                        shape = navigationShape,
+                        ambientColor = Color.Black.copy(alpha = 0.35f),
+                        spotColor = Color.Black.copy(alpha = 0.45f)
+                    )
+                    .then(
+                        if (useGlass) {
+                            Modifier.liquidGlass(shape = navigationShape, tint = null)
+                        } else {
+                            Modifier
+                                .clip(navigationShape)
+                                .background(navigationContainerColor)
+                        }
+                    )
+                    .clip(navigationShape)
+                    .selectableGroup(),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .padding(horizontal = 8.dp, vertical = NavigationItemVerticalPadding),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .widthIn(max = NavigationItemsMaxWidth)
-                            .fillMaxWidth()
-                            .fillMaxHeight()
-                            .padding(vertical = NavigationItemVerticalPadding),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        items.forEach { dest ->
-                            val selected = dest == selectedDestination
+                    items.forEach { dest ->
+                        val selected = dest == selectedDestination
 
-                            ShortNavigationBarItem(
-                                selected = selected,
-                                onClick = { onSelectDestination(dest) },
-                                modifier = Modifier.weight(1f),
-                                colors = ShortNavigationBarItemDefaults.colors(
-                                    selectedIndicatorColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                        alpha = 0.75f
-                                    ),
-                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                        alpha = 0.75f
-                                    )
+                        ShortNavigationBarItem(
+                            selected = selected,
+                            onClick = { onSelectDestination(dest) },
+                            modifier = Modifier.weight(1f),
+                            colors = ShortNavigationBarItemDefaults.colors(
+                                selectedIndicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                                selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                    alpha = 0.75f
                                 ),
-                                icon = {
-                                    val rotation by animateFloatAsState(
-                                        targetValue = when (dest) {
-                                            NavigationDestination.SETTINGS -> if (selected) 45f else 0f
-                                            else -> 0f
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                    alpha = 0.75f
+                                )
+                            ),
+                            icon = {
+                                val rotation by animateFloatAsState(
+                                    targetValue = when (dest) {
+                                        NavigationDestination.SETTINGS -> if (selected) 45f else 0f
+                                        else -> 0f
+                                    },
+                                    animationSpec = spring(
+                                        dampingRatio = 0.65f,
+                                        stiffness = Spring.StiffnessMediumLow
+                                    ),
+                                    label = "navIconRotation"
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .graphicsLayer {
+                                            rotationZ = rotation
                                         },
-                                        animationSpec = spring(
-                                            dampingRatio = 0.65f,
-                                            stiffness = Spring.StiffnessMediumLow
-                                        ),
-                                        label = "navIconRotation"
-                                    )
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    when (dest) {
+                                        NavigationDestination.HOME -> {
+                                            HomeMorphIcon(
+                                                selected = selected,
+                                                size = 24.dp,
+                                                contentDescription = dest.title,
+                                            )
+                                        }
 
-                                    Box(
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .graphicsLayer {
-                                                rotationZ = rotation
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        when (dest) {
-                                            NavigationDestination.HOME -> {
-                                                HomeMorphIcon(
-                                                    selected = selected,
-                                                    size = 24.dp,
-                                                    contentDescription = dest.title,
-                                                )
-                                            }
+                                        NavigationDestination.SEARCH -> {
+                                            SearchMorphIcon(
+                                                selected = selected,
+                                                size = 24.dp,
+                                                contentDescription = dest.title,
+                                            )
+                                        }
 
-                                            NavigationDestination.SEARCH -> {
-                                                SearchMorphIcon(
-                                                    selected = selected,
-                                                    size = 24.dp,
-                                                    contentDescription = dest.title,
-                                                )
-                                            }
+                                        NavigationDestination.LIBRARY -> {
+                                            LibraryMorphIcon(
+                                                selected = selected,
+                                                size = 24.dp,
+                                                contentDescription = dest.title,
+                                            )
+                                        }
 
-                                            NavigationDestination.LIBRARY -> {
-                                                LibraryMorphIcon(
-                                                    selected = selected,
-                                                    size = 24.dp,
-                                                    contentDescription = dest.title,
-                                                )
-                                            }
-
-                                            NavigationDestination.SETTINGS -> {
-                                                SettingsMorphIcon(
-                                                    selected = selected,
-                                                    size = 24.dp,
-                                                    contentDescription = dest.title,
-                                                )
-                                            }
+                                        NavigationDestination.SETTINGS -> {
+                                            SettingsMorphIcon(
+                                                selected = selected,
+                                                size = 24.dp,
+                                                contentDescription = dest.title,
+                                            )
                                         }
                                     }
-                                },
-                                label = {
-                                    Text(
-                                        text = dest.title,
-                                        maxLines = 1,
-                                    )
-                                },
-                            )
-                        }
+                                }
+                            },
+                            label = {
+                                Text(
+                                    text = dest.title,
+                                    maxLines = 1,
+                                )
+                            },
+                        )
                     }
                 }
             }

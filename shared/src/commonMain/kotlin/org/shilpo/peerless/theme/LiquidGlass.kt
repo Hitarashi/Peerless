@@ -81,12 +81,14 @@ fun Modifier.liquidGlass(
     shape: Shape,
     tint: Color? = null,
     frosted: Boolean = true,
+    hazeState: HazeState? = null,
 ): Modifier {
     val state = LocalLiquidGlassState.current
     if (state == null || !state.isEnabled) {
         return this
     }
 
+    val targetHazeState = hazeState ?: state.hazeState
     val colorScheme = MaterialTheme.colorScheme
     val resolvedTint = tint ?: colorScheme.surfaceContainerLow.copy(alpha = DEFAULT_TINT_ALPHA)
     val blurRadius = if (frosted) BLUR_RADIUS_FROSTED else BLUR_RADIUS_CLEAR
@@ -99,8 +101,8 @@ fun Modifier.liquidGlass(
             blurredEdgeTreatment(BlurredEdgeTreatment(shape))
         }
     }
-    val hazeInput = remember(state.hazeState) {
-        HazeInput.Sources(state.hazeState)
+    val hazeInput = remember(targetHazeState) {
+        HazeInput.Sources(targetHazeState)
     }
 
     return this

@@ -70,7 +70,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
@@ -109,6 +111,7 @@ import org.shilpo.peerless.theme.LocalWindowWidthSizeClass
 import org.shilpo.peerless.theme.PillShape
 import org.shilpo.peerless.theme.SpecBadgeTypography
 import org.shilpo.peerless.theme.WindowWidthSizeClass
+import org.shilpo.peerless.theme.liquidGlass
 import org.shilpo.peerless.theme.liquidGlassSource
 import org.shilpo.peerless.theme.rememberLiquidGlassState
 import org.shilpo.peerless.ui.components.FloatingNavigationToolbar
@@ -359,6 +362,7 @@ fun AdaptiveShell(
                                 )
                             )
                         )
+                        .liquidGlassSource(LocalLiquidGlassState.current)
                 )
                 val onRipClick: (TrackSummaryDto) -> Unit = { track ->
                     coroutineScope.launch {
@@ -953,116 +957,101 @@ private fun ExpandedLayout(
         )
         val sidebarHeight = maxHeight - playerSlotHeight
 
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f),
-                            MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.45f),
-                            MaterialTheme.colorScheme.background
-                        )
-                    )
-                )
-                .liquidGlassSource(LocalLiquidGlassState.current)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-            ) {
-                ExpressiveWideNavigationRail(
-                    selectedDestination = currentDestination,
-                    onSelectDestination = onSelectDestination,
-                    initialExpanded = true,
-                    modifier = Modifier.height(sidebarHeight)
-                        .padding(start = 4.dp, top = 4.dp, bottom = 2.dp)
-                )
+            ExpressiveWideNavigationRail(
+                selectedDestination = currentDestination,
+                onSelectDestination = onSelectDestination,
+                initialExpanded = true,
+                modifier = Modifier.height(sidebarHeight)
+                    .padding(start = 4.dp, top = 4.dp, bottom = 2.dp)
+            )
 
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                ) {
-                    DestinationContent(
-                        destination = currentDestination,
-                        onSelectDestination = onSelectDestination,
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .liquidGlassSource(LocalLiquidGlassState.current)
+            ) {
+                DestinationContent(
+                    destination = currentDestination,
+                    onSelectDestination = onSelectDestination,
+                    playerConnection = playerConnection,
+                    currentTrackDto = currentTrackDto,
+                    status = status,
+                    serverConnected = serverConnected,
+                    searchQuery = searchQuery,
+                    onQueryChange = onQueryChange,
+                    selectedFilter = selectedFilter,
+                    onSelectFilter = onSelectFilter,
+                    displayedTracks = displayedTracks,
+                    allTracks = allTracks,
+                    onOpenSettings = onOpenSettings,
+                    onOpenProfile = onOpenProfile,
+                    onOpenNowPlaying = onOpenNowPlaying,
+                    contentBottomPadding = 16.dp + playerSlotHeight,
+                    onRipClick = onRipClick
+                )
+            }
+
+            AnimatedVisibility(
+                visible = activeSupportingPane != null,
+                enter = slideInHorizontally(
+                    initialOffsetX = { it },
+                    animationSpec = spring(
+                        dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
+                        stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
+                        visibilityThreshold = IntOffset(1, 1)
+                    )
+                ) + expandHorizontally(
+                    animationSpec = spring(
+                        dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
+                        stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
+                        visibilityThreshold = IntSize(1, 1)
+                    ),
+                    expandFrom = Alignment.End,
+                    clip = false
+                ),
+                exit = slideOutHorizontally(
+                    targetOffsetX = { it },
+                    animationSpec = spring(
+                        dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
+                        stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
+                        visibilityThreshold = IntOffset(1, 1)
+                    )
+                ) + shrinkHorizontally(
+                    animationSpec = spring(
+                        dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
+                        stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
+                        visibilityThreshold = IntSize(1, 1)
+                    ),
+                    shrinkTowards = Alignment.End,
+                    clip = false
+                )
+            ) {
+                val paneType = activeSupportingPane ?: displayedSupportingPane
+                if (paneType != null) {
+                    SupportingPaneContainer(
+                        paneType = paneType,
                         playerConnection = playerConnection,
                         currentTrackDto = currentTrackDto,
+                        lyricsLoader = lyricsLoader,
+                        positionMs = positionMs,
                         status = status,
-                        serverConnected = serverConnected,
-                        searchQuery = searchQuery,
-                        onQueryChange = onQueryChange,
-                        selectedFilter = selectedFilter,
-                        onSelectFilter = onSelectFilter,
-                        displayedTracks = displayedTracks,
-                        allTracks = allTracks,
-                        onOpenSettings = onOpenSettings,
-                        onOpenProfile = onOpenProfile,
-                        onOpenNowPlaying = onOpenNowPlaying,
-                        contentBottomPadding = 16.dp + playerSlotHeight,
-                        onRipClick = onRipClick
+                        isPlaying = isPlaying,
+                        onClose = { onToggleSupportingPane(paneType) },
+                        onSelectPane = onSelectSupportingPane,
+                        currentWidth = supportingPaneWidth,
+                        onWidthChange = onSupportingPaneWidthChange,
+                        onResetWidth = {
+                            onSupportingPaneWidthChange(340.dp)
+                        },
+                        modifier = Modifier
+                            .width(supportingPaneWidth + 48.dp)
+                            .height(sidebarHeight)
                     )
-                }
-
-                AnimatedVisibility(
-                    visible = activeSupportingPane != null,
-                    enter = slideInHorizontally(
-                        initialOffsetX = { it },
-                        animationSpec = spring(
-                            dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
-                            stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
-                            visibilityThreshold = IntOffset(1, 1)
-                        )
-                    ) + expandHorizontally(
-                        animationSpec = spring(
-                            dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
-                            stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
-                            visibilityThreshold = IntSize(1, 1)
-                        ),
-                        expandFrom = Alignment.End,
-                        clip = false
-                    ),
-                    exit = slideOutHorizontally(
-                        targetOffsetX = { it },
-                        animationSpec = spring(
-                            dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
-                            stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
-                            visibilityThreshold = IntOffset(1, 1)
-                        )
-                    ) + shrinkHorizontally(
-                        animationSpec = spring(
-                            dampingRatio = ExpressiveMotion.SpringDefaultSpatialDamping,
-                            stiffness = ExpressiveMotion.SpringDefaultSpatialStiffness,
-                            visibilityThreshold = IntSize(1, 1)
-                        ),
-                        shrinkTowards = Alignment.End,
-                        clip = false
-                    )
-                ) {
-                    val paneType = activeSupportingPane ?: displayedSupportingPane
-                    if (paneType != null) {
-                        SupportingPaneContainer(
-                            paneType = paneType,
-                            playerConnection = playerConnection,
-                            currentTrackDto = currentTrackDto,
-                            lyricsLoader = lyricsLoader,
-                            positionMs = positionMs,
-                            status = status,
-                            isPlaying = isPlaying,
-                            onClose = { onToggleSupportingPane(paneType) },
-                            onSelectPane = onSelectSupportingPane,
-                            currentWidth = supportingPaneWidth,
-                            onWidthChange = onSupportingPaneWidthChange,
-                            onResetWidth = {
-                                onSupportingPaneWidthChange(340.dp)
-                            },
-                            modifier = Modifier
-                                .width(supportingPaneWidth + 48.dp)
-                                .height(sidebarHeight)
-                        )
-                    }
                 }
             }
         }
@@ -1385,11 +1374,13 @@ private fun ExpressiveWideNavigationRail(
         )
     }
 
+    val liquidGlassEnabled = LocalLiquidGlassState.current?.isEnabled == true
+
     WideNavigationRail(
         state = railState,
         shape = railShape,
         colors = WideNavigationRailDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            containerColor = if (liquidGlassEnabled) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerLow,
             contentColor = MaterialTheme.colorScheme.onSurface
         ),
         header = {
@@ -1419,6 +1410,19 @@ private fun ExpressiveWideNavigationRail(
             }
         },
         modifier = modifier
+            .shadow(
+                elevation = if (liquidGlassEnabled) 10.dp else 4.dp,
+                shape = railShape,
+                ambientColor = Color.Black.copy(alpha = 0.35f),
+                spotColor = Color.Black.copy(alpha = 0.45f)
+            )
+            .then(
+                if (liquidGlassEnabled) {
+                    Modifier.liquidGlass(shape = railShape)
+                } else {
+                    Modifier.background(MaterialTheme.colorScheme.surfaceContainerLow, railShape)
+                }
+            )
             .clip(railShape)
     ) {
         Spacer(modifier = Modifier.height(8.dp))
