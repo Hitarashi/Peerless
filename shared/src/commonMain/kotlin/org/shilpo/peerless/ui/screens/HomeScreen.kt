@@ -1,6 +1,12 @@
 package org.shilpo.peerless.ui.screens
 
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,6 +29,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,6 +57,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -61,17 +70,20 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import kotlin.math.roundToInt
 import org.shilpo.peerless.auth.LocalSessionManager
 import org.shilpo.peerless.auth.SessionState
 import org.shilpo.peerless.home.HomeFeedEmptyReason
 import org.shilpo.peerless.home.HomeFeedItem
 import org.shilpo.peerless.home.HomeFeedState
 import org.shilpo.peerless.home.LocalHomeFeedRepository
+import org.shilpo.peerless.model.RipStage
 import org.shilpo.peerless.model.TrackSummaryDto
 import org.shilpo.peerless.model.toTrack
 import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
+import org.shilpo.peerless.tasks.LocalRipCoordinator
 import org.shilpo.peerless.theme.ExpressiveTypography
 import org.shilpo.peerless.theme.LocalWindowWidthSizeClass
 import org.shilpo.peerless.theme.SquircleShapeSmall
@@ -433,6 +445,17 @@ fun QuickPickCard(
     modifier: Modifier = Modifier
 ) {
     var showTrackMenu by remember(track.id) { mutableStateOf(false) }
+
+    val ripCoordinator = LocalRipCoordinator.current
+    val activeTasks by (ripCoordinator?.activeTasks
+        ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptyMap()) }).collectAsState()
+    val activeTask = remember(activeTasks, track.provider, track.track_id) {
+        activeTasks.values.firstOrNull {
+            it.provider.equals(track.provider, ignoreCase = true) && it.trackId == track.track_id
+        }
+    }
+    val isRipping = !track.is_cached && activeTask != null && !activeTask.isFinished
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -554,23 +577,62 @@ fun QuickPickCard(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .background(
+                        if (isRipping) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)
+                        else MaterialTheme.colorScheme.primaryContainer
+                    ),
                 contentAlignment = Alignment.Center
             ) {
-                PeerlessIcon(
-                    icon = when {
-                        isPlaying -> PeerlessIcons.LosslessWave
-                        track.is_cached -> PeerlessIcons.Play
-                        else -> PeerlessIcons.Download
-                    },
-                    contentDescription = when {
-                        isPlaying -> "Now playing ${track.title}"
-                        track.is_cached -> "Play ${track.title}"
-                        else -> "Rip ${track.title}"
-                    },
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(20.dp)
-                )
+                if (isRipping && activeTask != null) {
+                    val infiniteTransition = rememberInfiniteTransition(label = "QuickPickRipSpin")
+                    val rotation by infiniteTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 360f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1200, easing = LinearEasing),
+                            repeatMode = RepeatMode.Restart
+                        ),
+                        label = "QuickPickRipSpinAngle"
+                    )
+
+                    CircularProgressIndicator(
+                        progress = { (activeTask.percent / 100f).coerceIn(0f, 1f) },
+                        modifier = Modifier.size(44.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                        strokeWidth = 2.5.dp,
+                        strokeCap = StrokeCap.Round
+                    )
+
+                    PeerlessIcon(
+                        icon = PeerlessIcons.RipCloudSync,
+                        contentDescription = "Ripping ${track.title} (${activeTask.percent.roundToInt()}%)",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .graphicsLayer(rotationZ = rotation)
+                    )
+                } else {
+                    PeerlessIcon(
+                        icon = when {
+                            isPlaying -> PeerlessIcons.LosslessWave
+                            track.is_cached -> PeerlessIcons.Play
+                            activeTask != null && (activeTask.stage == RipStage.COMPLETED || activeTask.completed) -> PeerlessIcons.RipCloudDone
+                            else -> PeerlessIcons.RipCloudDownload
+                        },
+                        contentDescription = when {
+                            isPlaying -> "Now playing ${track.title}"
+                            track.is_cached -> "Play ${track.title}"
+                            activeTask != null && (activeTask.stage == RipStage.COMPLETED || activeTask.completed) -> "Rip completed for ${track.title}"
+                            else -> "Rip ${track.title}"
+                        },
+                        tint = if (activeTask != null && (activeTask.stage == RipStage.COMPLETED || activeTask.completed))
+                            MaterialTheme.colorScheme.secondary
+                        else
+                            MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }

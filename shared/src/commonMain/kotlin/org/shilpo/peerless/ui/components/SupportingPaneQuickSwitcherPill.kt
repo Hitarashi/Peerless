@@ -4,8 +4,12 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -22,8 +26,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +42,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalDensity
@@ -43,8 +50,12 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import org.shilpo.peerless.tasks.LocalRipCoordinator
+import org.shilpo.peerless.theme.SpecBadgeTypography
 import org.shilpo.peerless.ui.shell.SupportingPaneType
 import kotlin.math.PI
 import kotlin.math.roundToInt
@@ -58,12 +69,16 @@ fun SupportingPaneQuickSwitcherPill(
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val density = LocalDensity.current
+    val ripCoordinator = LocalRipCoordinator.current
+    val activeTasksCount by (ripCoordinator?.activeCount
+        ?: remember { kotlinx.coroutines.flow.MutableStateFlow(0) }).collectAsState()
 
     val panes = remember {
         listOf(
             SupportingPaneType.QUEUE to PeerlessIcons.Queue,
             SupportingPaneType.LYRICS to PeerlessIcons.Lyrics,
-            SupportingPaneType.TRACK_CONTEXT to PeerlessIcons.InfoOutline
+            SupportingPaneType.TRACK_CONTEXT to PeerlessIcons.InfoOutline,
+            SupportingPaneType.TASKS to PeerlessIcons.RipCloudSync
         )
     }
 
@@ -71,6 +86,7 @@ fun SupportingPaneQuickSwitcherPill(
         SupportingPaneType.QUEUE -> 0
         SupportingPaneType.LYRICS -> 1
         SupportingPaneType.TRACK_CONTEXT -> 2
+        SupportingPaneType.TASKS -> 3
         null -> null
     }
 
@@ -248,6 +264,19 @@ fun SupportingPaneQuickSwitcherPill(
                                 contentDescription = type.title
                             )
                         } else {
+                            val isTasks = type == SupportingPaneType.TASKS
+                            val infiniteTransition =
+                                rememberInfiniteTransition(label = "TasksTabSpin")
+                            val taskRotation by infiniteTransition.animateFloat(
+                                initialValue = 0f,
+                                targetValue = 360f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(1600, easing = LinearEasing),
+                                    repeatMode = RepeatMode.Restart
+                                ),
+                                label = "TaskTabRotation"
+                            )
+
                             PeerlessIcon(
                                 icon = if (type == SupportingPaneType.TRACK_CONTEXT && isSelected) {
                                     PeerlessIcons.InfoFilled
@@ -259,7 +288,33 @@ fun SupportingPaneQuickSwitcherPill(
                                 modifier = Modifier
                                     .size(18.dp)
                                     .scale(pressScale)
+                                    .then(
+                                        if (isTasks && activeTasksCount > 0) {
+                                            Modifier.graphicsLayer(rotationZ = taskRotation)
+                                        } else {
+                                            Modifier
+                                        }
+                                    )
                             )
+                        }
+
+                        if (type == SupportingPaneType.TASKS && activeTasksCount > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .offset(x = 3.dp, y = (-3).dp)
+                                    .clip(CircleShape)
+                                    .background(colorScheme.primary)
+                                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (activeTasksCount > 9) "9+" else "$activeTasksCount",
+                                    style = SpecBadgeTypography.copy(fontSize = 7.sp),
+                                    fontWeight = FontWeight.Bold,
+                                    color = colorScheme.onPrimary
+                                )
+                            }
                         }
                     }
                 }

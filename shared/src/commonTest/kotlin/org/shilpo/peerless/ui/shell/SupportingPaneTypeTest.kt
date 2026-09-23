@@ -10,7 +10,8 @@ class SupportingPaneTypeTest {
             listOf(
                 SupportingPaneType.QUEUE,
                 SupportingPaneType.LYRICS,
-                SupportingPaneType.TRACK_CONTEXT
+                SupportingPaneType.TRACK_CONTEXT,
+                SupportingPaneType.TASKS
             ),
             SupportingPaneType.entries.toList()
         )

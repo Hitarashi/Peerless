@@ -104,6 +104,7 @@ tasks.register("testDebugUnitTest") {
 }
 
 tasks.named<Jar>("jvmJar") {
+    dependsOn("compileKotlinJvm")
     from(kotlin.jvm().compilations.getByName("main").output.classesDirs)
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

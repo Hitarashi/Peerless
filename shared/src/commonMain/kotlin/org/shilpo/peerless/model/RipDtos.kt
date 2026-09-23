@@ -59,18 +59,19 @@ data class TaskProgressEvent(
 ) {
     val effectiveStage: String get() = stage.ifBlank { "queued" }
     val effectivePercent: Float get() = percent ?: 0f
-    val isFinished: Boolean get() = completed || error != null || effectiveStage == "completed" || effectiveStage == "error" || effectiveStage == "failed"
+    val isFinished: Boolean get() = completed || error != null || effectiveStage == "completed" || effectiveStage == "error" || effectiveStage == "failed" || effectiveStage == "cancelled"
 }
 
 @Serializable
-enum class RipStage(val displayName: String, val emoji: String) {
-    QUEUED("Queued", "⏳"),
-    DOWNLOADING("Downloading", "⬇️"),
-    DECRYPTING("Decrypting", "🔓"),
-    TAGGING("Tagging", "🏷️"),
-    UPLOADING("Uploading to Telegram", "☁️"),
-    COMPLETED("Ready to Stream", "✅"),
-    ERROR("Rip Failed", "❌");
+enum class RipStage(val displayName: String, val emoji: String = "") {
+    QUEUED("Queued", ""),
+    DOWNLOADING("Downloading", ""),
+    DECRYPTING("Decrypting", ""),
+    TAGGING("Tagging", ""),
+    UPLOADING("Uploading to Telegram", ""),
+    COMPLETED("Ready to Stream", ""),
+    CANCELLED("Cancelled", ""),
+    ERROR("Rip Failed", "");
 
     companion object {
         fun fromStage(stage: String): RipStage = when (stage.lowercase().trim()) {
@@ -80,6 +81,7 @@ enum class RipStage(val displayName: String, val emoji: String) {
             "tagging" -> TAGGING
             "uploading", "uploading_telegram", "uploading to telegram" -> UPLOADING
             "completed" -> COMPLETED
+            "cancelled" -> CANCELLED
             "error", "failed" -> ERROR
             else -> QUEUED
         }
@@ -95,5 +97,19 @@ data class ActiveRipTask(
     val speed: String? = null,
     val completed: Boolean = false,
     val error: String? = null,
-    val resultingTrackId: String? = null
-)
+    val resultingTrackId: String? = null,
+    val isOwner: Boolean = true,
+    val isAutoPlayPending: Boolean = false
+) {
+    val isFinished: Boolean
+        get() = completed || stage == RipStage.COMPLETED || stage == RipStage.ERROR || stage == RipStage.CANCELLED
+
+    val isCompleted: Boolean
+        get() = (completed || stage == RipStage.COMPLETED) && stage != RipStage.ERROR && error == null
+
+    val isError: Boolean
+        get() = stage == RipStage.ERROR || error != null
+
+    val provider: String get() = track.provider
+    val trackId: String get() = track.track_id
+}

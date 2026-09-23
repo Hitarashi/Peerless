@@ -214,6 +214,69 @@ object PeerlessIcons {
             }.build()
             return _hiRes!!
         }
+
+    private var _ripCloudDownload: ImageVector? = null
+    val RipCloudDownload: ImageVector
+        get() {
+            if (_ripCloudDownload != null) return _ripCloudDownload!!
+            _ripCloudDownload = ImageVector.Builder(
+                name = "RipCloudDownload",
+                defaultWidth = 24.dp,
+                defaultHeight = 24.dp,
+                viewportWidth = 24f,
+                viewportHeight = 24f,
+            ).apply {
+                addPath(
+                    pathData = PathParser().parsePathString(
+                        "M6.087 7.75a5.752 5.752 0 0 1 11.326 0h.087a4 4 0 0 1 3.962 4.552 6.534 6.534 0 0 0-1.597-1.364A2.501 2.501 0 0 0 17.5 9.25h-.756a.75.75 0 0 1-.75-.713 4.25 4.25 0 0 0-8.489 0 .75.75 0 0 1-.749.713H6a2.5 2.5 0 0 0 0 5h4.4a6.458 6.458 0 0 0-.357 1.5H6a4 4 0 0 1 0-8h.087ZM22 16.5a5.5 5.5 0 1 0-11 0 5.5 5.5 0 0 0 11 0Zm-6-3a.5.5 0 0 1 1 0v4.793l1.646-1.647a.5.5 0 0 1 .708.708l-2.5 2.5a.5.5 0 0 1-.708 0l-2.5-2.5a.5.5 0 0 1 .708-.708L16 18.293V13.5Z"
+                    ).toNodes(),
+                    fill = SolidColor(Color.White)
+                )
+            }.build()
+            return _ripCloudDownload!!
+        }
+
+    private var _ripCloudSync: ImageVector? = null
+    val RipCloudSync: ImageVector
+        get() {
+            if (_ripCloudSync != null) return _ripCloudSync!!
+            _ripCloudSync = ImageVector.Builder(
+                name = "RipCloudSync",
+                defaultWidth = 24.dp,
+                defaultHeight = 24.dp,
+                viewportWidth = 24f,
+                viewportHeight = 24f,
+            ).apply {
+                addPath(
+                    pathData = PathParser().parsePathString(
+                        "M6.087 7.75a5.752 5.752 0 0 1 11.326 0h.087a4 4 0 0 1 3.962 4.552 6.534 6.534 0 0 0-1.597-1.364A2.501 2.501 0 0 0 17.5 9.25h-.756a.75.75 0 0 1-.75-.713 4.25 4.25 0 0 0-8.489 0 .75.75 0 0 1-.749.713H6a2.5 2.5 0 0 0 0 5h4.4a6.458 6.458 0 0 0-.357 1.5H6a4 4 0 0 1 0-8h.087ZM11 16.5a5.5 5.5 0 1 0 11 0 5.5 5.5 0 0 0-11 0Zm8.5-3.5a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h1a2.496 2.496 0 0 0-2-1c-.833 0-1.572.407-2.027 1.036a.5.5 0 0 1-.81-.586A3.496 3.496 0 0 1 16.5 13c.98 0 1.865.403 2.5 1.05v-.55a.5.5 0 0 1 .5-.5ZM14 18.95v.55a.5.5 0 0 1-1 0v-2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-1c.456.608 1.183 1 2 1 .766 0 1.452-.344 1.911-.888a.5.5 0 0 1 .764.645A3.493 3.493 0 0 1 16.5 20a3.49 3.49 0 0 1-2.5-1.05Z"
+                    ).toNodes(),
+                    fill = SolidColor(Color.White)
+                )
+            }.build()
+            return _ripCloudSync!!
+        }
+
+    private var _ripCloudDone: ImageVector? = null
+    val RipCloudDone: ImageVector
+        get() {
+            if (_ripCloudDone != null) return _ripCloudDone!!
+            _ripCloudDone = ImageVector.Builder(
+                name = "RipCloudDone",
+                defaultWidth = 24.dp,
+                defaultHeight = 24.dp,
+                viewportWidth = 24f,
+                viewportHeight = 24f,
+            ).apply {
+                addPath(
+                    pathData = PathParser().parsePathString(
+                        "M6.087 7.75a5.752 5.752 0 0 1 11.326 0h.087a4 4 0 0 1 3.962 4.552 6.534 6.534 0 0 0-1.597-1.364A2.501 2.501 0 0 0 17.5 9.25h-.756a.75.75 0 0 1-.75-.713 4.25 4.25 0 0 0-8.489 0 .75.75 0 0 1-.749.713H6a2.5 2.5 0 0 0 0 5h4.4a6.458 6.458 0 0 0-.357 1.5H6a4 4 0 0 1 0-8h.087ZM22 16.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0Zm-2.146-2.354a.5.5 0 0 0-.708 0L15.5 17.793l-1.646-1.647a.5.5 0 0 0-.708.708l2 2a.5.5 0 0 0 .708 0l4-4a.5.5 0 0 0 0-.708Z"
+                    ).toNodes(),
+                    fill = SolidColor(Color.White)
+                )
+            }.build()
+            return _ripCloudDone!!
+        }
 }
 
 
@@ -247,6 +310,32 @@ fun PeerlessIcon(
         modifier = modifier,
         tint = tint,
     )
+}
+
+@Composable
+fun PeerlessIcon(
+    icon: Any,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    tint: Color = LocalContentColor.current,
+) {
+    when (icon) {
+        is ImageVector -> PeerlessIcon(
+            icon = icon,
+            contentDescription = contentDescription,
+            modifier = modifier,
+            tint = tint
+        )
+
+        is DrawableResource -> PeerlessIcon(
+            icon = icon,
+            contentDescription = contentDescription,
+            modifier = modifier,
+            tint = tint
+        )
+
+        else -> error("Unsupported icon type: ${icon::class}")
+    }
 }
 
 private fun DrawableResource.isAutoMirrored(): Boolean =

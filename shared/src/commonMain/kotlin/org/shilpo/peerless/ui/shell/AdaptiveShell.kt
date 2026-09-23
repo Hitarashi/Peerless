@@ -14,6 +14,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -39,11 +40,22 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.foundation.border
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.WideNavigationRail
 import androidx.compose.material3.WideNavigationRailDefaults
@@ -96,6 +108,11 @@ import org.shilpo.peerless.player.PlayerConnection
 import org.shilpo.peerless.theme.ExpressiveMotion
 import org.shilpo.peerless.theme.ExpressiveTypography
 import org.shilpo.peerless.theme.LocalLiquidGlassState
+import androidx.compose.ui.graphics.graphicsLayer
+import org.shilpo.peerless.tasks.RipCoordinator
+import org.shilpo.peerless.tasks.LocalRipCoordinator
+import org.shilpo.peerless.theme.PillShape
+import org.shilpo.peerless.theme.SpecBadgeTypography
 import org.shilpo.peerless.theme.LocalWindowWidthSizeClass
 import org.shilpo.peerless.theme.WindowWidthSizeClass
 import org.shilpo.peerless.theme.liquidGlassSource
@@ -103,6 +120,7 @@ import org.shilpo.peerless.theme.rememberLiquidGlassState
 import org.shilpo.peerless.ui.components.FloatingNavigationToolbar
 import org.shilpo.peerless.ui.components.HomeMorphIcon
 import org.shilpo.peerless.ui.components.LibraryMorphIcon
+import org.shilpo.peerless.ui.components.LocalToastNotifier
 import org.shilpo.peerless.ui.components.MiniPlayerBar
 import org.shilpo.peerless.ui.components.MiniPlayerBottomSpacing
 import org.shilpo.peerless.ui.components.NavToggleMorphIcon
@@ -113,6 +131,7 @@ import org.shilpo.peerless.ui.components.NowPlayingSheet
 import org.shilpo.peerless.ui.components.PeerlessIcon
 import org.shilpo.peerless.ui.components.PeerlessIcons
 import org.shilpo.peerless.ui.components.PersistentBottomPlayer
+import org.shilpo.peerless.ui.components.RipActivityPane
 import org.shilpo.peerless.ui.components.SearchMorphIcon
 import org.shilpo.peerless.ui.components.ServerSettingsDialog
 import org.shilpo.peerless.ui.components.SettingsMorphIcon
@@ -295,10 +314,23 @@ fun AdaptiveShell(
             paneLayout.isAvailable && windowPosture.kind == WindowPostureKind.FLAT
         val fullPlayerBounds = fullPlayerRegion(maxWidth, maxHeight, windowPosture)
 
+        val coroutineScope = rememberCoroutineScope()
+        val ripCoordinator = remember(apiClient, coroutineScope) {
+            RipCoordinator.getInstance(apiClient, coroutineScope)
+        }
+        val snackbarHostState = remember { SnackbarHostState() }
+        val toastNotifier: (String) -> Unit = { message ->
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(message)
+            }
+        }
+
         val liquidGlassState = rememberLiquidGlassState()
         CompositionLocalProvider(
             LocalWindowWidthSizeClass provides windowSizeClass,
-            LocalLiquidGlassState provides liquidGlassState
+            LocalLiquidGlassState provides liquidGlassState,
+            LocalRipCoordinator provides ripCoordinator,
+            LocalToastNotifier provides toastNotifier
         ) {
             Box(
                 modifier = Modifier
@@ -318,19 +350,9 @@ fun AdaptiveShell(
                             )
                         )
                 )
-                val coroutineScope = rememberCoroutineScope()
                 val onRipClick: (TrackSummaryDto) -> Unit = { track ->
                     coroutineScope.launch {
-                        println("[Peerless] Initiating rip task for ${track.title} (${track.provider}:${track.track_id})")
-                        apiClient.createRipTask(
-                            provider = track.provider,
-                            trackId = track.track_id,
-                            codec = track.codec
-                        ).onSuccess { resp ->
-                            println("[Peerless] Rip task started: ${resp.task_id} (status: ${resp.status})")
-                        }.onFailure { err ->
-                            println("[Peerless] Rip task error: ${err.message}")
-                        }
+                        ripCoordinator.ripTrack(track)
                     }
                 }
 
@@ -532,6 +554,14 @@ fun AdaptiveShell(
                         onDismiss = { isSettingsOpen = false }
                     )
                 }
+
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(bottom = 88.dp)
+                )
             }
         }
     }
@@ -601,6 +631,7 @@ private fun SessionVerificationFailedScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CompactLayout(
     currentDestination: NavigationDestination,
@@ -654,6 +685,24 @@ private fun CompactLayout(
             )
         }
 
+        val ripCoordinator = LocalRipCoordinator.current
+        val activeTasksCount by (ripCoordinator?.activeCount
+            ?: remember { kotlinx.coroutines.flow.MutableStateFlow(0) }).collectAsState()
+        var showRipActivitySheet by remember { mutableStateOf(false) }
+
+        if (showRipActivitySheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showRipActivitySheet = false },
+                containerColor = MaterialTheme.colorScheme.surface
+            ) {
+                RipActivityPane(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.75f)
+                )
+            }
+        }
+
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -662,6 +711,60 @@ private fun CompactLayout(
                 .padding(bottom = NavigationBarBottomPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            AnimatedVisibility(
+                visible = activeTasksCount > 0,
+                enter = slideInVertically(initialOffsetY = { it / 2 }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it / 2 }) + fadeOut(),
+                modifier = Modifier.padding(bottom = 6.dp)
+            ) {
+                val infiniteTransition = rememberInfiniteTransition(label = "CompactChipSpin")
+                val spinAngle by infiniteTransition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 360f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1400, easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "CompactChipRotation"
+                )
+
+                Surface(
+                    onClick = { showRipActivitySheet = true },
+                    shape = PillShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 8.dp,
+                    border = BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    ),
+                    modifier = Modifier
+                        .height(34.dp)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        PeerlessIcon(
+                            icon = PeerlessIcons.RipCloudSync,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .size(16.dp)
+                                .graphicsLayer(rotationZ = spinAngle)
+                        )
+                        Text(
+                            text = "Ripping: $activeTasksCount active",
+                            style = SpecBadgeTypography.copy(fontSize = 11.sp),
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+            }
+
             AnimatedVisibility(
                 visible = currentTrackDto != null,
                 enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
@@ -1527,6 +1630,7 @@ private fun SupportingPaneContainer(
                             SupportingPaneType.QUEUE -> PeerlessIcons.Queue
                             SupportingPaneType.LYRICS -> PeerlessIcons.Lyrics
                             SupportingPaneType.TRACK_CONTEXT -> PeerlessIcons.InfoFilled
+                            SupportingPaneType.TASKS -> PeerlessIcons.RipCloudSync
                         }
 
                         PeerlessIcon(
@@ -1545,7 +1649,16 @@ private fun SupportingPaneContainer(
                             overflow = TextOverflow.Ellipsis
                         )
 
-                        if (paneType == SupportingPaneType.QUEUE && queueDtos.isNotEmpty()) {
+                        val ripCoordinator = LocalRipCoordinator.current
+                        val activeRipCount by (ripCoordinator?.activeCount
+                            ?: remember { kotlinx.coroutines.flow.MutableStateFlow(0) }).collectAsState()
+                        val headerBadgeCount = when (paneType) {
+                            SupportingPaneType.QUEUE -> queueDtos.size
+                            SupportingPaneType.TASKS -> activeRipCount
+                            else -> 0
+                        }
+
+                        if (headerBadgeCount > 0) {
                             Box(
                                 modifier = Modifier
                                     .clip(CircleShape)
@@ -1554,7 +1667,7 @@ private fun SupportingPaneContainer(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "${queueDtos.size}",
+                                    text = "$headerBadgeCount",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 10.sp
@@ -1618,6 +1731,10 @@ private fun SupportingPaneContainer(
                             currentTrack = currentTrackDto,
                             playerConnection = playerConnection
                         )
+                    }
+
+                    SupportingPaneType.TASKS -> {
+                        RipActivityPane()
                     }
                 }
             }

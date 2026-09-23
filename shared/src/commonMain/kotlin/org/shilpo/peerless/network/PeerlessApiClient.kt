@@ -351,6 +351,19 @@ open class PeerlessApiClient(
             }
         }
 
+    open suspend fun cancelRipTask(taskId: String, token: String? = null): Result<Unit> =
+        runCatching {
+            val authToken = resolveToken(token)
+            val response = httpClient.delete("$baseUrl/api/v1/tasks/$taskId") {
+                if (!authToken.isNullOrBlank()) {
+                    header(HttpHeaders.Authorization, "Bearer $authToken")
+                }
+            }
+            if (!response.status.isSuccess()) {
+                error("Cancel rip task failed with status: ${response.status}")
+            }
+        }
+
     open suspend fun exchangeOtp(
         code: String,
         deviceName: String? = null,

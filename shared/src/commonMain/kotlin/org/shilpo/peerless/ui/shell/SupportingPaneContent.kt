@@ -217,3 +217,10 @@ internal fun LyricsPaneContent(
         }
     }
 }
+
+@Composable
+internal fun RipPaneContent(
+    modifier: Modifier = Modifier
+) {
+    org.shilpo.peerless.ui.components.RipActivityPane(modifier = modifier)
+}

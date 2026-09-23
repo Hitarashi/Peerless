@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -29,11 +30,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -41,13 +48,16 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
@@ -58,6 +68,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.launch
+import org.shilpo.peerless.model.ActiveRipTask
+import org.shilpo.peerless.model.RipStage
+import org.shilpo.peerless.player.LocalPlayerConnection
+import org.shilpo.peerless.player.playTrack
+import org.shilpo.peerless.tasks.LocalRipCoordinator
+import kotlin.math.roundToInt
 import org.shilpo.peerless.model.CanonicalTrack
 import org.shilpo.peerless.model.Codec
 import org.shilpo.peerless.model.TrackSource
@@ -204,6 +221,31 @@ fun TrackRow(
     var showAudioDetails by remember { mutableStateOf(false) }
     var showTrackMenu by remember { mutableStateOf(false) }
 
+    val ripCoordinator = LocalRipCoordinator.current
+    val playerConnection = LocalPlayerConnection.current
+    val toastNotifier = LocalToastNotifier.current
+    val coroutineScope = rememberCoroutineScope()
+
+    val activeTasks by (ripCoordinator?.activeTasks
+        ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptyMap()) }).collectAsState()
+    val activeTask = remember(activeTasks, track.provider, track.track_id) {
+        activeTasks.values.firstOrNull {
+            it.provider.equals(track.provider, ignoreCase = true) && it.trackId == track.track_id
+        }
+    }
+    var showRipDetailSheet by remember { mutableStateOf(false) }
+
+    if (showRipDetailSheet && activeTask != null) {
+        RipTaskDetailSheet(
+            task = activeTask,
+            artworkUrl = artworkUrl,
+            onDismiss = { showRipDetailSheet = false },
+            onCancelRip = {
+                coroutineScope.launch { ripCoordinator?.cancelRip(activeTask.taskId) }
+            }
+        )
+    }
+
     if (showAudioDetails) {
         val detailTrack = canonicalTrack?.toSummaryDto(activeSource) ?: track
         AudioDetailsModal(
@@ -244,7 +286,18 @@ fun TrackRow(
                 indication = ripple(),
                 onClick = {
                     val clickSummary = canonicalTrack?.toSummaryDto(activeSource) ?: track
-                    onTrackClick(clickSummary)
+                    if (!isTrackCached) {
+                        if (ripCoordinator != null) {
+                            coroutineScope.launch {
+                                ripCoordinator.ripAndPlay(clickSummary, playerConnection)
+                            }
+                            toastNotifier?.invoke("Ripping ${clickSummary.title}... Playback will begin as soon as upload finishes.")
+                        } else {
+                            onTrackClick(clickSummary)
+                        }
+                    } else {
+                        onTrackClick(clickSummary)
+                    }
                 },
                 onLongClick = { showAudioDetails = true }
             )
@@ -609,33 +662,21 @@ fun TrackRow(
                     softWrap = false
                 )
 
-                if (!isTrackCached && onRipClick != null) {
-                    Box(
-                        modifier = Modifier
-                            .clip(PillShape)
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(colorScheme.tertiary, colorScheme.primary)
-                                )
-                            )
-                            .clickable {
-                                val ripTarget = canonicalTrack?.toSummaryDto(activeSource) ?: track
-                                onRipClick(ripTarget)
+                RipMorphBadge(
+                    activeTask = activeTask,
+                    isCached = isTrackCached,
+                    onRipClick = {
+                        val ripTarget = canonicalTrack?.toSummaryDto(activeSource) ?: track
+                        if (onRipClick != null) {
+                            onRipClick(ripTarget)
+                        } else {
+                            coroutineScope.launch {
+                                ripCoordinator?.ripTrack(ripTarget)
                             }
-                            .padding(horizontal = 7.dp, vertical = 2.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "RIP",
-                            style = SpecBadgeTypography.copy(
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 0.6.sp
-                            ),
-                            color = colorScheme.onTertiary
-                        )
-                    }
-                }
+                        }
+                    },
+                    onOpenDetails = { showRipDetailSheet = true }
+                )
             }
 
             IconButton(
@@ -753,3 +794,280 @@ fun TrackRow(
         showArtworkOverlay = showArtworkOverlay
     )
 }
+
+@Composable
+fun RipMorphBadge(
+    activeTask: ActiveRipTask?,
+    isCached: Boolean,
+    onRipClick: () -> Unit,
+    onOpenDetails: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val touchTarget = 48.dp
+
+    when {
+        activeTask != null && !activeTask.isFinished -> {
+            val infiniteTransition = rememberInfiniteTransition(label = "RipSpin")
+            val rotation by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1200, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "RipSpinAngle"
+            )
+
+            Box(
+                modifier = modifier
+                    .size(touchTarget)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(bounded = false, radius = 20.dp),
+                        onClick = onOpenDetails
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier.size(28.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        progress = { (activeTask.percent / 100f).coerceIn(0f, 1f) },
+                        modifier = Modifier.size(28.dp),
+                        color = colorScheme.primary,
+                        trackColor = colorScheme.primary.copy(alpha = 0.2f),
+                        strokeWidth = 2.5.dp,
+                        strokeCap = StrokeCap.Round
+                    )
+                    PeerlessIcon(
+                        icon = PeerlessIcons.RipCloudSync,
+                        contentDescription = "Ripping ${activeTask.percent.roundToInt()}%",
+                        tint = colorScheme.primary,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .graphicsLayer(rotationZ = rotation)
+                    )
+                }
+            }
+        }
+
+        activeTask != null && (activeTask.stage == RipStage.COMPLETED || activeTask.completed) -> {
+            Box(
+                modifier = modifier
+                    .size(touchTarget)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(bounded = false, radius = 20.dp),
+                        onClick = onOpenDetails
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                PeerlessIcon(
+                    icon = PeerlessIcons.RipCloudDone,
+                    contentDescription = "Rip Completed",
+                    tint = colorScheme.secondary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
+        !isCached -> {
+            Box(
+                modifier = modifier
+                    .size(touchTarget)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(bounded = false, radius = 20.dp),
+                        onClick = onRipClick
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(PillShape)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(colorScheme.tertiary, colorScheme.primary)
+                            )
+                        )
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        PeerlessIcon(
+                            icon = PeerlessIcons.RipCloudDownload,
+                            contentDescription = "Rip Track",
+                            tint = colorScheme.onPrimary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Text(
+                            text = "RIP",
+                            style = SpecBadgeTypography.copy(
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 0.6.sp
+                            ),
+                            color = colorScheme.onPrimary
+                        )
+                    }
+                }
+            }
+        }
+
+        else -> {
+            // Track is cached and no active rip
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RipTaskDetailSheet(
+    task: ActiveRipTask,
+    artworkUrl: String,
+    onDismiss: () -> Unit,
+    onCancelRip: () -> Unit
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val isFinished = task.isFinished
+    val isCompleted = task.stage == RipStage.COMPLETED || task.completed
+
+    val targetProgress = when {
+        isCompleted -> 1f
+        else -> (task.percent / 100f).coerceIn(0f, 1f)
+    }
+
+    val animatedProgress by animateFloatAsState(
+        targetValue = targetProgress,
+        animationSpec = tween(durationMillis = 300),
+        label = "DetailProgress"
+    )
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = colorScheme.surfaceContainerHigh
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 24.dp, end = 24.dp, bottom = 36.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(ArtworkShape)
+                        .background(colorScheme.surfaceContainerHighest),
+                    contentAlignment = Alignment.Center
+                ) {
+                    PeerlessIcon(
+                        icon = PeerlessIcons.MusicNote,
+                        contentDescription = null,
+                        tint = colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    AsyncImage(
+                        model = artworkUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = task.track.title,
+                        style = ExpressiveTypography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "${task.track.artist} • ${task.track.album}",
+                        style = ExpressiveTypography.bodyMedium,
+                        color = colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            HorizontalDivider(color = colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                RipStageBadge(stage = task.stage)
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    task.speed?.let { speedText ->
+                        if (!isFinished && speedText.isNotBlank()) {
+                            Text(
+                                text = speedText,
+                                style = SpecBadgeTypography,
+                                color = colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    val percentLabel = when {
+                        isCompleted -> "100%"
+                        task.percent > 0f -> "${task.percent.roundToInt().coerceIn(0, 100)}%"
+                        task.stage == RipStage.QUEUED -> "Queued"
+                        else -> "0%"
+                    }
+                    Text(
+                        text = percentLabel,
+                        style = SpecBadgeTypography,
+                        fontWeight = FontWeight.Bold,
+                        color = colorScheme.onSurface
+                    )
+                }
+            }
+
+            LinearProgressIndicator(
+                progress = { animatedProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(PillShape),
+                color = when {
+                    task.stage == RipStage.ERROR -> colorScheme.error
+                    isCompleted -> Color(0xFF4CAF50)
+                    else -> colorScheme.primary
+                },
+                trackColor = colorScheme.surfaceContainerHighest,
+                strokeCap = StrokeCap.Round
+            )
+
+            if (!task.isFinished && task.isOwner) {
+                OutlinedButton(
+                    onClick = {
+                        onCancelRip()
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = colorScheme.error)
+                ) {
+                    Text("Cancel Rip", style = ExpressiveTypography.labelLarge)
+                }
+            }
+        }
+    }
+}
+
