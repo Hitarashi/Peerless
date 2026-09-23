@@ -3,7 +3,12 @@ package org.shilpo.peerless.ui.shell
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
@@ -40,12 +45,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.foundation.border
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -77,6 +76,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
@@ -105,15 +105,15 @@ import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.LocalPlayerConnection
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
+import org.shilpo.peerless.sync.LocalPlaybackSyncManager
+import org.shilpo.peerless.tasks.LocalRipCoordinator
+import org.shilpo.peerless.tasks.RipCoordinator
 import org.shilpo.peerless.theme.ExpressiveMotion
 import org.shilpo.peerless.theme.ExpressiveTypography
 import org.shilpo.peerless.theme.LocalLiquidGlassState
-import androidx.compose.ui.graphics.graphicsLayer
-import org.shilpo.peerless.tasks.RipCoordinator
-import org.shilpo.peerless.tasks.LocalRipCoordinator
+import org.shilpo.peerless.theme.LocalWindowWidthSizeClass
 import org.shilpo.peerless.theme.PillShape
 import org.shilpo.peerless.theme.SpecBadgeTypography
-import org.shilpo.peerless.theme.LocalWindowWidthSizeClass
 import org.shilpo.peerless.theme.WindowWidthSizeClass
 import org.shilpo.peerless.theme.liquidGlassSource
 import org.shilpo.peerless.theme.rememberLiquidGlassState
@@ -186,6 +186,8 @@ fun AdaptiveShell(
     val windowPostureProvider = LocalWindowPostureProvider.current
     val windowPosture by windowPostureProvider.posture.collectAsState()
     val sessionState by sessionManager.sessionState.collectAsState()
+    val authenticatedUserId = (sessionState as? SessionState.Authenticated)?.user?.telegram_id
+    val playbackSyncManager = LocalPlaybackSyncManager.current
     val sessionCheckScope = rememberCoroutineScope()
 
     var isProfileOpen by remember { mutableStateOf(false) }
@@ -315,8 +317,18 @@ fun AdaptiveShell(
         val fullPlayerBounds = fullPlayerRegion(maxWidth, maxHeight, windowPosture)
 
         val coroutineScope = rememberCoroutineScope()
-        val ripCoordinator = remember(apiClient, coroutineScope) {
-            RipCoordinator.getInstance(apiClient, coroutineScope)
+        val ripCoordinator = remember(apiClient, coroutineScope, playbackSyncManager) {
+            RipCoordinator.getInstance(
+                apiClient,
+                coroutineScope,
+                playbackSyncManager.remoteRipTasks
+            )
+        }
+        LaunchedEffect(ripCoordinator, authenticatedUserId, currentServerUrl) {
+            ripCoordinator.clearServerProjection()
+            if (authenticatedUserId != null) {
+                ripCoordinator.refreshServerTasks()
+            }
         }
         val snackbarHostState = remember { SnackbarHostState() }
         val toastNotifier: (String) -> Unit = { message ->

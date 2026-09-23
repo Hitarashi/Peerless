@@ -62,15 +62,8 @@ fun RipActivityPane(
 
     val taskList = remember(activeTasksMap) {
         activeTasksMap.values
-            .filter { !it.isCompleted }
-            .sortedWith(
-                compareBy<ActiveRipTask> { it.isFinished }
-                    .thenByDescending { it.taskId }
-            )
-    }
-
-    val hasFinishedTasks = remember(taskList) {
-        taskList.any { it.isFinished }
+            .filterNot { it.isFinished }
+            .sortedByDescending { it.taskId }
     }
 
     if (taskList.isEmpty()) {
@@ -90,11 +83,6 @@ fun RipActivityPane(
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                if (hasFinishedTasks) {
-                    TextButton(onClick = { ripCoordinator?.clearFinishedTasks() }) {
-                        Text("Clear finished")
-                    }
-                }
             }
 
             LazyColumn(
@@ -110,12 +98,6 @@ fun RipActivityPane(
                         artworkUrl = apiClient.getArtworkUrl(task.track, 120),
                         onCancel = {
                             coroutineScope.launch { ripCoordinator?.cancelRip(task.taskId) }
-                        },
-                        onRetry = {
-                            coroutineScope.launch { ripCoordinator?.retryRip(task.taskId) }
-                        },
-                        onDismiss = {
-                            ripCoordinator?.dismissTask(task.taskId)
                         }
                     )
                 }
@@ -129,19 +111,10 @@ fun RipTaskRow(
     task: ActiveRipTask,
     artworkUrl: String,
     onCancel: () -> Unit,
-    onRetry: () -> Unit,
-    onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val isFinished = task.isFinished
-    val isError = task.stage == RipStage.ERROR || task.error != null
-    val isCompleted = task.stage == RipStage.COMPLETED || task.completed
-
-    val targetProgress = when {
-        isCompleted -> 1f
-        else -> (task.percent / 100f).coerceIn(0f, 1f)
-    }
+    val targetProgress = (task.percent / 100f).coerceIn(0f, 1f)
 
     val animatedProgress by animateFloatAsState(
         targetValue = targetProgress,
@@ -156,7 +129,7 @@ fun RipTaskRow(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(if (!isFinished) colorScheme.secondaryContainer else Color.Transparent)
+            .background(colorScheme.secondaryContainer)
             .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -180,20 +153,18 @@ fun RipTaskRow(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
-            if (!isFinished) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.35f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    PeerlessIcon(
-                        icon = PeerlessIcons.RipCloudSync,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.35f)),
+                contentAlignment = Alignment.Center
+            ) {
+                PeerlessIcon(
+                    icon = PeerlessIcons.RipCloudSync,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
             }
         }
 
@@ -207,8 +178,8 @@ fun RipTaskRow(
             Text(
                 text = task.track.title,
                 style = ExpressiveTypography.titleMedium,
-                fontWeight = if (!isFinished) FontWeight.Bold else FontWeight.SemiBold,
-                color = if (!isFinished) colorScheme.primary else colorScheme.onSurface,
+                fontWeight = FontWeight.Bold,
+                color = colorScheme.primary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -253,7 +224,7 @@ fun RipTaskRow(
 
                 RipStageBadge(stage = task.stage)
 
-                if (!isFinished && !task.speed.isNullOrBlank()) {
+                if (!task.speed.isNullOrBlank()) {
                     Text(
                         text = "• ${task.speed}",
                         style = SpecBadgeTypography.copy(fontSize = 9.sp),
@@ -262,19 +233,17 @@ fun RipTaskRow(
                 }
             }
 
-            if (!isFinished) {
-                Spacer(modifier = Modifier.height(2.dp))
-                LinearProgressIndicator(
-                    progress = { animatedProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(2.5.dp)
-                        .clip(PillShape),
-                    color = if (isError) colorScheme.error else colorScheme.primary,
-                    trackColor = colorScheme.surfaceContainerHighest,
-                    strokeCap = StrokeCap.Round
-                )
-            }
+            Spacer(modifier = Modifier.height(2.dp))
+            LinearProgressIndicator(
+                progress = { animatedProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.5.dp)
+                    .clip(PillShape),
+                color = colorScheme.primary,
+                trackColor = colorScheme.surfaceContainerHighest,
+                strokeCap = StrokeCap.Round
+            )
         }
 
         Spacer(modifier = Modifier.width(8.dp))
@@ -284,54 +253,19 @@ fun RipTaskRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            if (!isFinished) {
-                Text(
-                    text = "${task.percent.toInt()}%",
-                    style = SpecBadgeTypography.copy(fontSize = 11.sp),
-                    fontWeight = FontWeight.Bold,
-                    color = colorScheme.primary
-                )
+            Text(
+                text = "${task.percent.toInt()}%",
+                style = SpecBadgeTypography.copy(fontSize = 11.sp),
+                fontWeight = FontWeight.Bold,
+                color = colorScheme.primary
+            )
 
-                if (task.isOwner) {
-                    TextButton(
-                        onClick = onCancel,
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text("Cancel", style = ExpressiveTypography.labelSmall)
-                    }
-                }
-            } else if (isError) {
+            if (task.isOwner) {
                 TextButton(
-                    onClick = onRetry,
+                    onClick = onCancel,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                 ) {
-                    Text(
-                        "Retry",
-                        style = ExpressiveTypography.labelSmall,
-                        color = colorScheme.error
-                    )
-                }
-                TextButton(
-                    onClick = onDismiss,
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text("Dismiss", style = ExpressiveTypography.labelSmall)
-                }
-            } else {
-                // Completed
-                val duration = task.track.duration
-                if (duration > 0) {
-                    Text(
-                        text = formatDuration(duration),
-                        style = ExpressiveTypography.bodySmall,
-                        color = colorScheme.onSurfaceVariant
-                    )
-                }
-                TextButton(
-                    onClick = onDismiss,
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text("Dismiss", style = ExpressiveTypography.labelSmall)
+                    Text("Cancel", style = ExpressiveTypography.labelSmall)
                 }
             }
         }

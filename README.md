@@ -116,10 +116,10 @@ Peerless/
 │   │   ├── library/                    # FavoritesManager (/api/v1/me/favorites)
 │   │   ├── lyrics/                     # LyricsLoader, TTML/LRC parsers
 │   │   ├── model/                      # DTOs, CanonicalTrack, CanonicalDeduplicator
-│   │   ├── network/                    # PeerlessApiClient (Ktor 3.x REST/SSE)
+│   │   ├── network/                    # PeerlessApiClient (Ktor 3.x REST)
 │   │   ├── player/                     # PlayerConnection, RealPlayerConnection, AudioSpectrum
 │   │   ├── sync/                       # PlaybackSyncManager (WebSocket Connect)
-│   │   ├── tasks/                      # RipCoordinator (SSE progress tracking)
+│   │   ├── tasks/                      # RipCoordinator (server-owned task snapshots and WebSocket updates)
 │   │   ├── theme/                      # ExpressiveTheme, LiquidGlass, ColorScheme
 │   │   └── ui/                         # Compose Multiplatform UI components & screens
 │   ├── androidMain/kotlin/org/shilpo/peerless/

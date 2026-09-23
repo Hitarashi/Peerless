@@ -55,6 +55,7 @@ import org.shilpo.peerless.model.toTrack
 import org.shilpo.peerless.network.LocalPeerlessApiClient
 import org.shilpo.peerless.player.PlaybackStatus
 import org.shilpo.peerless.player.PlayerConnection
+import org.shilpo.peerless.tasks.LocalRipCoordinator
 import org.shilpo.peerless.theme.ExpressiveTypography
 import org.shilpo.peerless.theme.LosslessPurple
 import org.shilpo.peerless.theme.PillShape
@@ -678,6 +679,7 @@ private fun SearchResultsContent(
     contentBottomPadding: Dp
 ) {
     val apiClient = LocalPeerlessApiClient.current
+    val ripCoordinator = LocalRipCoordinator.current
     val coroutineScope = rememberCoroutineScope()
     val cachedTracks = remember(canonicalTracks) { canonicalTracks.filter { it.isCached } }
     val liveTracks = remember(canonicalTracks) { canonicalTracks.filter { !it.isCached } }
@@ -739,8 +741,12 @@ private fun SearchResultsContent(
                                 apiClient.createRipTask(
                                     provider = bgRip.provider.raw,
                                     trackId = bgRip.providerTrackId,
-                                    codec = bgRip.codec.raw
-                                )
+                                    codec = bgRip.codec.raw,
+                                    title = trackDto.title,
+                                    artist = trackDto.artist,
+                                    album = trackDto.album,
+                                    duration = trackDto.duration
+                                ).onSuccess { ripCoordinator?.refreshServerTasks() }
                             }
                         }
                     },
@@ -798,8 +804,12 @@ private fun SearchResultsContent(
                                 apiClient.createRipTask(
                                     provider = bgRip.provider.raw,
                                     trackId = bgRip.providerTrackId,
-                                    codec = bgRip.codec.raw
-                                )
+                                    codec = bgRip.codec.raw,
+                                    title = trackDto.title,
+                                    artist = trackDto.artist,
+                                    album = trackDto.album,
+                                    duration = trackDto.duration
+                                ).onSuccess { ripCoordinator?.refreshServerTasks() }
                             }
                         }
                     },

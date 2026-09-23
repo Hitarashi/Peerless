@@ -14,7 +14,6 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
-import io.ktor.client.request.prepareGet
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -25,15 +24,10 @@ import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
-import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.LineEnding
-import io.ktor.utils.io.readLine
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
 import org.shilpo.peerless.auth.TokenStorage
 import org.shilpo.peerless.config.AppConfig
@@ -51,9 +45,9 @@ import org.shilpo.peerless.model.RefreshRequest
 import org.shilpo.peerless.model.RefreshResponse
 import org.shilpo.peerless.model.RipTaskRequest
 import org.shilpo.peerless.model.RipTaskResponse
+import org.shilpo.peerless.model.RipTaskSnapshotDto
 import org.shilpo.peerless.model.SearchResponse
 import org.shilpo.peerless.model.ServerHealthDto
-import org.shilpo.peerless.model.TaskProgressEvent
 import org.shilpo.peerless.model.TrackDetailDto
 import org.shilpo.peerless.model.TrackSummaryDto
 
@@ -270,6 +264,10 @@ open class PeerlessApiClient(
         provider: String,
         trackId: String,
         codec: String? = null,
+        title: String? = null,
+        artist: String? = null,
+        album: String? = null,
+        duration: Int? = null,
         token: String? = null
     ): Result<RipTaskResponse> = runCatching {
         val authToken = resolveToken(token)
@@ -278,7 +276,17 @@ open class PeerlessApiClient(
             if (!authToken.isNullOrBlank()) {
                 header(HttpHeaders.Authorization, "Bearer $authToken")
             }
-            setBody(RipTaskRequest(provider = provider, track_id = trackId, codec = codec))
+            setBody(
+                RipTaskRequest(
+                    provider = provider,
+                    track_id = trackId,
+                    codec = codec,
+                    title = title,
+                    artist = artist,
+                    album = album,
+                    duration = duration
+                )
+            )
         }
         if (!response.status.isSuccess()) {
             error("Create rip task failed with status: ${response.status}")
@@ -286,69 +294,18 @@ open class PeerlessApiClient(
         response.body<RipTaskResponse>()
     }
 
-    open fun streamTaskEvents(taskId: String, token: String? = null): Flow<TaskProgressEvent> =
-        flow {
+    open suspend fun listRipTasks(token: String? = null): Result<List<RipTaskSnapshotDto>> =
+        requestResult {
             val authToken = resolveToken(token)
-            try {
-                val statement = httpClient.prepareGet("$baseUrl/api/v1/tasks/$taskId/events") {
-                    header(HttpHeaders.Accept, "text/event-stream")
-                    if (!authToken.isNullOrBlank()) {
-                        header(HttpHeaders.Authorization, "Bearer $authToken")
-                    }
+            val response = httpClient.get("$baseUrl/api/v1/tasks") {
+                if (!authToken.isNullOrBlank()) {
+                    header(HttpHeaders.Authorization, "Bearer $authToken")
                 }
-                statement.execute { response ->
-                    if (!response.status.isSuccess()) {
-                        emit(
-                            TaskProgressEvent(
-                                task_id = taskId,
-                                stage = "failed",
-                                completed = true,
-                                error = "SSE connection failed with status: ${response.status}"
-                            )
-                        )
-                        return@execute
-                    }
-                    val channel: ByteReadChannel = response.body()
-                    while (true) {
-                        val line = channel.readLine(lineEnding = LineEnding.Lenient) ?: break
-                        val trimmed = line.trim()
-                        if (trimmed.isEmpty() || trimmed.startsWith(":") || trimmed.contains(
-                                "keep-alive",
-                                ignoreCase = true
-                            )
-                        ) {
-                            continue
-                        }
-                        if (trimmed.startsWith("data:")) {
-                            val jsonStr = trimmed.removePrefix("data:").trim()
-                            if (jsonStr.isNotEmpty()) {
-                                val event = try {
-                                    json.decodeFromString<TaskProgressEvent>(jsonStr)
-                                } catch (e: Exception) {
-                                    null
-                                }
-                                if (event != null) {
-                                    emit(event)
-                                    if (event.isFinished) {
-                                        break
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                emit(
-                    TaskProgressEvent(
-                        task_id = taskId,
-                        stage = "failed",
-                        completed = true,
-                        error = e.message ?: "Network error during SSE stream"
-                    )
-                )
             }
+            if (!response.status.isSuccess()) {
+                error("List rip tasks failed with status: ${response.status}")
+            }
+            response.body<List<RipTaskSnapshotDto>>()
         }
 
     open suspend fun cancelRipTask(taskId: String, token: String? = null): Result<Unit> =

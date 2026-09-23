@@ -70,19 +70,18 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import org.shilpo.peerless.model.ActiveRipTask
-import org.shilpo.peerless.model.RipStage
-import org.shilpo.peerless.player.LocalPlayerConnection
-import org.shilpo.peerless.player.playTrack
-import org.shilpo.peerless.tasks.LocalRipCoordinator
-import kotlin.math.roundToInt
 import org.shilpo.peerless.model.CanonicalTrack
 import org.shilpo.peerless.model.Codec
+import org.shilpo.peerless.model.RipStage
 import org.shilpo.peerless.model.TrackSource
 import org.shilpo.peerless.model.TrackSummaryDto
+import org.shilpo.peerless.player.LocalPlayerConnection
+import org.shilpo.peerless.tasks.LocalRipCoordinator
 import org.shilpo.peerless.theme.ArtworkShape
 import org.shilpo.peerless.theme.ExpressiveTypography
 import org.shilpo.peerless.theme.PillShape
 import org.shilpo.peerless.theme.SpecBadgeTypography
+import kotlin.math.roundToInt
 
 fun formatDuration(durationSeconds: Int): String {
     if (durationSeconds <= 0) return "00:00"
@@ -935,7 +934,7 @@ fun RipTaskDetailSheet(
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val isFinished = task.isFinished
-    val isCompleted = task.stage == RipStage.COMPLETED || task.completed
+    val isCompleted = task.stage == RipStage.COMPLETED
 
     val targetProgress = when {
         isCompleted -> 1f
@@ -1070,4 +1069,3 @@ fun RipTaskDetailSheet(
         }
     }
 }
-

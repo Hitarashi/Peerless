@@ -37,6 +37,7 @@ import org.shilpo.peerless.auth.TokenStorage
 import org.shilpo.peerless.getDeviceDisplayName
 import org.shilpo.peerless.getPlatform
 import org.shilpo.peerless.model.PlaybackStateSnapshot
+import org.shilpo.peerless.model.RipTaskSnapshotDto
 import org.shilpo.peerless.network.createDefaultPeerlessHttpClient
 
 @Serializable
@@ -144,6 +145,9 @@ class PlaybackSyncManager(
     private val _remoteSnapshot = MutableStateFlow<PlaybackStateSnapshot?>(null)
     val remoteSnapshot: StateFlow<PlaybackStateSnapshot?> = _remoteSnapshot.asStateFlow()
 
+    private val _remoteRipTasks = MutableStateFlow<List<RipTaskSnapshotDto>?>(null)
+    val remoteRipTasks: StateFlow<List<RipTaskSnapshotDto>?> = _remoteRipTasks.asStateFlow()
+
     private val _commandFlow = MutableSharedFlow<ExecuteCommandPayload>(extraBufferCapacity = 16)
     val incomingCommands: SharedFlow<ExecuteCommandPayload> = _commandFlow.asSharedFlow()
 
@@ -152,6 +156,7 @@ class PlaybackSyncManager(
 
     fun start(serverUrl: String, token: String) {
         connectionJob?.cancel()
+        _remoteRipTasks.value = null
         connectionJob = scope.launch {
             closeCurrentSession()
             while (isActive) {
@@ -170,6 +175,7 @@ class PlaybackSyncManager(
     fun stop() {
         connectionJob?.cancel()
         connectionJob = null
+        _remoteRipTasks.value = null
         scope.launch {
             closeCurrentSession()
         }
@@ -248,6 +254,32 @@ class PlaybackSyncManager(
                 "execute_command" -> {
                     val cmd = json.decodeFromJsonElement<ExecuteCommandPayload>(payload)
                     _commandFlow.tryEmit(cmd)
+                }
+
+                "rip_tasks_snapshot" -> {
+                    val tasks = payload.jsonObject["tasks"]
+                        ?.let { json.decodeFromJsonElement<List<RipTaskSnapshotDto>>(it) }
+                        ?: emptyList()
+                    _remoteRipTasks.value = tasks.filterNot { it.isTerminal }
+                }
+
+                "rip_task_updated" -> {
+                    val task = payload.jsonObject["task"]
+                        ?.let { json.decodeFromJsonElement<RipTaskSnapshotDto>(it) }
+                        ?: return
+                    val current = _remoteRipTasks.value.orEmpty().associateBy { it.task_id }
+                    val next = if (task.isTerminal) {
+                        current - task.task_id
+                    } else {
+                        current + (task.task_id to task)
+                    }
+                    _remoteRipTasks.value = next.values.toList()
+                }
+
+                "rip_task_dismissed" -> {
+                    val taskId = payload.jsonObject["task_id"]?.jsonPrimitive?.content ?: return
+                    _remoteRipTasks.value =
+                        _remoteRipTasks.value.orEmpty().filterNot { it.task_id == taskId }
                 }
             }
         }
