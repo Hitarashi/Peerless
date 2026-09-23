@@ -17,7 +17,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -198,16 +197,10 @@ fun SupportingPaneQuickSwitcherPill(
                 val isSelected = activeSupportingPane == type
                 val interactionSource = remember(type) { MutableInteractionSource() }
                 val isHovered by interactionSource.collectIsHoveredAsState()
-                val isPressed by interactionSource.collectIsPressedAsState()
                 val glowAlpha by animateFloatAsState(
                     targetValue = if (isHovered && !isSelected) 0.12f else 0f,
                     animationSpec = tween(160),
                     label = "SwitcherIconGlow"
-                )
-                val pressScale by animateFloatAsState(
-                    targetValue = if (isPressed) 0.92f else 1f,
-                    animationSpec = tween(100),
-                    label = "SwitcherIconPress"
                 )
                 val iconTint by animateColorAsState(
                     targetValue = when {
@@ -255,16 +248,28 @@ fun SupportingPaneQuickSwitcherPill(
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (type == SupportingPaneType.LYRICS) {
-                            LyricsMorphIcon(
+                        if (type == SupportingPaneType.QUEUE) {
+                            QueueMorphIcon(
                                 selected = isSelected,
-                                modifier = Modifier.scale(pressScale),
                                 tint = iconTint,
-                                size = 18.dp,
+                                size = 24.dp,
                                 contentDescription = type.title
                             )
-                        } else {
-                            val isTasks = type == SupportingPaneType.TASKS
+                        } else if (type == SupportingPaneType.LYRICS) {
+                            LyricsMorphIcon(
+                                selected = isSelected,
+                                tint = iconTint,
+                                size = 24.dp,
+                                contentDescription = type.title
+                            )
+                        } else if (type == SupportingPaneType.TRACK_CONTEXT) {
+                            InfoMorphIcon(
+                                selected = isSelected,
+                                tint = iconTint,
+                                size = 24.dp,
+                                contentDescription = type.title
+                            )
+                        } else if (type == SupportingPaneType.TASKS) {
                             val infiniteTransition =
                                 rememberInfiniteTransition(label = "TasksTabSpin")
                             val taskRotation by infiniteTransition.animateFloat(
@@ -277,24 +282,26 @@ fun SupportingPaneQuickSwitcherPill(
                                 label = "TaskTabRotation"
                             )
 
-                            PeerlessIcon(
-                                icon = if (type == SupportingPaneType.TRACK_CONTEXT && isSelected) {
-                                    PeerlessIcons.InfoFilled
-                                } else {
-                                    icon
-                                },
-                                contentDescription = type.title,
+                            LiveRipsMorphIcon(
+                                selected = isSelected,
                                 tint = iconTint,
+                                contentDescription = type.title,
                                 modifier = Modifier
-                                    .size(18.dp)
-                                    .scale(pressScale)
+                                    .size(24.dp)
                                     .then(
-                                        if (isTasks && activeTasksCount > 0) {
+                                        if (activeTasksCount > 0) {
                                             Modifier.graphicsLayer(rotationZ = taskRotation)
                                         } else {
                                             Modifier
                                         }
                                     )
+                            )
+                        } else {
+                            PeerlessIcon(
+                                icon = icon,
+                                contentDescription = type.title,
+                                tint = iconTint,
+                                modifier = Modifier.size(24.dp)
                             )
                         }
 

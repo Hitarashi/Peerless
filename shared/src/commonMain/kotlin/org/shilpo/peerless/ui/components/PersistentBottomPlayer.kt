@@ -375,17 +375,14 @@ fun PersistentBottomPlayer(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        IconButton(
+                        SkipTrackMorphButton(
+                            isNext = false,
                             onClick = onPlayPrevious,
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            PeerlessIcon(
-                                icon = PeerlessIcons.SkipPrevious,
-                                contentDescription = "Previous Track",
-                                tint = colorScheme.onSurface,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                            modifier = Modifier.size(48.dp),
+                            iconSize = 24.dp,
+                            tint = colorScheme.onSurface,
+                            contentDescription = "Previous Track",
+                        )
 
                         Box(
                             modifier = Modifier
@@ -420,17 +417,14 @@ fun PersistentBottomPlayer(
                             }
                         }
 
-                        IconButton(
+                        SkipTrackMorphButton(
+                            isNext = true,
                             onClick = onPlayNext,
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            PeerlessIcon(
-                                icon = PeerlessIcons.SkipNext,
-                                contentDescription = "Next Track",
-                                tint = colorScheme.onSurface,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                            modifier = Modifier.size(48.dp),
+                            iconSize = 24.dp,
+                            tint = colorScheme.onSurface,
+                            contentDescription = "Next Track",
+                        )
                     }
 
                     IconButton(
@@ -468,7 +462,7 @@ fun PersistentBottomPlayer(
                 ExpressiveVolumeSlider(
                     volume = volume,
                     onVolumeChange = onVolumeChange,
-                    modifier = Modifier.width(160.dp)
+                    modifier = Modifier.width(194.dp)
                 )
 
                 Spacer(modifier = Modifier.width(8.dp))

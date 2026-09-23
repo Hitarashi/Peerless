@@ -5,7 +5,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -34,7 +35,7 @@ import androidx.compose.ui.unit.dp
 fun ExpressiveVolumeSlider(
     volume: Float,
     onVolumeChange: (Float) -> Unit,
-    modifier: Modifier = Modifier.width(190.dp),
+    modifier: Modifier = Modifier.width(234.dp),
     enabled: Boolean = true,
     isMuted: Boolean? = null,
     onToggleMute: (() -> Unit)? = null,
@@ -77,23 +78,12 @@ fun ExpressiveVolumeSlider(
         onVolumeChange(newVol)
     }
 
-    val isCoveredByActiveTrack = !effectiveMuted && displayVolume >= 0.20f
-
-    val iconTint by animateColorAsState(
-        targetValue = if (isCoveredByActiveTrack) {
-            colorScheme.onPrimary
-        } else {
-            colorScheme.onSurfaceVariant
-        },
+    val isIconOnActiveTrack = !effectiveMuted && displayVolume >= 0.2f
+    val volumeIconTint by animateColorAsState(
+        targetValue = if (isIconOnActiveTrack) colorScheme.onPrimary else colorScheme.onSurfaceVariant,
         animationSpec = tween(durationMillis = 200),
-        label = "VolumeSliderIconTint"
+        label = "VolumeSliderIconTint",
     )
-
-    val cutoutColor = if (isCoveredByActiveTrack) {
-        colorScheme.primary
-    } else {
-        colorScheme.surfaceContainerHighest
-    }
 
     val sliderColors = SliderDefaults.colors(
         thumbColor = colorScheme.primary,
@@ -103,42 +93,12 @@ fun ExpressiveVolumeSlider(
 
     val interactionSource = remember { MutableInteractionSource() }
 
-    Box(
+    Row(
         modifier = modifier.height(52.dp),
-        contentAlignment = Alignment.CenterStart
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Slider(
-            value = displayVolume,
-            onValueChange = handleVolumeChange,
-            valueRange = 0f..1f,
-            enabled = enabled,
-            interactionSource = interactionSource,
-            thumb = {
-                SliderDefaults.Thumb(
-                    interactionSource = interactionSource,
-                    colors = sliderColors,
-                    enabled = enabled,
-                    thumbSize = DpSize(4.dp, 52.dp)
-                )
-            },
-            track = { sliderState ->
-                SliderDefaults.Track(
-                    sliderState = sliderState,
-                    modifier = Modifier.height(40.dp),
-                    colors = sliderColors,
-                    enabled = enabled,
-                    thumbTrackGapSize = 6.dp,
-                    trackInsideCornerSize = 12.dp,
-                    trackCornerSize = 12.dp
-                )
-            },
-            colors = sliderColors,
-            modifier = Modifier.fillMaxWidth()
-        )
-
         Box(
             modifier = Modifier
-                .padding(start = 10.dp)
                 .size(26.dp)
                 .clip(CircleShape)
                 .clickable(
@@ -149,12 +109,59 @@ fun ExpressiveVolumeSlider(
                 ),
             contentAlignment = Alignment.Center
         ) {
+            VolumeMuteIcon(
+                isMuted = effectiveMuted || displayVolume <= 0.001f,
+                tint = colorScheme.onSurfaceVariant,
+                size = 20.dp,
+            )
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(52.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Slider(
+                value = displayVolume,
+                onValueChange = handleVolumeChange,
+                valueRange = 0f..1f,
+                enabled = enabled,
+                interactionSource = interactionSource,
+                thumb = {
+                    SliderDefaults.Thumb(
+                        interactionSource = interactionSource,
+                        colors = sliderColors,
+                        enabled = enabled,
+                        thumbSize = DpSize(4.dp, 52.dp)
+                    )
+                },
+                track = { sliderState ->
+                    SliderDefaults.Track(
+                        sliderState = sliderState,
+                        modifier = Modifier.height(40.dp),
+                        colors = sliderColors,
+                        enabled = enabled,
+                        thumbTrackGapSize = 6.dp,
+                        trackInsideCornerSize = 12.dp,
+                        trackCornerSize = 12.dp
+                    )
+                },
+                colors = sliderColors,
+                modifier = Modifier.matchParentSize()
+            )
+
             VolumeMorphIcon(
                 volume = displayVolume,
-                isMuted = effectiveMuted,
-                tint = iconTint,
-                cutoutColor = cutoutColor,
-                size = 22.dp
+                isMuted = false,
+                tint = volumeIconTint,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 10.dp),
+                size = 22.dp,
+                contentDescription = null,
             )
         }
     }

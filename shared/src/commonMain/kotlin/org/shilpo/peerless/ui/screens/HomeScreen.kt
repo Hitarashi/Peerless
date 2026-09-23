@@ -70,7 +70,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import kotlin.math.roundToInt
 import org.shilpo.peerless.auth.LocalSessionManager
 import org.shilpo.peerless.auth.SessionState
 import org.shilpo.peerless.home.HomeFeedEmptyReason
@@ -90,7 +89,9 @@ import org.shilpo.peerless.theme.SquircleShapeSmall
 import org.shilpo.peerless.theme.WindowWidthSizeClass
 import org.shilpo.peerless.ui.components.PeerlessIcon
 import org.shilpo.peerless.ui.components.PeerlessIcons
+import org.shilpo.peerless.ui.components.PlayPauseMorphIcon
 import org.shilpo.peerless.ui.components.TrackRow
+import kotlin.math.roundToInt
 
 val SampleLosslessLibrary = listOf(
     TrackSummaryDto(
@@ -339,6 +340,7 @@ fun HomeTrackCarousel(
     currentTrackId: Int?,
     isPlaying: Boolean,
     onTrackClick: (TrackSummaryDto) -> Unit,
+    onTogglePlayback: () -> Unit,
     onPlayNext: ((TrackSummaryDto) -> Unit)? = null,
     onAddToQueue: ((TrackSummaryDto) -> Unit)? = null,
     onStartRadio: ((TrackSummaryDto) -> Unit)? = null,
@@ -411,6 +413,15 @@ fun HomeTrackCarousel(
                         track = track,
                         artworkUrl = getArtworkUrl(track),
                         isPlaying = isCurrentPlaying,
+                        onPlayPauseClick = {
+                            if (currentTrackId == track.id) {
+                                onTogglePlayback()
+                            } else if (track.is_cached) {
+                                onTrackClick(track)
+                            } else {
+                                onRipClick?.invoke(track)
+                            }
+                        },
                         onClick = {
                             if (track.is_cached) onTrackClick(track) else onRipClick?.invoke(track)
                         },
@@ -437,6 +448,7 @@ fun QuickPickCard(
     track: TrackSummaryDto,
     artworkUrl: String,
     isPlaying: Boolean,
+    onPlayPauseClick: () -> Unit,
     onClick: () -> Unit,
     onPlayNext: (() -> Unit)? = null,
     onAddToQueue: (() -> Unit)? = null,
@@ -570,7 +582,7 @@ fun QuickPickCard(
                 .padding(10.dp)
                 .size(48.dp)
                 .clip(CircleShape)
-                .clickable(enabled = canActivate, onClick = onClick),
+                .clickable(enabled = canActivate, onClick = onPlayPauseClick),
             contentAlignment = Alignment.Center
         ) {
             Box(
@@ -613,25 +625,28 @@ fun QuickPickCard(
                             .graphicsLayer(rotationZ = rotation)
                     )
                 } else {
-                    PeerlessIcon(
-                        icon = when {
-                            isPlaying -> PeerlessIcons.LosslessWave
-                            track.is_cached -> PeerlessIcons.Play
-                            activeTask != null && (activeTask.stage == RipStage.COMPLETED || activeTask.completed) -> PeerlessIcons.RipCloudDone
-                            else -> PeerlessIcons.RipCloudDownload
-                        },
-                        contentDescription = when {
-                            isPlaying -> "Now playing ${track.title}"
-                            track.is_cached -> "Play ${track.title}"
-                            activeTask != null && (activeTask.stage == RipStage.COMPLETED || activeTask.completed) -> "Rip completed for ${track.title}"
-                            else -> "Rip ${track.title}"
-                        },
-                        tint = if (activeTask != null && (activeTask.stage == RipStage.COMPLETED || activeTask.completed))
-                            MaterialTheme.colorScheme.secondary
-                        else
-                            MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    if (isPlaying || track.is_cached) {
+                        PlayPauseMorphIcon(
+                            isPlaying = isPlaying,
+                            contentDescription = if (isPlaying) "Pause ${track.title}" else "Play ${track.title}",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            size = 20.dp
+                        )
+                    } else {
+                        val ripCompleted = activeTask != null &&
+                                (activeTask.stage == RipStage.COMPLETED || activeTask.completed)
+                        PeerlessIcon(
+                            icon = if (ripCompleted) PeerlessIcons.RipCloudDone else PeerlessIcons.RipCloudDownload,
+                            contentDescription = if (ripCompleted) {
+                                "Rip completed for ${track.title}"
+                            } else {
+                                "Rip ${track.title}"
+                            },
+                            tint = if (ripCompleted) MaterialTheme.colorScheme.secondary
+                            else MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }
@@ -894,6 +909,7 @@ fun HomeScreenContent(
                         picks = homeFeed.yourRotation,
                         currentTrackId = currentTrackDto?.id,
                         isPlaying = status == PlaybackStatus.PLAYING,
+                        onTogglePlayback = { playerConnection.togglePlayPause() },
                         onTrackClick = { clicked ->
                             playerConnection.playFromContext(
                                 clicked.toTrack(),
@@ -918,6 +934,7 @@ fun HomeScreenContent(
                         picks = homeFeed.similarToTaste,
                         currentTrackId = currentTrackDto?.id,
                         isPlaying = status == PlaybackStatus.PLAYING,
+                        onTogglePlayback = { playerConnection.togglePlayPause() },
                         onTrackClick = { clicked ->
                             playerConnection.playFromContext(
                                 clicked.toTrack(),

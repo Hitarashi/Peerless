@@ -10,17 +10,33 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.graphics.vector.toPath
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlin.math.PI
 import kotlin.math.min
-import kotlin.math.sin
+
+private const val HOME_SVG_MORPH_SAMPLES = 512
+private const val HOME_NORMAL_VIEWBOX_SCALE = 4f / 3f
+private const val HOME_SOURCE_VIEWBOX_SIZE = 128f
+
+private const val HOME_NORMAL_OUTER_PATH =
+    "M11 33v45h1v3h1v1h1v1h1v1h2v1h3v1h15V59h1v-3h1v-1h1v-2h2v-1h1v-1h2v-1h10v1h2v1h1v1h2v2h1v1h1v3h1v27h15v-1h3v-1h2v-1h1v-1h1v-1h1v-2h1V34h-1v-3h-1v-1h-1v-1h-1v-1h-1v-1h-1v-1h-2v-1h-2v-1h-1v-1h-2v-1h-2v-1h-1v-1h-2v-1h-2v-1h-2v-1h-1v-1h-2v-1h-2v-1h-2v-1h-1v-1h-2v-1h-4v-1h-2v1h-4v1h-2v1h-1v1h-2v1h-2v1h-2v1h-1v1h-2v1h-2v1h-1v1h-2v1h-2v1h-2v1h-1v1h-2v1h-2v1h-1v1h-2v2h-1v1h-1v2Z"
+private const val HOME_NORMAL_DOOR_PATH =
+    "M36 59v27h24V59h-1v-2h-1v-2h-1v-1h-1v-1h-1v-1h-2v-1h-4v-1h-2v1h-4v1h-2v1h-1v1h-1v1h-1v2h-1v2Z"
+private const val HOME_SELECTED_OUTER_PATH =
+    "M12 55v52h1v4h1v1h1v1h1v1h1v1h3v1h20v-1h4v-1h1v-1h1v-1h1v-1h1v-3h1V84h1v-2h1v-2h1v-2h1v-1h1v-1h1v-1h2v-1h2v-1h10h2v1h2v1h1v1h1v1h1v1h1v1h1v2h1v6h1v23h1v1h1v1h1v1h1v1h4v1h19v-1h4v-1h1v-1h1v-1h1v-1h1v-4h1V55h-1v-5h-1v-2h-1v-2h-1v-1h-1v-1h-1v-1h-1v-1h-2v-1h-1v-1h-1v-1h-1v-1h-2v-1h-1v-1h-1v-1h-1v-1h-2v-1h-1v-1h-1v-1h-1v-1h-2v-1h-1v-1h-1v-1h-1v-1h-2v-1h-1v-1h-1v-1h-1v-1h-2v-1h-1v-1h-1v-1h-1v-1h-2v-1h-1v-1h-1v-1h-1v-1h-2v-1h-2v-1h-5v-1h-4v1h-5v1h-2v1h-2v1h-1v1h-1v1h-2v1h-1v1h-1v1h-1v1h-2v1h-1v1h-1v1h-1v1h-2v1h-1v1h-1v1h-1v1h-2v1h-1v1h-1v1h-1v1h-2v1h-1v1h-1v1h-1v1h-2v1h-1v1h-1v1h-1v1h-1v2h-1v2h-1v5Z"
+private const val HOME_SELECTED_ARCH_PATH =
+    "M49 108V84h1v-2h1v-2h1v-2h1v-1h1v-1h1v-1h2v-1h2v-1h10h2v1h2v1h1v1h1v1h1v1h1v1h1v2h1v6h1v23Z"
 
 @Composable
 fun HomeMorphIcon(
@@ -45,157 +61,208 @@ fun HomeMorphIcon(
         modifier
     }
 
-    val path = remember { Path() }
+    val bodyMorph = remember {
+        val normalOuter = sampleSvgContour(HOME_NORMAL_OUTER_PATH, HOME_NORMAL_VIEWBOX_SCALE)
+        val selectedOuter = sampleSvgContour(HOME_SELECTED_OUTER_PATH, 1f)
+        SvgPathMorph(
+            start = listOf(normalOuter),
+            end = listOf(alignHomeContour(normalOuter, selectedOuter)),
+        )
+    }
+    val doorMorph = remember(bodyMorph) {
+        val initialDoor = sampleSvgContour(HOME_NORMAL_DOOR_PATH, HOME_NORMAL_VIEWBOX_SCALE)
+        val selectedShell = alignHomeContour(
+            initialDoor,
+            bodyMorph.end.single(),
+        )
+        val selectedDoor = alignHomeContour(
+            selectedShell,
+            sampleSvgContour(HOME_SELECTED_ARCH_PATH, 1f),
+        )
+        HomeDoorMorph(
+            initialDoor = initialDoor,
+            selectedShell = selectedShell,
+            selectedDoor = selectedDoor,
+        )
+    }
+    val bodyPath = remember { Path() }
+    val doorPath = remember { Path() }
 
     Canvas(modifier = descModifier.size(size)) {
         drawHomeMorph(
             progress = progress,
             tint = tint,
-            path = path
+            bodyMorph = bodyMorph,
+            doorMorph = doorMorph,
+            bodyPath = bodyPath,
+            doorPath = doorPath,
         )
+    }
+}
+
+private data class SvgPathMorph(
+    val start: List<List<Offset>>,
+    val end: List<List<Offset>>,
+)
+
+private data class HomeDoorMorph(
+    val initialDoor: List<Offset>,
+    val selectedShell: List<Offset>,
+    val selectedDoor: List<Offset>,
+)
+
+private fun sampleSvgContour(pathData: String, viewBoxScale: Float): List<Offset> {
+    val sourcePath = PathParser().parsePathString(pathData).toNodes().toPath()
+    val measure = PathMeasure().apply {
+        setPath(sourcePath, forceClosed = true)
+    }
+    val contourLength = measure.length
+
+    return List(HOME_SVG_MORPH_SAMPLES) { index ->
+        val position = measure.getPosition(contourLength * index / HOME_SVG_MORPH_SAMPLES)
+        Offset(position.x * viewBoxScale, position.y * viewBoxScale)
+    }
+}
+
+private fun alignHomeContour(start: List<Offset>, end: List<Offset>): List<Offset> {
+    val count = start.size
+    var bestOffset = 0
+    var bestReversed = false
+    var bestScore = Float.POSITIVE_INFINITY
+
+    for (reversed in listOf(false, true)) {
+        for (offset in 0 until count) {
+            var score = 0f
+            for (index in 0 until count) {
+                val endIndex = if (reversed) {
+                    (offset - index + count) % count
+                } else {
+                    (offset + index) % count
+                }
+                val dx = start[index].x - end[endIndex].x
+                val dy = start[index].y - end[endIndex].y
+                score += dx * dx + dy * dy
+            }
+            if (score < bestScore) {
+                bestScore = score
+                bestOffset = offset
+                bestReversed = reversed
+            }
+        }
+    }
+
+    return List(count) { index ->
+        val endIndex = if (bestReversed) {
+            (bestOffset - index + count) % count
+        } else {
+            (bestOffset + index) % count
+        }
+        end[endIndex]
     }
 }
 
 private fun DrawScope.drawHomeMorph(
     progress: Float,
     tint: Color,
-    path: Path,
+    bodyMorph: SvgPathMorph,
+    doorMorph: HomeDoorMorph,
+    bodyPath: Path,
+    doorPath: Path,
 ) {
     val p = progress.coerceIn(0f, 1f)
+    val bodyProgress = (p * 2f).coerceIn(0f, 1f)
+    updateMorphedPath(
+        path = bodyPath,
+        startContours = bodyMorph.start,
+        endContours = bodyMorph.end,
+        progress = bodyProgress,
+    )
+    updateHomeDoorPath(doorPath, doorMorph, p)
 
-    val elasticScale = 1f - 0.04f * sin(p * PI.toFloat())
+    val iconSize = min(size.width, size.height)
+    val iconScale = iconSize / HOME_SOURCE_VIEWBOX_SIZE
+    val left = (size.width - iconSize) / 2f
+    val top = (size.height - iconSize) / 2f
 
-    val baseSize = min(this.size.width, this.size.height)
-    val s = (baseSize / 960f) * elasticScale
-    val cx = this.size.width / 2f
-    val cy = this.size.height / 2f
+    withTransform({
+        translate(left = left, top = top)
+        scale(scaleX = iconScale, scaleY = iconScale, pivot = Offset.Zero)
+    }) {
+        drawPath(
+            path = bodyPath,
+            color = tint.copy(alpha = tint.alpha * lerp(0.4f, 1f, bodyProgress)),
+        )
+        if (p < 1f) {
+            drawPath(
+                path = doorPath,
+                color = tint.copy(alpha = tint.alpha * homeDoorOpacity(p)),
+            )
+        }
+    }
+}
 
-    fun toCanvasX(x: Float): Float = cx + (x - 480f) * s
-    fun toCanvasY(y: Float): Float = cy + (y + 480f) * s
-
+private fun updateHomeDoorPath(path: Path, morph: HomeDoorMorph, progress: Float) {
+    val phaseProgress = if (progress <= 0.5f) {
+        progress * 2f
+    } else {
+        (progress - 0.5f) * 2f
+    }
     path.reset()
-    path.fillType = PathFillType.EvenOdd
+    path.fillType = PathFillType.NonZero
+    val shellStart = if (progress <= 0.5f) morph.initialDoor else morph.selectedShell
+    val shellEnd = if (progress <= 0.5f) morph.selectedShell else morph.selectedDoor
+    appendMorphedContour(path, shellStart, shellEnd, phaseProgress)
 
-    path.moveTo(toCanvasX(160f), toCanvasY(-200f))
-    path.lineTo(toCanvasX(160f), toCanvasY(-560f))
-    path.quadraticTo(
-        toCanvasX(160f), toCanvasY(-579f),
-        toCanvasX(168.5f), toCanvasY(-596f)
-    )
-    path.quadraticTo(
-        toCanvasX(177f), toCanvasY(-613f),
-        toCanvasX(192f), toCanvasY(-624f)
-    )
-    path.lineTo(toCanvasX(432f), toCanvasY(-804f))
-    path.quadraticTo(
-        toCanvasX(453f), toCanvasY(-820f),
-        toCanvasX(480f), toCanvasY(-820f)
-    )
-    path.quadraticTo(
-        toCanvasX(507f), toCanvasY(-820f),
-        toCanvasX(528f), toCanvasY(-804f)
-    )
-    path.lineTo(toCanvasX(768f), toCanvasY(-624f))
-    path.quadraticTo(
-        toCanvasX(783f), toCanvasY(-613f),
-        toCanvasX(791.5f), toCanvasY(-596f)
-    )
-    path.quadraticTo(
-        toCanvasX(800f), toCanvasY(-579f),
-        toCanvasX(800f), toCanvasY(-560f)
-    )
-    path.lineTo(toCanvasX(800f), toCanvasY(-200f))
-    path.quadraticTo(
-        toCanvasX(800f), toCanvasY(-167f),
-        toCanvasX(776.5f), toCanvasY(-143.5f)
-    )
-    path.quadraticTo(
-        toCanvasX(753f), toCanvasY(-120f),
-        toCanvasX(720f), toCanvasY(-120f)
-    )
+    val doorStart = if (progress <= 0.5f) morph.initialDoor else morph.selectedDoor
+    appendMorphedContour(path, doorStart, morph.selectedDoor, phaseProgress)
+}
 
-    path.lineTo(toCanvasX(lerp(560f, 600f, p)), toCanvasY(-120f))
-    path.quadraticTo(
-        toCanvasX(lerp(543f, 583f, p)), toCanvasY(-120f),
-        toCanvasX(lerp(531.5f, 571.5f, p)), toCanvasY(-131.5f)
+private fun appendMorphedContour(
+    path: Path,
+    start: List<Offset>,
+    end: List<Offset>,
+    progress: Float,
+) {
+    path.moveTo(
+        lerp(start[0].x, end[0].x, progress),
+        lerp(start[0].y, end[0].y, progress),
     )
-    path.quadraticTo(
-        toCanvasX(lerp(520f, 560f, p)), toCanvasY(-143f),
-        toCanvasX(lerp(520f, 560f, p)), toCanvasY(-160f)
-    )
-    path.lineTo(toCanvasX(lerp(520f, 560f, p)), toCanvasY(-360f))
-    path.quadraticTo(
-        toCanvasX(lerp(520f, 560f, p)), toCanvasY(lerp(-360f, -377f, p)),
-        toCanvasX(lerp(520f, 548.5f, p)), toCanvasY(lerp(-360f, -388.5f, p))
-    )
-    path.quadraticTo(
-        toCanvasX(lerp(520f, 537f, p)), toCanvasY(lerp(-360f, -400f, p)),
-        toCanvasX(520f), toCanvasY(lerp(-360f, -400f, p))
-    )
-    path.lineTo(toCanvasX(440f), toCanvasY(lerp(-360f, -400f, p)))
-    path.quadraticTo(
-        toCanvasX(lerp(440f, 423f, p)), toCanvasY(lerp(-360f, -400f, p)),
-        toCanvasX(lerp(440f, 411.5f, p)), toCanvasY(lerp(-360f, -388.5f, p))
-    )
-    path.quadraticTo(
-        toCanvasX(lerp(440f, 400f, p)), toCanvasY(lerp(-360f, -377f, p)),
-        toCanvasX(lerp(440f, 400f, p)), toCanvasY(-360f)
-    )
-    path.lineTo(toCanvasX(lerp(440f, 400f, p)), toCanvasY(-160f))
-    path.quadraticTo(
-        toCanvasX(lerp(440f, 400f, p)), toCanvasY(-143f),
-        toCanvasX(lerp(428.5f, 388.5f, p)), toCanvasY(-131.5f)
-    )
-    path.quadraticTo(
-        toCanvasX(lerp(417f, 377f, p)), toCanvasY(-120f),
-        toCanvasX(lerp(400f, 360f, p)), toCanvasY(-120f)
-    )
-    path.lineTo(toCanvasX(240f), toCanvasY(-120f))
-    path.quadraticTo(
-        toCanvasX(207f), toCanvasY(-120f),
-        toCanvasX(183.5f), toCanvasY(-143.5f)
-    )
-    path.quadraticTo(
-        toCanvasX(160f), toCanvasY(-167f),
-        toCanvasX(160f), toCanvasY(-200f)
-    )
+    for (pointIndex in 1 until HOME_SVG_MORPH_SAMPLES) {
+        path.lineTo(
+            lerp(start[pointIndex].x, end[pointIndex].x, progress),
+            lerp(start[pointIndex].y, end[pointIndex].y, progress),
+        )
+    }
     path.close()
+}
 
-    val holeScale = (1f - p).coerceIn(0f, 1f)
-    if (holeScale > 0.001f) {
-        fun holeX(x: Float): Float = toCanvasX(480f + (x - 480f) * holeScale)
-        fun holeY(y: Float): Float = toCanvasY(-470f + (y + 470f) * holeScale)
+private fun homeDoorOpacity(progress: Float): Float =
+    if (progress <= 0.5f) 1f else 1f - (progress - 0.5f) * 2f
 
-        path.moveTo(holeX(240f), holeY(-200f))
-        path.lineTo(holeX(360f), holeY(-200f))
-        path.lineTo(holeX(360f), holeY(-400f))
-        path.quadraticTo(
-            holeX(360f), holeY(-417f),
-            holeX(371.5f), holeY(-428.5f)
+private fun updateMorphedPath(
+    path: Path,
+    startContours: List<List<Offset>>,
+    endContours: List<List<Offset>>,
+    progress: Float,
+) {
+    path.reset()
+    path.fillType = PathFillType.NonZero
+
+    startContours.indices.forEach { contourIndex ->
+        val start = startContours[contourIndex]
+        val end = endContours[contourIndex]
+        path.moveTo(
+            lerp(start[0].x, end[0].x, progress),
+            lerp(start[0].y, end[0].y, progress),
         )
-        path.quadraticTo(
-            holeX(383f), holeY(-440f),
-            holeX(400f), holeY(-440f)
-        )
-        path.lineTo(holeX(560f), holeY(-440f))
-        path.quadraticTo(
-            holeX(577f), holeY(-440f),
-            holeX(588.5f), holeY(-428.5f)
-        )
-        path.quadraticTo(
-            holeX(600f), holeY(-417f),
-            holeX(600f), holeY(-400f)
-        )
-        path.lineTo(holeX(600f), holeY(-200f))
-        path.lineTo(holeX(720f), holeY(-200f))
-        path.lineTo(holeX(720f), holeY(-560f))
-        path.lineTo(holeX(480f), holeY(-740f))
-        path.lineTo(holeX(240f), holeY(-560f))
-        path.lineTo(holeX(240f), holeY(-200f))
+        for (pointIndex in 1 until HOME_SVG_MORPH_SAMPLES) {
+            path.lineTo(
+                lerp(start[pointIndex].x, end[pointIndex].x, progress),
+                lerp(start[pointIndex].y, end[pointIndex].y, progress),
+            )
+        }
         path.close()
     }
-
-    drawPath(path = path, color = tint)
 }
 
 private fun lerp(start: Float, stop: Float, fraction: Float): Float =

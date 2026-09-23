@@ -31,10 +31,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -42,6 +43,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -53,7 +55,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.compositeOver
@@ -630,27 +631,8 @@ fun TrackRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(1.dp)
         ) {
-            IconButton(
-                onClick = {
-                    val favTrack = canonicalTrack?.toSummaryDto(activeSource) ?: track
-                    if (onToggleFavorite != null) {
-                        onToggleFavorite(favTrack)
-                    } else {
-                        favoritesManager?.toggleFavorite(favTrack)
-                    }
-                },
-                modifier = Modifier.size(48.dp)
-            ) {
-                PeerlessIcon(
-                    icon = if (isFav) PeerlessIcons.Heart else PeerlessIcons.HeartBorder,
-                    contentDescription = if (isFav) "Remove from favorites" else "Add to favorites",
-                    tint = if (isFav) Color(0xFFFF5252) else colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-
             Column(
-                horizontalAlignment = Alignment.End,
+                horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
@@ -661,21 +643,46 @@ fun TrackRow(
                     softWrap = false
                 )
 
-                RipMorphBadge(
-                    activeTask = activeTask,
-                    isCached = isTrackCached,
-                    onRipClick = {
-                        val ripTarget = canonicalTrack?.toSummaryDto(activeSource) ?: track
-                        if (onRipClick != null) {
-                            onRipClick(ripTarget)
-                        } else {
-                            coroutineScope.launch {
-                                ripCoordinator?.ripTrack(ripTarget)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (!isTrackCached || activeTask != null) {
+                        RipMorphBadge(
+                            activeTask = activeTask,
+                            isCached = isTrackCached,
+                            onRipClick = {
+                                val ripTarget = canonicalTrack?.toSummaryDto(activeSource) ?: track
+                                if (onRipClick != null) {
+                                    onRipClick(ripTarget)
+                                } else {
+                                    coroutineScope.launch {
+                                        ripCoordinator?.ripTrack(ripTarget)
+                                    }
+                                }
+                            },
+                            onOpenDetails = { showRipDetailSheet = true }
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+                            val favTrack = canonicalTrack?.toSummaryDto(activeSource) ?: track
+                            if (onToggleFavorite != null) {
+                                onToggleFavorite(favTrack)
+                            } else {
+                                favoritesManager?.toggleFavorite(favTrack)
                             }
-                        }
-                    },
-                    onOpenDetails = { showRipDetailSheet = true }
-                )
+                        },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        PeerlessIcon(
+                            icon = if (isFav) PeerlessIcons.Heart else PeerlessIcons.HeartBorder,
+                            contentDescription = if (isFav) "Remove from favorites" else "Add to favorites",
+                            tint = if (isFav) Color(0xFFFF5252) else colorScheme.onSurfaceVariant.copy(
+                                alpha = 0.65f
+                            ),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
             }
 
             IconButton(
@@ -795,6 +802,7 @@ fun TrackRow(
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 fun RipMorphBadge(
     activeTask: ActiveRipTask?,
     isCached: Boolean,
@@ -832,13 +840,14 @@ fun RipMorphBadge(
                     modifier = Modifier.size(28.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(
+                    CircularWavyProgressIndicator(
                         progress = { (activeTask.percent / 100f).coerceIn(0f, 1f) },
                         modifier = Modifier.size(28.dp),
                         color = colorScheme.primary,
                         trackColor = colorScheme.primary.copy(alpha = 0.2f),
-                        strokeWidth = 2.5.dp,
-                        strokeCap = StrokeCap.Round
+                        amplitude = { progress ->
+                            WavyProgressIndicatorDefaults.indicatorAmplitude(progress)
+                        }
                     )
                     PeerlessIcon(
                         icon = PeerlessIcons.RipCloudSync,
@@ -883,38 +892,13 @@ fun RipMorphBadge(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .clip(PillShape)
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(colorScheme.tertiary, colorScheme.primary)
-                            )
-                        )
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        PeerlessIcon(
-                            icon = PeerlessIcons.RipCloudDownload,
-                            contentDescription = "Rip Track",
-                            tint = colorScheme.onPrimary,
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Text(
-                            text = "RIP",
-                            style = SpecBadgeTypography.copy(
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 0.6.sp
-                            ),
-                            color = colorScheme.onPrimary
-                        )
-                    }
-                }
+                LiveRipsMorphIcon(
+                    selected = false,
+                    contentDescription = "Rip Track",
+                    tint = colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                    size = 18.dp,
+                )
             }
         }
 

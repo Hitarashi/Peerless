@@ -10,17 +10,33 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.graphics.vector.toPath
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlin.math.PI
 import kotlin.math.min
-import kotlin.math.sin
+
+private const val SEARCH_MORPH_SAMPLES = 512
+private const val SEARCH_NORMAL_VIEWBOX_SCALE = 0.75f
+private const val SEARCH_VIEWBOX_SIZE = 96f
+
+private const val SEARCH_NORMAL_CIRCLE_PATH =
+    "M15 50v19h1v3h1v4h1v2h1v2h1v2h1v2h1v2h1v1h1v1h1v1h1v1h1v1h1v2h1v1h2v1h1v1h1v1h1v1h1v1h2v1h2v1h2v1h2v1h2v1h4v1h3v1h17v-1h4v-1h3v-1h3v-1h2v-1h2v-1h2v-1h2v-1h1v-1h1v-1h1v-1h1v-1h2v-1h1v-2h1v-1h1v-1h1v-1h1v-1h1v-2h1v-2h1v-2h1v-1h1v-3h1v-3h1v-4h1V51h-1v-4h-1v-3h-1v-3h-1v-1h-1v-2h-1v-2h-1v-2h-1v-1h-1v-1h-1v-1h-1v-2h-1v-1h-1v-1h-1v-1h-1v-1h-2v-1h-1v-1h-1v-1h-2v-1h-1v-1h-2v-1h-2v-1h-3v-1h-3v-1h-3v-1h-9v-1h-2v1h-9v1h-3v1h-3v1h-3v1h-1v1h-2v1h-2v1h-2v1h-1v1h-1v1h-1v1h-2v1h-1v1h-1v1h-1v2h-1v1h-1v1h-1v1h-1v2h-1v2h-1v1h-1v2h-1v3h-1v3h-1v3Z"
+private const val SEARCH_NORMAL_HANDLE_PATH =
+    "M95 104v1h1v4h1v1h1v1h1v1h1v1h4v1h1v-1h4v-1h1v-1h1v-1h1v-1h1v-8h-1v-2h-1v-1h-1v-1h-2v-1h-7v1h-2v1h-1v1h-1v1h-1v4Z"
+private const val SEARCH_FILL_CIRCLE_PATH =
+    "M11 40v10h1v4h1v3h1v3h1v2h1v1h1v2h1v1h1v1h1v1h1v1h1v1h1v1h1v1h1v1h2v1h1v1h2v1h3v1h3v1h4v1h10v-1h4v-1h3v-1h3v-1h1v-1h2v-1h2v-1h1v-1h1v-1h1v-1h1v-1h1v-1h1v-1h1v-1h1v-2h1v-1h1v-2h1v-2h1v-3h1v-5h1V39h-1v-4h-1v-3h-1v-2h-1v-2h-1v-1h-1v-2h-1v-1h-1v-1h-1v-1h-1v-1h-1v-1h-1v-1h-1v-1h-1v-1h-2v-1h-2v-1h-2v-1h-3v-1h-4v-1H39v1h-4v1h-3v1h-2v1h-2v1h-1v1h-2v1h-1v1h-1v1h-1v1h-1v1h-1v1h-1v1h-1v1h-1v2h-1v1h-1v2h-1v2h-1v3h-1v3h-1v5Z"
+private const val SEARCH_FILL_HANDLE_PATH =
+    "M72 75v6h1v2h1v1h2v1h5v-1h1v-1h1v-1h1v-1h1v-5h-1v-2h-1v-1h-2v-1h-5v1h-2v1h-1v1Z"
 
 @Composable
 fun SearchMorphIcon(
@@ -45,138 +61,159 @@ fun SearchMorphIcon(
         modifier
     }
 
-    val path = remember { Path() }
+    val inactiveLens = remember {
+        searchPathFromContour(
+            sampleSvgContour(SEARCH_NORMAL_CIRCLE_PATH, SEARCH_NORMAL_VIEWBOX_SCALE)
+        )
+    }
+    val dotMorph = remember {
+        val dot = sampleSvgContour(SEARCH_NORMAL_HANDLE_PATH, SEARCH_NORMAL_VIEWBOX_SCALE)
+        SearchContourMorph(
+            start = dot,
+            end = alignSearchContour(dot, sampleSvgContour(SEARCH_FILL_CIRCLE_PATH, 1f)),
+        )
+    }
+    val handleMorph = remember {
+        val normalHandle = sampleSvgContour(
+            SEARCH_NORMAL_HANDLE_PATH,
+            SEARCH_NORMAL_VIEWBOX_SCALE,
+        )
+        SearchContourMorph(
+            start = normalHandle,
+            end = alignSearchContour(
+                normalHandle,
+                sampleSvgContour(SEARCH_FILL_HANDLE_PATH, 1f),
+            ),
+        )
+    }
+    val dotPath = remember { Path() }
+    val handlePath = remember { Path() }
 
     Canvas(modifier = descModifier.size(size)) {
         drawSearchMorph(
             progress = progress,
             tint = tint,
-            path = path
+            inactiveLens = inactiveLens,
+            dotMorph = dotMorph,
+            handleMorph = handleMorph,
+            dotPath = dotPath,
+            handlePath = handlePath,
         )
+    }
+}
+
+private data class SearchContourMorph(
+    val start: List<Offset>,
+    val end: List<Offset>,
+)
+
+private fun sampleSvgContour(pathData: String, viewBoxScale: Float): List<Offset> {
+    val sourcePath = PathParser().parsePathString(pathData).toNodes().toPath()
+    val measure = PathMeasure().apply {
+        setPath(sourcePath, forceClosed = true)
+    }
+    val contourLength = measure.length
+
+    return List(SEARCH_MORPH_SAMPLES) { index ->
+        val position = measure.getPosition(contourLength * index / SEARCH_MORPH_SAMPLES)
+        Offset(position.x * viewBoxScale, position.y * viewBoxScale)
+    }
+}
+
+private fun searchPathFromContour(points: List<Offset>): Path = Path().apply {
+    fillType = PathFillType.NonZero
+    moveTo(points.first().x, points.first().y)
+    points.drop(1).forEach { point -> lineTo(point.x, point.y) }
+    close()
+}
+
+private fun alignSearchContour(start: List<Offset>, end: List<Offset>): List<Offset> {
+    val count = start.size
+    var bestOffset = 0
+    var bestReversed = false
+    var bestScore = Float.POSITIVE_INFINITY
+
+    for (reversed in listOf(false, true)) {
+        for (offset in 0 until count) {
+            var score = 0f
+            for (index in 0 until count) {
+                val endIndex = if (reversed) {
+                    (offset - index + count) % count
+                } else {
+                    (offset + index) % count
+                }
+                val dx = start[index].x - end[endIndex].x
+                val dy = start[index].y - end[endIndex].y
+                score += dx * dx + dy * dy
+            }
+            if (score < bestScore) {
+                bestScore = score
+                bestOffset = offset
+                bestReversed = reversed
+            }
+        }
+    }
+
+    return List(count) { index ->
+        val endIndex = if (bestReversed) {
+            (bestOffset - index + count) % count
+        } else {
+            (bestOffset + index) % count
+        }
+        end[endIndex]
     }
 }
 
 private fun DrawScope.drawSearchMorph(
     progress: Float,
     tint: Color,
-    path: Path,
+    inactiveLens: Path,
+    dotMorph: SearchContourMorph,
+    handleMorph: SearchContourMorph,
+    dotPath: Path,
+    handlePath: Path,
 ) {
     val p = progress.coerceIn(0f, 1f)
+    updateMorphedContour(dotPath, dotMorph, p)
+    updateMorphedContour(handlePath, handleMorph, p)
 
-    val elasticScale = 1f - 0.04f * sin(p * PI.toFloat())
+    val iconSize = min(size.width, size.height)
+    val iconScale = iconSize / SEARCH_VIEWBOX_SIZE
+    val left = (size.width - iconSize) / 2f
+    val top = (size.height - iconSize) / 2f
 
-    val baseSize = min(this.size.width, this.size.height)
-    val s = (baseSize / 960f) * elasticScale
-    val cx = this.size.width / 2f
-    val cy = this.size.height / 2f
-
-    fun toCanvasX(x: Float): Float = cx + (x - 480f) * s
-    fun toCanvasY(y: Float): Float = cy + (y + 480f) * s
-
-    path.reset()
-    path.fillType = PathFillType.EvenOdd
-
-    path.moveTo(toCanvasX(380f), toCanvasY(-320f))
-    path.quadraticTo(
-        toCanvasX(271f), toCanvasY(-320f),
-        toCanvasX(195.5f), toCanvasY(-395.5f)
-    )
-    path.quadraticTo(
-        toCanvasX(120f), toCanvasY(-471f),
-        toCanvasX(120f), toCanvasY(-580f)
-    )
-    path.quadraticTo(
-        toCanvasX(120f), toCanvasY(-689f),
-        toCanvasX(195.5f), toCanvasY(-764.5f)
-    )
-    path.quadraticTo(
-        toCanvasX(271f), toCanvasY(-840f),
-        toCanvasX(380f), toCanvasY(-840f)
-    )
-    path.quadraticTo(
-        toCanvasX(489f), toCanvasY(-840f),
-        toCanvasX(564.5f), toCanvasY(-764.5f)
-    )
-    path.quadraticTo(
-        toCanvasX(640f), toCanvasY(-689f),
-        toCanvasX(640f), toCanvasY(-580f)
-    )
-    path.quadraticTo(
-        toCanvasX(640f), toCanvasY(-536f),
-        toCanvasX(626f), toCanvasY(-497f)
-    )
-    path.quadraticTo(
-        toCanvasX(612f), toCanvasY(-458f),
-        toCanvasX(588f), toCanvasY(-428f)
-    )
-    path.lineTo(toCanvasX(812f), toCanvasY(-204f))
-    path.quadraticTo(
-        toCanvasX(823f), toCanvasY(-193f),
-        toCanvasX(823f), toCanvasY(-176f)
-    )
-    path.quadraticTo(
-        toCanvasX(823f), toCanvasY(-159f),
-        toCanvasX(812f), toCanvasY(-148f)
-    )
-    path.quadraticTo(
-        toCanvasX(801f), toCanvasY(-137f),
-        toCanvasX(784f), toCanvasY(-137f)
-    )
-    path.quadraticTo(
-        toCanvasX(767f), toCanvasY(-137f),
-        toCanvasX(756f), toCanvasY(-148f)
-    )
-    path.lineTo(toCanvasX(532f), toCanvasY(-372f))
-    path.quadraticTo(
-        toCanvasX(502f), toCanvasY(-348f),
-        toCanvasX(463f), toCanvasY(-334f)
-    )
-    path.quadraticTo(
-        toCanvasX(424f), toCanvasY(-320f),
-        toCanvasX(380f), toCanvasY(-320f)
-    )
-    path.close()
-
-    val holeScale = (1f - p).coerceIn(0f, 1f)
-    if (holeScale > 0.001f) {
-        fun holeX(x: Float): Float = toCanvasX(380f + (x - 380f) * holeScale)
-        fun holeY(y: Float): Float = toCanvasY(-580f + (y + 580f) * holeScale)
-
-        path.moveTo(holeX(380f), holeY(-400f))
-        path.quadraticTo(
-            holeX(455f), holeY(-400f),
-            holeX(507.5f), holeY(-452.5f)
+    withTransform({
+        translate(left = left, top = top)
+        scale(scaleX = iconScale, scaleY = iconScale, pivot = Offset.Zero)
+    }) {
+        drawPath(
+            path = inactiveLens,
+            color = tint.copy(alpha = tint.alpha * 0.4f * (1f - p)),
         )
-        path.quadraticTo(
-            holeX(560f), holeY(-505f),
-            holeX(560f), holeY(-580f)
-        )
-        path.quadraticTo(
-            holeX(560f), holeY(-655f),
-            holeX(507.5f), holeY(-707.5f)
-        )
-        path.quadraticTo(
-            holeX(455f), holeY(-760f),
-            holeX(380f), holeY(-760f)
-        )
-        path.quadraticTo(
-            holeX(305f), holeY(-760f),
-            holeX(252.5f), holeY(-707.5f)
-        )
-        path.quadraticTo(
-            holeX(200f), holeY(-655f),
-            holeX(200f), holeY(-580f)
-        )
-        path.quadraticTo(
-            holeX(200f), holeY(-505f),
-            holeX(252.5f), holeY(-452.5f)
-        )
-        path.quadraticTo(
-            holeX(305f), holeY(-400f),
-            holeX(380f), holeY(-400f)
-        )
-        path.close()
+        drawPath(path = handlePath, color = tint.copy(alpha = tint.alpha * p))
+        drawPath(path = dotPath, color = tint)
     }
-
-    drawPath(path = path, color = tint)
 }
+
+private fun updateMorphedContour(
+    path: Path,
+    morph: SearchContourMorph,
+    progress: Float,
+) {
+    path.reset()
+    path.fillType = PathFillType.NonZero
+    path.moveTo(
+        lerp(morph.start[0].x, morph.end[0].x, progress),
+        lerp(morph.start[0].y, morph.end[0].y, progress),
+    )
+    for (pointIndex in 1 until SEARCH_MORPH_SAMPLES) {
+        path.lineTo(
+            lerp(morph.start[pointIndex].x, morph.end[pointIndex].x, progress),
+            lerp(morph.start[pointIndex].y, morph.end[pointIndex].y, progress),
+        )
+    }
+    path.close()
+}
+
+private fun lerp(start: Float, stop: Float, fraction: Float): Float =
+    start + (stop - start) * fraction

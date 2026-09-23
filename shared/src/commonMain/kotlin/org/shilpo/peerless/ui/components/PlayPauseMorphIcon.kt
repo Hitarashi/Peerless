@@ -8,19 +8,31 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.graphics.vector.toPath
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlin.math.PI
 import kotlin.math.min
-import kotlin.math.sin
-import kotlin.math.sqrt
+
+private const val PLAY_PAUSE_VIEWBOX_SIZE = 128f
+private const val PLAY_PAUSE_MORPH_SAMPLES = 512
+
+private const val PLAY_PAUSE_PAUSE_PATH =
+    "M26 29v70h1v3h1v1h1v2h2v1h1v1h2v1h2v1h7v-1h3v-1h2v-1h1v-1h1v-1h1v-2h1v-2h1V28h-1v-2h-1v-2h-1v-1h-1v-1h-2v-1h-1v-1h-3v-1h-7v1h-3v1h-1v1h-1v1h-1v1h-1v1h-1v1h-1v1h-1v3Z M75 28v72h1v2h1v2h1v1h1v1h2v1h1v1h3v1h7v-1h3v-1h1v-1h1v-1h1v-1h1v-1h1v-1h1v-1h1v-3h1V29h-1v-3h-1v-1h-1v-2h-2v-1h-1v-1h-2v-1h-2v-1h-7v1h-3v1h-2v1h-1v1h-1v1h-1v2h-1v2Z"
+
+private const val PLAY_PAUSE_PLAY_PATH =
+    "M27 49v29h1v13h1v4h1v2h1v2h1v2h1v1h1v1h2v1h1v1h3v1h10v-1h3v-1h3v-1h2v-1h2v-1h2v-1h2v-1h2v-1h2v-1h2v-1h1v-1h2v-1h2v-1h1v-1h2v-1h1v-1h2v-1h1v-1h1v-1h1v-1h2v-1h1v-1h1v-1h1v-1h1v-1h1v-1h1v-1h1v-1h1v-1h1v-2h1v-2h1v-3h1v-8h-1v-3h-1v-2h-1v-2h-1v-1h-1v-1h-1v-1h-1v-1h-1v-1h-1v-1h-1v-1h-1v-1h-1v-1h-2v-1h-1v-1h-1v-1h-1v-1h-2v-1h-1v-1h-2v-1h-1v-1h-1v-1h-2v-1h-2v-1h-1v-1h-2v-1h-2v-1h-2v-1h-1v-1h-3v-1h-2v-1h-2v-1h-2v-1h-2v-1h-3v-1H40v1h-2v1h-2v1h-1v1h-2v2h-1v1h-1v2h-1v2h-1v4h-1v12Z"
 
 @Composable
 fun PlayPauseMorphIcon(
@@ -35,9 +47,9 @@ fun PlayPauseMorphIcon(
         animationSpec = spring(
             dampingRatio = 0.78f,
             stiffness = Spring.StiffnessMediumLow,
-            visibilityThreshold = 0.001f
+            visibilityThreshold = 0.001f,
         ),
-        label = "PlayPauseMorphProgress"
+        label = "PlayPauseMorphProgress",
     )
 
     val descModifier = if (contentDescription != null) {
@@ -46,133 +58,146 @@ fun PlayPauseMorphIcon(
         modifier
     }
 
+    val morphContours = remember {
+        val playContour = playPauseSampleContour(PLAY_PAUSE_PLAY_PATH)
+        val pauseContours = playPauseSplitContours(PLAY_PAUSE_PAUSE_PATH)
+            .map(::playPauseSampleContour)
+        check(pauseContours.size == 2) {
+            "Pause SVG must contain its two bar contours."
+        }
+        pauseContours.map { pauseContour ->
+            PlayPauseContourMorph(
+                play = playContour,
+                pause = playPauseAlignContour(playContour, pauseContour),
+            )
+        }
+    }
+    val paths = remember { morphContours.map { Path() } }
+
     Canvas(modifier = descModifier.size(size)) {
         drawPlayPauseMorph(
             progress = progress,
-            tint = tint
+            tint = tint,
+            morphContours = morphContours,
+            paths = paths,
         )
+    }
+}
+
+private data class PlayPauseContourMorph(
+    val play: List<Offset>,
+    val pause: List<Offset>,
+)
+
+private fun playPauseSampleContour(pathData: String): List<Offset> {
+    val sourcePath = PathParser().parsePathString(pathData).toNodes().toPath()
+    val measure = PathMeasure().apply { setPath(sourcePath, forceClosed = true) }
+    val contourLength = measure.length
+
+    return List(PLAY_PAUSE_MORPH_SAMPLES) { index ->
+        measure.getPosition(contourLength * index / PLAY_PAUSE_MORPH_SAMPLES)
+    }
+}
+
+private fun playPauseSplitContours(pathData: String): List<String> {
+    val contours = mutableListOf<String>()
+    var contourStart = 0
+    var previousNonWhitespace: Char? = null
+
+    pathData.forEachIndexed { index, command ->
+        if (command == 'M' && index > contourStart && previousNonWhitespace == 'Z') {
+            contours += pathData.substring(contourStart, index)
+            contourStart = index
+        }
+        if (!command.isWhitespace()) previousNonWhitespace = command
+    }
+    contours += pathData.substring(contourStart)
+    return contours
+}
+
+private fun playPauseAlignContour(
+    play: List<Offset>,
+    pause: List<Offset>,
+): List<Offset> {
+    val count = play.size
+    var bestOffset = 0
+    var bestReversed = false
+    var bestScore = Float.POSITIVE_INFINITY
+
+    for (reversed in listOf(false, true)) {
+        for (offset in 0 until count) {
+            var score = 0f
+            for (index in 0 until count) {
+                val pauseIndex = if (reversed) {
+                    (offset - index + count) % count
+                } else {
+                    (offset + index) % count
+                }
+                val dx = play[index].x - pause[pauseIndex].x
+                val dy = play[index].y - pause[pauseIndex].y
+                score += dx * dx + dy * dy
+            }
+            if (score < bestScore) {
+                bestScore = score
+                bestOffset = offset
+                bestReversed = reversed
+            }
+        }
+    }
+
+    return List(count) { index ->
+        val pauseIndex = if (bestReversed) {
+            (bestOffset - index + count) % count
+        } else {
+            (bestOffset + index) % count
+        }
+        pause[pauseIndex]
     }
 }
 
 private fun DrawScope.drawPlayPauseMorph(
     progress: Float,
     tint: Color,
+    morphContours: List<PlayPauseContourMorph>,
+    paths: List<Path>,
 ) {
     val p = progress.coerceIn(0f, 1f)
+    morphContours.forEachIndexed { contourIndex, morph ->
+        playPauseUpdatePath(paths[contourIndex], morph, p)
+    }
 
-    val scale = 1f - 0.07f * sin(p * PI.toFloat())
+    val iconSize = min(size.width, size.height)
+    val scale = iconSize / PLAY_PAUSE_VIEWBOX_SIZE
+    val left = (size.width - iconSize) / 2f
+    val top = (size.height - iconSize) / 2f
 
-    val baseSize = min(size.width, size.height)
-    val s = (baseSize / 24f) * scale
-    val cx = size.width / 2f
-    val cy = size.height / 2f
+    withTransform({
+        translate(left = left, top = top)
+        scale(scaleX = scale, scaleY = scale, pivot = Offset.Zero)
+    }) {
+        paths.forEach { path -> drawPath(path = path, color = tint) }
+    }
+}
 
-    fun toCanvas(x: Float, y: Float): Offset {
-        return Offset(
-            cx + (x - 12f) * s,
-            cy + (y - 12f) * s
+private fun playPauseUpdatePath(
+    path: Path,
+    morph: PlayPauseContourMorph,
+    progress: Float,
+) {
+    path.reset()
+    path.fillType = PathFillType.NonZero
+    path.moveTo(
+        playPauseLerp(morph.play[0].x, morph.pause[0].x, progress),
+        playPauseLerp(morph.play[0].y, morph.pause[0].y, progress),
+    )
+    for (index in 1 until PLAY_PAUSE_MORPH_SAMPLES) {
+        path.lineTo(
+            playPauseLerp(morph.play[index].x, morph.pause[index].x, progress),
+            playPauseLerp(morph.play[index].y, morph.pause[index].y, progress),
         )
     }
-
-    val cornerRadius = lerp(3.4f * s, 2.0f * s, p)
-    val tipRadius = lerp(3.6f * s, 2.0f * s, p)
-
-    if (p <= 0.015f) {
-        val playVertices = listOf(
-            Vertex(toCanvas(8.0f, 5.0f), cornerRadius),
-            Vertex(toCanvas(19.0f, 12.0f), tipRadius),
-            Vertex(toCanvas(8.0f, 19.0f), cornerRadius)
-        )
-        val playPath = Path().apply { addRoundedPolygon(playVertices) }
-        drawPath(playPath, color = tint)
-        return
-    }
-
-    val seamRadius = lerp(0f, 2.0f * s, p)
-    val bar1SeamX = lerp(13.4f, 10.0f, p)
-    val bar1SeamTopY = lerp(8.436f, 5.0f, p)
-    val bar1SeamBotY = lerp(15.564f, 19.0f, p)
-
-    val bar1Vertices = listOf(
-        Vertex(toCanvas(lerp(8.0f, 6.0f, p), lerp(5.0f, 5.0f, p)), cornerRadius),
-        Vertex(toCanvas(bar1SeamX, bar1SeamTopY), seamRadius),
-        Vertex(toCanvas(bar1SeamX, bar1SeamBotY), seamRadius),
-        Vertex(toCanvas(lerp(8.0f, 6.0f, p), lerp(19.0f, 19.0f, p)), cornerRadius)
-    )
-
-    val bar2Vertices = listOf(
-        Vertex(toCanvas(lerp(13.0f, 14.0f, p), lerp(8.182f, 5.0f, p)), seamRadius),
-        Vertex(toCanvas(lerp(19.0f, 18.0f, p), lerp(12.0f, 5.0f, p)), tipRadius),
-        Vertex(toCanvas(lerp(19.0f, 18.0f, p), lerp(12.0f, 19.0f, p)), tipRadius),
-        Vertex(toCanvas(lerp(13.0f, 14.0f, p), lerp(15.818f, 19.0f, p)), seamRadius)
-    )
-
-    val path1 = Path().apply { addRoundedPolygon(bar1Vertices) }
-    val path2 = Path().apply { addRoundedPolygon(bar2Vertices) }
-
-    drawPath(path1, color = tint)
-    drawPath(path2, color = tint)
+    path.close()
 }
 
-private data class Vertex(val pos: Offset, val radius: Float)
-
-private fun Path.addRoundedPolygon(vertices: List<Vertex>) {
-    val filtered = mutableListOf<Vertex>()
-    for (i in vertices.indices) {
-        val curr = vertices[i]
-        val next = vertices[(i + 1) % vertices.size]
-        val dist = distance(curr.pos, next.pos)
-        if (dist > 0.08f) {
-            filtered.add(curr)
-        }
-    }
-    if (filtered.size < 3) return
-
-    val n = filtered.size
-    for (i in 0 until n) {
-        val prev = filtered[(i - 1 + n) % n]
-        val curr = filtered[i]
-        val next = filtered[(i + 1) % n]
-
-        val dPrev = distance(prev.pos, curr.pos)
-        val dNext = distance(next.pos, curr.pos)
-        if (dPrev < 0.08f || dNext < 0.08f) continue
-
-        val uPrevX = (prev.pos.x - curr.pos.x) / dPrev
-        val uPrevY = (prev.pos.y - curr.pos.y) / dPrev
-        val uNextX = (next.pos.x - curr.pos.x) / dNext
-        val uNextY = (next.pos.y - curr.pos.y) / dNext
-
-        val maxRPrev = if (prev.radius <= 0.01f) dPrev * 0.85f else dPrev * 0.48f
-        val maxRNext = if (next.radius <= 0.01f) dNext * 0.85f else dNext * 0.48f
-        val maxR = minOf(maxRPrev, maxRNext, curr.radius)
-
-        val startX = curr.pos.x + uPrevX * maxR
-        val startY = curr.pos.y + uPrevY * maxR
-        val endX = curr.pos.x + uNextX * maxR
-        val endY = curr.pos.y + uNextY * maxR
-
-        if (i == 0) {
-            moveTo(startX, startY)
-        } else {
-            lineTo(startX, startY)
-        }
-
-        if (maxR > 0.08f) {
-            quadraticTo(curr.pos.x, curr.pos.y, endX, endY)
-        } else {
-            lineTo(curr.pos.x, curr.pos.y)
-        }
-    }
-    close()
-}
-
-private fun distance(a: Offset, b: Offset): Float {
-    val dx = a.x - b.x
-    val dy = a.y - b.y
-    return sqrt(dx * dx + dy * dy)
-}
-
-private fun lerp(start: Float, stop: Float, fraction: Float): Float {
-    return start + (stop - start) * fraction
-}
+private fun playPauseLerp(start: Float, stop: Float, fraction: Float): Float =
+    start + (stop - start) * fraction

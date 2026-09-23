@@ -28,7 +28,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -528,22 +527,15 @@ fun MiniPlayerBar(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(
+                    SkipTrackMorphButton(
+                        isNext = false,
                         onClick = onPlayPrevious,
-                        shapes = IconButtonDefaults.shapes(),
                         modifier = Modifier.size(48.dp),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = Color.Black.copy(alpha = 0.22f),
-                            contentColor = Color.White
-                        )
-                    ) {
-                        PeerlessIcon(
-                            icon = PeerlessIcons.SkipPrevious,
-                            contentDescription = "Previous Track",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                        iconSize = 20.dp,
+                        tint = Color.White,
+                        contentDescription = "Previous Track",
+                        containerColor = Color.Black.copy(alpha = 0.22f),
+                    )
 
                     FilledIconButton(
                         onClick = onTogglePlayPause,
@@ -561,22 +553,15 @@ fun MiniPlayerBar(
                         )
                     }
 
-                    IconButton(
+                    SkipTrackMorphButton(
+                        isNext = true,
                         onClick = onPlayNext,
-                        shapes = IconButtonDefaults.shapes(),
                         modifier = Modifier.size(48.dp),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = Color.Black.copy(alpha = 0.22f),
-                            contentColor = Color.White
-                        )
-                    ) {
-                        PeerlessIcon(
-                            icon = PeerlessIcons.SkipNext,
-                            contentDescription = "Next Track",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                        iconSize = 20.dp,
+                        tint = Color.White,
+                        contentDescription = "Next Track",
+                        containerColor = Color.Black.copy(alpha = 0.22f),
+                    )
                 }
             }
 

@@ -195,7 +195,6 @@ fun FloatingNavigationToolbar(
                                                     selected = selected,
                                                     size = 24.dp,
                                                     contentDescription = dest.title,
-                                                    animateRotation = false,
                                                 )
                                             }
                                         }

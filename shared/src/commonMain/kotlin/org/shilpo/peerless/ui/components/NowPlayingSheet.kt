@@ -610,17 +610,14 @@ fun NowPlayingSheet(
                         )
                     }
 
-                    IconButton(
+                    SkipTrackMorphButton(
+                        isNext = false,
                         onClick = onPlayPrevious,
-                        modifier = Modifier.size(52.dp)
-                    ) {
-                        PeerlessIcon(
-                            icon = PeerlessIcons.SkipPrevious,
-                            contentDescription = "Previous Track",
-                            tint = colorScheme.onSurface,
-                            modifier = Modifier.size(30.dp)
-                        )
-                    }
+                        modifier = Modifier.size(52.dp),
+                        iconSize = 30.dp,
+                        tint = colorScheme.onSurface,
+                        contentDescription = "Previous Track",
+                    )
 
                     Box(
                         modifier = Modifier
@@ -642,17 +639,14 @@ fun NowPlayingSheet(
                         )
                     }
 
-                    IconButton(
+                    SkipTrackMorphButton(
+                        isNext = true,
                         onClick = onPlayNext,
-                        modifier = Modifier.size(52.dp)
-                    ) {
-                        PeerlessIcon(
-                            icon = PeerlessIcons.SkipNext,
-                            contentDescription = "Next Track",
-                            tint = colorScheme.onSurface,
-                            modifier = Modifier.size(30.dp)
-                        )
-                    }
+                        modifier = Modifier.size(52.dp),
+                        iconSize = 30.dp,
+                        tint = colorScheme.onSurface,
+                        contentDescription = "Next Track",
+                    )
 
                     IconButton(
                         onClick = onToggleRepeat,
@@ -1358,14 +1352,14 @@ private fun LyricsPlayerLayout(
                     modifier = Modifier.size(22.dp)
                 )
             }
-            IconButton(onClick = onPlayPrevious, modifier = Modifier.size(52.dp)) {
-                PeerlessIcon(
-                    icon = PeerlessIcons.SkipPrevious,
-                    contentDescription = "Previous track",
-                    tint = Color.White,
-                    modifier = Modifier.size(30.dp)
-                )
-            }
+            SkipTrackMorphButton(
+                isNext = false,
+                onClick = onPlayPrevious,
+                modifier = Modifier.size(52.dp),
+                iconSize = 30.dp,
+                tint = Color.White,
+                contentDescription = "Previous track",
+            )
             Box(
                 modifier = Modifier
                     .scale(playButtonScale)
@@ -1385,14 +1379,14 @@ private fun LyricsPlayerLayout(
                     size = 34.dp
                 )
             }
-            IconButton(onClick = onPlayNext, modifier = Modifier.size(52.dp)) {
-                PeerlessIcon(
-                    icon = PeerlessIcons.SkipNext,
-                    contentDescription = "Next track",
-                    tint = Color.White,
-                    modifier = Modifier.size(30.dp)
-                )
-            }
+            SkipTrackMorphButton(
+                isNext = true,
+                onClick = onPlayNext,
+                modifier = Modifier.size(52.dp),
+                iconSize = 30.dp,
+                tint = Color.White,
+                contentDescription = "Next track",
+            )
             IconButton(onClick = onToggleRepeat, modifier = Modifier.size(48.dp)) {
                 val repeatIcon =
                     if (repeatMode == RepeatMode.ONE) PeerlessIcons.RepeatOne else PeerlessIcons.Repeat
