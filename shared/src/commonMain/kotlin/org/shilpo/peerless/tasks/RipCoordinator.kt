@@ -191,29 +191,59 @@ open class RipCoordinator(
     }
 
     private fun RipTaskSnapshotDto.toActiveRipTask(existing: ActiveRipTask? = null): ActiveRipTask {
+        var cleanTitle = title ?: existing?.track?.title.orEmpty()
+        var cleanArtist = artist ?: existing?.track?.artist.orEmpty()
+
+        if (is_album || cleanTitle.startsWith("Album: ", ignoreCase = true)) {
+            val stripped = cleanTitle.removePrefix("Album: ").removePrefix("album: ").trim()
+            if (stripped.contains(" by ")) {
+                val parts = stripped.split(" by ", limit = 2)
+                cleanTitle = parts[0].trim()
+                if (cleanArtist.isBlank() || cleanArtist.endsWith("tracks")) {
+                    cleanArtist = parts[1].trim()
+                }
+            } else {
+                cleanTitle = stripped
+            }
+        }
+
         val taskTrack = TrackSummaryDto(
             id = result_track_id ?: existing?.track?.id ?: 0,
             provider = provider,
             track_id = source_track_id,
-            title = title ?: existing?.track?.title.orEmpty(),
-            artist = artist ?: existing?.track?.artist.orEmpty(),
+            title = cleanTitle,
+            artist = cleanArtist,
             album = album ?: existing?.track?.album.orEmpty(),
             duration = duration ?: existing?.track?.duration ?: 0,
             codec = codec ?: existing?.track?.codec ?: "alac",
             is_cached = is_cached ?: (completed && stage == "completed"),
             artwork_url = existing?.track?.artwork_url
         )
+        val isArchive = stage.equals("packaging_zip", ignoreCase = true) ||
+                stage.equals("uploading_zip", ignoreCase = true) ||
+                stage.contains("zip", ignoreCase = true)
+
         return ActiveRipTask(
             taskId = task_id,
             track = taskTrack,
             stage = RipStage.fromStage(stage),
             percent = percent ?: existing?.percent ?: 0f,
-            speed = speed,
+            speed = speed ?: existing?.speed,
             completed = completed,
             error = error,
             resultingTrackId = result_track_id?.toString() ?: existing?.resultingTrackId,
             isOwner = is_owner,
-            isAutoPlayPending = existing?.isAutoPlayPending ?: false
+            isAutoPlayPending = existing?.isAutoPlayPending ?: false,
+            isAlbum = is_album || (existing?.isAlbum ?: false),
+            currentTrackTitle = current_track_title
+                ?: (if (isArchive) "Album ZIP archive" else existing?.currentTrackTitle),
+            currentTrackArtist = if (isArchive) null else (current_track_artist
+                ?: existing?.currentTrackArtist),
+            currentTrackIndex = if (isArchive) null else (current_track_index
+                ?: existing?.currentTrackIndex),
+            totalTracks = total_tracks ?: existing?.totalTracks,
+            completedTracks = if (isArchive) (total_tracks
+                ?: existing?.totalTracks) else (completed_tracks ?: existing?.completedTracks)
         )
     }
 

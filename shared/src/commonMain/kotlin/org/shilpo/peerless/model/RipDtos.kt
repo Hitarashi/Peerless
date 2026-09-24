@@ -36,7 +36,13 @@ data class RipTaskSnapshotDto(
     val is_cached: Boolean? = null,
     val completed: Boolean = false,
     val error: String? = null,
-    val is_owner: Boolean = false
+    val is_owner: Boolean = false,
+    val is_album: Boolean = false,
+    val current_track_title: String? = null,
+    val current_track_artist: String? = null,
+    val current_track_index: Int? = null,
+    val total_tracks: Int? = null,
+    val completed_tracks: Int? = null
 ) {
     val isTerminal: Boolean
         get() = completed || error != null || stage.equals("completed", ignoreCase = true) ||
@@ -54,6 +60,8 @@ enum class RipStage(val displayName: String, val emoji: String = "") {
     DECRYPTING("Decrypting", ""),
     TAGGING("Tagging", ""),
     UPLOADING("Uploading to Telegram", ""),
+    PACKAGING_ZIP("Packaging ZIP", ""),
+    UPLOADING_ZIP("Uploading ZIP", ""),
     COMPLETED("Ready to Stream", ""),
     CANCELLED("Cancelled", ""),
     ERROR("Rip Failed", "");
@@ -65,6 +73,8 @@ enum class RipStage(val displayName: String, val emoji: String = "") {
             "decrypting" -> DECRYPTING
             "tagging" -> TAGGING
             "uploading", "uploading_telegram", "uploading to telegram" -> UPLOADING
+            "packaging_zip", "building_zip", "archiving" -> PACKAGING_ZIP
+            "uploading_zip" -> UPLOADING_ZIP
             "completed" -> COMPLETED
             "cancelled" -> CANCELLED
             "error", "failed" -> ERROR
@@ -84,7 +94,13 @@ data class ActiveRipTask(
     val error: String? = null,
     val resultingTrackId: String? = null,
     val isOwner: Boolean = true,
-    val isAutoPlayPending: Boolean = false
+    val isAutoPlayPending: Boolean = false,
+    val isAlbum: Boolean = false,
+    val currentTrackTitle: String? = null,
+    val currentTrackArtist: String? = null,
+    val currentTrackIndex: Int? = null,
+    val totalTracks: Int? = null,
+    val completedTracks: Int? = null
 ) {
     val isFinished: Boolean
         get() = completed || stage == RipStage.COMPLETED || stage == RipStage.ERROR || stage == RipStage.CANCELLED

@@ -157,7 +157,7 @@ fun RipTaskRow(
                 contentAlignment = Alignment.Center
             ) {
                 PeerlessIcon(
-                    icon = PeerlessIcons.MusicNote,
+                    icon = if (task.isAlbum) PeerlessIcons.Library else PeerlessIcons.MusicNote,
                     contentDescription = null,
                     tint = colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                     modifier = Modifier.size(24.dp)
@@ -228,18 +228,36 @@ fun RipTaskRow(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                val subtitleText = buildString {
-                    append(task.track.artist)
-                    if (task.track.album.isNotBlank()) {
-                        append(" • ")
-                        append(task.track.album)
+                val subtitleText = if (task.isAlbum) {
+                    buildString {
+                        if (task.track.artist.isNotBlank()) {
+                            append(task.track.artist)
+                            append(" • ")
+                        }
+                        if (task.totalTracks != null) {
+                            if (task.completedTracks != null && task.completedTracks > 0) {
+                                append("${task.completedTracks}/${task.totalTracks} tracks completed")
+                            } else {
+                                append("${task.totalTracks} tracks")
+                            }
+                        } else {
+                            append("Album")
+                        }
                     }
-                    if (!task.speed.isNullOrBlank()) {
-                        append(" • ")
-                        append(task.speed)
-                    } else if (task.stage != RipStage.QUEUED && task.stage != RipStage.COMPLETED) {
-                        append(" • ")
-                        append(task.stage.displayName)
+                } else {
+                    buildString {
+                        append(task.track.artist)
+                        if (task.track.album.isNotBlank()) {
+                            append(" • ")
+                            append(task.track.album)
+                        }
+                        if (!task.speed.isNullOrBlank()) {
+                            append(" • ")
+                            append(task.speed)
+                        } else if (task.stage != RipStage.QUEUED && task.stage != RipStage.COMPLETED) {
+                            append(" • ")
+                            append(task.stage.displayName)
+                        }
                     }
                 }
                 Text(
@@ -249,6 +267,67 @@ fun RipTaskRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+
+                val isZip =
+                    task.stage == RipStage.UPLOADING_ZIP || task.stage == RipStage.PACKAGING_ZIP
+                if (task.isAlbum && (!task.currentTrackTitle.isNullOrBlank() || isZip)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 1.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        PeerlessIcon(
+                            icon = if (isZip) PeerlessIcons.CloudDone else PeerlessIcons.MusicNote,
+                            contentDescription = null,
+                            tint = colorScheme.primary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        val trackLabel = buildString {
+                            if (task.currentTrackIndex != null && task.totalTracks != null) {
+                                append("${task.currentTrackIndex}/${task.totalTracks}: ")
+                            } else if (task.currentTrackIndex != null) {
+                                append("${task.currentTrackIndex}: ")
+                            }
+                            append(task.currentTrackTitle ?: if (isZip) "Album ZIP archive" else "")
+                            if (!task.currentTrackArtist.isNullOrBlank() && task.currentTrackArtist != task.track.artist) {
+                                append(" • ")
+                                append(task.currentTrackArtist)
+                            }
+                        }
+                        Text(
+                            text = trackLabel,
+                            style = ExpressiveTypography.bodySmall.copy(
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            ),
+                            color = colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Text(
+                            text = "•",
+                            style = ExpressiveTypography.bodySmall.copy(fontSize = 11.sp),
+                            color = colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                        )
+                        val stageColor = when (task.stage) {
+                            RipStage.DOWNLOADING, RipStage.UPLOADING, RipStage.UPLOADING_ZIP -> colorScheme.primary
+                            RipStage.PACKAGING_ZIP, RipStage.DECRYPTING -> colorScheme.tertiary
+                            RipStage.TAGGING -> colorScheme.secondary
+                            RipStage.ERROR -> colorScheme.error
+                            RipStage.COMPLETED -> Color(0xFF4CAF50)
+                            else -> colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        }
+                        Text(
+                            text = task.stage.displayName,
+                            style = ExpressiveTypography.labelSmall.copy(
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = stageColor
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(2.dp))
 
@@ -274,6 +353,25 @@ fun RipTaskRow(
                             color = colorScheme.primary,
                             trackColor = colorScheme.surfaceContainerHighest
                         )
+                    }
+
+                    if (!task.speed.isNullOrBlank()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            PeerlessIcon(
+                                icon = PeerlessIcons.Speed,
+                                contentDescription = null,
+                                tint = colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Text(
+                                text = task.speed,
+                                style = SpecBadgeTypography.copy(fontSize = 10.sp),
+                                color = colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
                     Text(
@@ -350,6 +448,20 @@ fun RipStageBadge(
         )
 
         RipStage.UPLOADING -> StageBadgeStyle(
+            bgColor = colorScheme.primaryContainer,
+            fgColor = colorScheme.onPrimaryContainer,
+            borderColor = colorScheme.primary.copy(alpha = 0.25f),
+            icon = PeerlessIcons.CloudDone
+        )
+
+        RipStage.PACKAGING_ZIP -> StageBadgeStyle(
+            bgColor = colorScheme.tertiaryContainer,
+            fgColor = colorScheme.onTertiaryContainer,
+            borderColor = colorScheme.tertiary.copy(alpha = 0.25f),
+            icon = PeerlessIcons.Library
+        )
+
+        RipStage.UPLOADING_ZIP -> StageBadgeStyle(
             bgColor = colorScheme.primaryContainer,
             fgColor = colorScheme.onPrimaryContainer,
             borderColor = colorScheme.primary.copy(alpha = 0.25f),
